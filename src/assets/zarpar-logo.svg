@@ -1,0 +1,28 @@
+<svg width="400" height="200" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="200" fill="white"/>
+  
+  <!-- Blue curved element -->
+  <path d="M20 40 Q80 20 140 40 Q200 60 280 40 L280 80 Q200 100 140 80 Q80 60 20 80 Z" fill="#7FB3D3" opacity="0.8"/>
+  
+  <!-- Turquoise accent -->
+  <rect x="20" y="20" width="90" height="20" fill="#5DADE2" rx="2"/>
+  
+  <!-- Main text ZARPAR -->
+  <text x="230" y="120" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#7FB3D3">ZARPAR</text>
+  
+  <!-- Subtitle IMPORTACIONES -->
+  <text x="230" y="150" font-family="Arial, sans-serif" font-size="24" font-weight="normal" fill="#7FB3D3" letter-spacing="2px">IMPORTACIONES</text>
+  
+  <!-- Airplane icon -->
+  <g transform="translate(560, 30) scale(0.8)">
+    <path d="M10 15 L25 10 L35 12 L45 8 L50 12 L40 16 L35 18 L25 16 L15 20 L10 15 Z" fill="#7FB3D3"/>
+    <path d="M25 10 L30 5 L35 10" fill="none" stroke="#7FB3D3" stroke-width="2"/>
+    <circle cx="45" cy="12" r="2" fill="#5DADE2"/>
+  </g>
+  
+  <!-- Decorative dots -->
+  <circle cx="580" cy="80" r="3" fill="#5DADE2" opacity="0.6"/>
+  <circle cx="590" cy="90" r="2" fill="#7FB3D3" opacity="0.4"/>
+  <circle cx="600" cy="75" r="2" fill="#5DADE2" opacity="0.5"/>
+</svg>

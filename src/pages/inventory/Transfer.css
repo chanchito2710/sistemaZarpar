@@ -1,0 +1,266 @@
+.transfer-container {
+  padding: 24px;
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+.transfer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.transfer-header h2 {
+  margin: 0;
+  color: #1890ff;
+}
+
+.transfer-stats {
+  margin-bottom: 24px;
+}
+
+.stats-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.stat-card {
+  text-align: center;
+  min-width: 120px;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.transfer-table {
+  background: white;
+  border-radius: 8px;
+}
+
+.transfer-table .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+  text-align: center;
+}
+
+.transfer-table .ant-table-tbody > tr > td {
+  text-align: center;
+}
+
+.transfer-btn {
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.paysandu-btn {
+  background: #52c41a;
+  border-color: #52c41a;
+}
+
+.paysandu-btn:hover {
+  background: #73d13d;
+  border-color: #73d13d;
+}
+
+.salto-btn {
+  background: #1890ff;
+  border-color: #1890ff;
+}
+
+.salto-btn:hover {
+  background: #40a9ff;
+  border-color: #40a9ff;
+}
+
+.rivera-btn {
+  background: #fa8c16;
+  border-color: #fa8c16;
+}
+
+.rivera-btn:hover {
+  background: #ffa940;
+  border-color: #ffa940;
+}
+
+.tacuarembo-btn {
+  background: #eb2f96;
+  border-color: #eb2f96;
+}
+
+.tacuarembo-btn:hover {
+  background: #f759ab;
+  border-color: #f759ab;
+}
+
+.pando-btn {
+  background: #722ed1;
+  border-color: #722ed1;
+}
+
+.pando-btn:hover {
+  background: #9254de;
+  border-color: #9254de;
+}
+
+.melo-btn {
+  background: #13c2c2;
+  border-color: #13c2c2;
+}
+
+.melo-btn:hover {
+  background: #36cfc9;
+  border-color: #36cfc9;
+}
+
+.low-stock {
+  color: #ff4d4f;
+  font-weight: bold;
+}
+
+.normal-stock {
+  color: #52c41a;
+  font-weight: 500;
+}
+
+.transfer-btn:disabled {
+  background: #d9d9d9 !important;
+  border-color: #d9d9d9 !important;
+  color: #ffffff !important;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .transfer-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .transfer-stats {
+    overflow-x: auto;
+  }
+  
+  .transfer-stats .ant-space {
+    min-width: max-content;
+  }
+}
+
+.ant-modal-header {
+  background: #fafafa;
+}
+
+.ant-modal-title {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.ant-input-number {
+  border-radius: 6px;
+}
+
+.ant-btn-primary {
+  border-radius: 6px;
+}
+
+.ant-table-scroll {
+  border-radius: 8px;
+}
+
+/* Botón Enviar elegante con animaciones */
+.enviar-button {
+  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  height: 48px !important;
+  padding: 0 24px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.enviar-button:hover {
+  background: linear-gradient(135deg, #73d13d 0%, #95de64 100%) !important;
+  transform: translateY(-2px) scale(1.05) !important;
+  box-shadow: 0 8px 20px rgba(82, 196, 26, 0.4) !important;
+}
+
+.enviar-button:active {
+  transform: translateY(0) scale(1.02) !important;
+  box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3) !important;
+}
+
+.enviar-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.enviar-button:hover::before {
+  left: 100%;
+}
+
+.enviar-button .anticon {
+  margin-right: 8px !important;
+  font-size: 18px !important;
+}
+
+/* Animación de pulso sutil */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(82, 196, 26, 0.5);
+  }
+  100% {
+    box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+  }
+}
+
+.enviar-button {
+  animation: pulse 2s infinite;
+}
+
+.enviar-button:hover {
+  animation: none;
+}
+
+/* Responsive para el botón */
+@media (max-width: 768px) {
+  .stats-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .enviar-button {
+    width: 100% !important;
+    margin-top: 16px;
+  }
+}
