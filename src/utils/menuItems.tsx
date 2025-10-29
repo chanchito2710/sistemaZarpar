@@ -252,6 +252,18 @@ export const menuItems: MenuItem[] = [
     ),
   ], 'group'),
 
+  // Sección de Administración
+  getItem('ADMINISTRACIÓN', 'admin-group', null, [
+    getItem(
+      'Base de Datos',
+      'admin/database',
+      <GradientIcon 
+        icon={<DashboardOutlined />} 
+        gradient={moduleColors.settings.gradient}
+        color={moduleColors.settings.color}
+      />
+    ),
+  ], 'group'),
 
 ];
 
@@ -276,7 +288,7 @@ export const routeMap: Record<string, string> = {
   'finance/payroll': '/finance/payroll',
   'finance/money-transfer': '/finance/money-transfer',
   'staff/sellers': '/staff/sellers',
-
+  'admin/database': '/admin/database',
 };
 
 // Información de los módulos para el dashboard
@@ -426,6 +438,12 @@ export const moduleInfo = {
     gradient: moduleColors.customers.gradient,
     icon: <HomeOutlined />,
   },
-
-
+  database: {
+    title: 'Base de Datos',
+    description: 'Administrar base de datos',
+    path: '/admin/database',
+    color: moduleColors.settings.color,
+    gradient: moduleColors.settings.gradient,
+    icon: <DashboardOutlined />,
+  },
 };

@@ -532,7 +532,7 @@ const PriceEditor: React.FC = () => {
           min={0}
           precision={2}
           formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+          parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
           onChange={(value) => handleBasePriceChange(record.id, value)}
           style={{ width: '100%', backgroundColor: '#f0f8ff', borderColor: '#1890ff' }}
         />
@@ -554,7 +554,7 @@ const PriceEditor: React.FC = () => {
           min={0}
           precision={2}
           formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+          parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
           onChange={(value) => handlePriceChange(record.id, branch.id, value)}
           style={{ width: '100%' }}
         />

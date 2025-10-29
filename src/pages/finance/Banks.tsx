@@ -19,7 +19,7 @@ import {
 import {
   BankOutlined,
   DollarOutlined,
-  TrendingUpOutlined,
+  RiseOutlined,
   SendOutlined,
   FilterOutlined,
   DownloadOutlined,

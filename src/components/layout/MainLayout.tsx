@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Button, Avatar, Dropdown, Badge, theme } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Layout, Menu, Button, Avatar, Dropdown, Badge, theme, Tooltip, Tag, Spin } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -7,9 +7,12 @@ import {
   UserOutlined,
   LogoutOutlined,
   SettingOutlined,
+  CrownOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { menuItems } from '../../utils/menuItems';
+import { useAuth } from '../../contexts/AuthContext';
 import type { MenuProps } from 'antd';
 
 const { Header, Sider, Content } = Layout;
@@ -23,6 +26,26 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
+  const { usuario, isAuthenticated, isLoading, logout } = useAuth();
+
+  // Redirigir a login si no está autenticado
+  if (!isLoading && !isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Mostrar loading mientras verifica autenticación
+  if (isLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        <Spin size="large" tip="Cargando..." />
+      </div>
+    );
+  }
 
   // Obtener la clave del menú actual basada en la ruta
   const getCurrentMenuKey = () => {
@@ -39,7 +62,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   };
 
-  const handleUserMenuClick = ({ key }: { key: string }) => {
+  const handleUserMenuClick = async ({ key }: { key: string }) => {
     switch (key) {
       case 'profile':
         navigate('/profile');
@@ -48,8 +71,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         navigate('/settings');
         break;
       case 'logout':
-        // Aquí implementarías la lógica de logout
-        console.log('Logout');
+        await logout();
+        navigate('/login', { replace: true });
         break;
     }
   };
@@ -243,31 +266,47 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               >
                 <Avatar
                   size={32}
-                  icon={<UserOutlined />}
+                  icon={usuario?.esAdmin ? <CrownOutlined /> : <UserOutlined />}
                   style={{
-                    background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
+                    background: usuario?.esAdmin 
+                      ? 'linear-gradient(135deg, #faad14 0%, #d4b106 100%)'
+                      : 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
                   }}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: token.colorText,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Admin Usuario
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: token.colorTextSecondary,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Administrador
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: token.colorText,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {usuario?.nombre || 'Usuario'}
+                    </span>
+                    {usuario?.esAdmin && (
+                      <Tag 
+                        icon={<CrownOutlined />} 
+                        color="gold" 
+                        style={{ margin: 0, fontSize: 10 }}
+                      >
+                        ADMIN
+                      </Tag>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <ShopOutlined style={{ fontSize: 11, color: token.colorTextSecondary }} />
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: token.colorTextSecondary,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {usuario?.sucursal || 'Sin sucursal'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </Dropdown>

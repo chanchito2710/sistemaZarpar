@@ -428,7 +428,6 @@ const Cash: React.FC = () => {
                       <Alert
                         message="Efectivo crítico"
                         type="error"
-                        size="small"
                         showIcon
                       />
                     )}
@@ -436,7 +435,6 @@ const Cash: React.FC = () => {
                       <Alert
                         message="Efectivo bajo"
                         type="warning"
-                        size="small"
                         showIcon
                       />
                     )}

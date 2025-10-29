@@ -157,7 +157,7 @@ const Payroll: React.FC = () => {
   const empleados = SELLERS.map(seller => {
     const branch = getBranchById(seller.branchId);
     return {
-      name: `${seller.firstName} ${seller.lastName}`,
+      name: seller.name,
       branch: branch?.name || 'Sin asignar',
       role: seller.role
     };
@@ -391,7 +391,7 @@ const Payroll: React.FC = () => {
                         Todos
                       </Space>
                     </Option>
-                    {empleados.map(empleado => (
+                    {empleadosNames.map(empleado => (
                       <Option key={empleado} value={empleado}>
                         <Space>
                           <UserOutlined />
@@ -485,7 +485,7 @@ const Payroll: React.FC = () => {
                   placeholder="Ingresa el monto"
                   prefix="$"
                   formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                  parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as any}
                   min={1}
                 />
               </Form.Item>

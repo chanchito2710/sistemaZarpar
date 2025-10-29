@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Row,
@@ -10,7 +10,8 @@ import {
   Form,
   Modal,
   Input,
-  message
+  message,
+  Spin
 } from 'antd';
 import {
   ShopOutlined,
@@ -20,7 +21,8 @@ import {
   PlusOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { BRANCHES, SELLERS } from '../../data/branches';
+import { useAuth } from '../../contexts/AuthContext';
+import { vendedoresService, clientesService, type Cliente, type Vendedor } from '../../services/api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -29,48 +31,189 @@ const { Option } = Select;
 
 const POS: React.FC = () => {
   const navigate = useNavigate();
+  const { usuario } = useAuth(); // Obtener usuario logueado
   const [form] = Form.useForm();
   const [clientForm] = Form.useForm();
+  
+  // Estados para las selecciones
   const [selectedBranch, setSelectedBranch] = useState<string | undefined>(undefined);
-  const [selectedClient, setSelectedClient] = useState<string | undefined>(undefined);
-  const [selectedSeller, setSelectedSeller] = useState<string | undefined>(undefined);
+  const [selectedClient, setSelectedClient] = useState<number | undefined>(undefined);
+  const [selectedSeller, setSelectedSeller] = useState<number | undefined>(undefined);
+  
+  // Estados para los datos de la API
+  const [sucursales, setSucursales] = useState<string[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  
+  // Estados de carga
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [loadingVendedores, setLoadingVendedores] = useState(false);
+  const [creatingCliente, setCreatingCliente] = useState(false);
+  
+  // Modal
   const [isClientModalVisible, setIsClientModalVisible] = useState(false);
-  const [clientsList, setClientsList] = useState([
-    { value: 'cliente-1', label: 'Juan Pérez' },
-    { value: 'cliente-2', label: 'María García' },
-    { value: 'cliente-3', label: 'Carlos López' },
-    { value: 'cliente-4', label: 'Ana Martínez' },
-    { value: 'cliente-5', label: 'Luis Rodríguez' }
-  ]);
-
-  // Datos dinámicos desde configuración centralizada
-  const branches = BRANCHES.filter(branch => branch.active).map(branch => ({
-    value: branch.id,
-    label: branch.name
-  }));
-
-  const clients = clientsList;
-
-  const sellers = SELLERS.map(seller => ({
-    value: seller.id,
-    label: `${seller.firstName} ${seller.lastName}`
-  }));
 
   const isFormComplete = selectedBranch && selectedClient && selectedSeller;
 
+  /**
+   * Efecto inicial: cargar sucursales y auto-seleccionar según usuario
+   */
+  useEffect(() => {
+    cargarSucursalesIniciales();
+  }, []);
+
+  /**
+   * Efecto: cuando se carga el usuario y las sucursales, auto-seleccionar
+   */
+  useEffect(() => {
+    if (usuario && sucursales.length > 0) {
+      // Si NO es admin, auto-seleccionar su sucursal
+      if (!usuario.esAdmin) {
+        const sucursalUsuario = usuario.sucursal?.toLowerCase();
+        if (sucursalUsuario && sucursales.includes(sucursalUsuario)) {
+          setSelectedBranch(sucursalUsuario);
+        }
+      }
+    }
+  }, [usuario, sucursales]);
+
+  /**
+   * Efecto: cargar vendedores y clientes cuando se selecciona una sucursal
+   */
+  useEffect(() => {
+    if (selectedBranch) {
+      // IMPORTANTE: Limpiar arrays ANTES de cargar nuevos datos
+      // Esto previene que se muestren datos de la sucursal anterior
+      setClientes([]);
+      setVendedores([]);
+      
+      // Resetear selecciones
+      setSelectedClient(undefined);
+      setSelectedSeller(undefined);
+      
+      // Cargar nuevos datos
+      cargarVendedores(selectedBranch);
+      cargarClientes(selectedBranch);
+    } else {
+      setVendedores([]);
+      setClientes([]);
+      setSelectedSeller(undefined);
+      setSelectedClient(undefined);
+    }
+  }, [selectedBranch]);
+
+  /**
+   * Efecto: auto-seleccionar vendedor SOLO para usuarios no-admin en su propia sucursal
+   */
+  useEffect(() => {
+    // Solo auto-seleccionar si:
+    // 1. Hay vendedores cargados
+    // 2. Hay un usuario logueado
+    // 3. El usuario NO es admin
+    // 4. La sucursal seleccionada coincide con la del usuario
+    if (
+      vendedores.length > 0 && 
+      usuario && 
+      !usuario.esAdmin && 
+      selectedBranch
+    ) {
+      // Verificar que la sucursal seleccionada sea la del usuario
+      const sucursalUsuario = usuario.sucursal?.toLowerCase();
+      const sucursalSeleccionada = selectedBranch.toLowerCase();
+      
+      if (sucursalUsuario === sucursalSeleccionada) {
+        // Buscar el vendedor que coincida con el email del usuario
+        const vendedorUsuario = vendedores.find(v => 
+          v.email?.toLowerCase() === usuario.email?.toLowerCase()
+        );
+        
+        if (vendedorUsuario) {
+          setSelectedSeller(vendedorUsuario.id);
+        } else {
+          console.warn('[POS] Vendedor del usuario no encontrado en la lista de vendedores');
+          setSelectedSeller(undefined);
+        }
+      } else {
+        // Si la sucursal seleccionada no coincide con la del usuario, resetear
+        setSelectedSeller(undefined);
+      }
+    }
+  }, [vendedores, usuario, selectedBranch]);
+
+  /**
+   * Cargar sucursales desde la base de datos
+   */
+  const cargarSucursalesIniciales = async () => {
+    setLoadingSucursales(true);
+    try {
+      const sucursalesData = await vendedoresService.obtenerSucursales();
+      setSucursales(sucursalesData);
+    } catch (error) {
+      message.error('Error al cargar sucursales');
+      console.error(error);
+    } finally {
+      setLoadingSucursales(false);
+    }
+  };
+
+  /**
+   * Cargar vendedores de una sucursal
+   */
+  const cargarVendedores = async (sucursal: string) => {
+    setLoadingVendedores(true);
+    try {
+      const vendedoresData = await vendedoresService.obtenerPorSucursal(sucursal);
+      setVendedores(vendedoresData);
+    } catch (error) {
+      message.error('Error al cargar vendedores');
+      console.error(error);
+    } finally {
+      setLoadingVendedores(false);
+    }
+  };
+
+  /**
+   * Cargar clientes de una sucursal
+   */
+  const cargarClientes = async (sucursal: string) => {
+    setLoadingClientes(true);
+    try {
+      const clientesData = await clientesService.obtenerPorSucursal(sucursal);
+      setClientes(clientesData);
+    } catch (error) {
+      message.error('Error al cargar clientes');
+      console.error(error);
+    } finally {
+      setLoadingClientes(false);
+    }
+  };
+
+  /**
+   * Manejar navegación al siguiente paso
+   */
   const handleNext = () => {
     if (isFormComplete) {
-      // Obtener los labels de los valores seleccionados
-      const selectedBranchLabel = branches.find(b => b.value === selectedBranch)?.label || selectedBranch;
-      const selectedClientLabel = clients.find(c => c.value === selectedClient)?.label || selectedClient;
-      const selectedSellerLabel = sellers.find(s => s.value === selectedSeller)?.label || selectedSeller;
+      // Obtener los datos completos de los seleccionados
+      const cliente = clientes.find(c => c.id === selectedClient);
+      const vendedor = vendedores.find(v => v.id === selectedSeller);
+      
+      // Capitalizar primera letra de la sucursal para mostrar
+      const sucursalCapitalizada = selectedBranch 
+        ? selectedBranch.charAt(0).toUpperCase() + selectedBranch.slice(1).toLowerCase()
+        : selectedBranch;
       
       // Navegar a la página de productos con los datos seleccionados
       navigate('/products', {
         state: {
-          branch: selectedBranchLabel,
-          client: selectedClientLabel,
-          seller: selectedSellerLabel
+          branch: sucursalCapitalizada,
+          branchId: selectedBranch,
+          client: `${cliente?.nombre} ${cliente?.apellido}`,
+          clientId: selectedClient,
+          clientData: cliente,
+          seller: vendedor?.nombre,
+          sellerId: selectedSeller,
+          sellerData: vendedor
         }
       });
     }
@@ -80,35 +223,59 @@ const POS: React.FC = () => {
     setIsClientModalVisible(true);
   };
 
+  /**
+   * Cerrar modal de nuevo cliente
+   */
   const handleClientModalCancel = () => {
     setIsClientModalVisible(false);
     clientForm.resetFields();
   };
 
+  /**
+   * Crear nuevo cliente en la base de datos
+   */
   const handleClientModalOk = async () => {
+    if (!selectedBranch) {
+      message.error('Primero selecciona una sucursal');
+      return;
+    }
+
     try {
+      setCreatingCliente(true);
       const values = await clientForm.validateFields();
       
-      // Generar un ID único para el nuevo cliente
-      const newClientId = `cliente-${Date.now()}`;
-      const newClientLabel = `${values.firstName} ${values.lastName}`;
-      
-      // Agregar el nuevo cliente a la lista
-      const newClient = {
-        value: newClientId,
-        label: newClientLabel
+      // Preparar datos del cliente para la API
+      const nuevoClienteData = {
+        nombre: values.firstName,
+        apellido: values.lastName,
+        email: values.email,
+        direccion: values.address,
+        telefono: values.telefono || undefined,
+        razon_social: values.companyName || undefined,
+        rut: values.rut || undefined,
+        nombre_fantasia: values.fantasyName || undefined,
+        vendedor_id: selectedSeller || undefined
       };
       
-      setClientsList(prev => [...prev, newClient]);
-      setSelectedClient(newClientId);
+      // Crear cliente en la API
+      const nuevoCliente = await clientesService.crear(selectedBranch, nuevoClienteData);
       
-      message.success('Cliente agregado exitosamente');
+      // Agregar el nuevo cliente a la lista local
+      setClientes(prev => [...prev, nuevoCliente]);
+      
+      // Seleccionar automáticamente el nuevo cliente
+      setSelectedClient(nuevoCliente.id);
+      
+      message.success('Cliente creado exitosamente');
       setIsClientModalVisible(false);
       clientForm.resetFields();
     } catch (error) {
-       console.error('Error al validar el formulario:', error);
-     }
-   };
+      console.error('Error al crear cliente:', error);
+      message.error('Error al crear el cliente. Por favor intenta nuevamente.');
+    } finally {
+      setCreatingCliente(false);
+    }
+  };
 
   return (
     <div style={{ 
@@ -167,10 +334,12 @@ const POS: React.FC = () => {
                       value={selectedBranch}
                       onChange={setSelectedBranch}
                       size="large"
+                      loading={loadingSucursales}
+                      disabled={!usuario?.esAdmin && !!selectedBranch}
                     >
-                      {branches.map(branch => (
-                        <Option key={branch.value} value={branch.value}>
-                          {branch.label}
+                      {sucursales.map(sucursal => (
+                        <Option key={sucursal} value={sucursal.toLowerCase()}>
+                          {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
                         </Option>
                       ))}
                     </Select>
@@ -200,21 +369,25 @@ const POS: React.FC = () => {
                       Cliente
                     </Title>
                     <Select
-                      placeholder="Seleccionar cliente"
+                      key={`clientes-${selectedBranch}`}
+                      placeholder={!selectedBranch ? "Primero selecciona una sucursal" : "Seleccionar cliente"}
                       style={{ width: '100%' }}
                       value={selectedClient}
                       onChange={setSelectedClient}
                       size="large"
                       showSearch
-                      filterOption={(input, option) =>
-                        (option?.children as unknown as string)
-                          .toLowerCase()
-                          .includes(input.toLowerCase())
-                      }
+                      disabled={!selectedBranch || loadingClientes}
+                      loading={loadingClientes}
+                      filterOption={(input, option) => {
+                        const label = option?.children as unknown as string;
+                        return label.toLowerCase().includes(input.toLowerCase());
+                      }}
+                      notFoundContent={loadingClientes ? <Spin size="small" /> : "No hay clientes disponibles"}
                     >
-                      {clients.map(client => (
-                        <Option key={client.value} value={client.value}>
-                          {client.label}
+                      {clientes.map(cliente => (
+                        <Option key={cliente.id} value={cliente.id}>
+                          {`${cliente.nombre} ${cliente.apellido}`}
+                          {cliente.nombre_fantasia && ` - ${cliente.nombre_fantasia}`}
                         </Option>
                       ))}
                     </Select>
@@ -257,18 +430,27 @@ const POS: React.FC = () => {
                       Vendedor
                     </Title>
                     <Select
-                      placeholder="Seleccionar vendedor"
+                      key={`vendedores-${selectedBranch}`}
+                      placeholder={!selectedBranch ? "Primero selecciona una sucursal" : "Seleccionar vendedor"}
                       style={{ width: '100%' }}
                       value={selectedSeller}
                       onChange={setSelectedSeller}
                       size="large"
+                      disabled={!selectedBranch || loadingVendedores || (!usuario?.esAdmin && !!selectedSeller)}
+                      loading={loadingVendedores}
+                      notFoundContent={loadingVendedores ? <Spin size="small" /> : "No hay vendedores disponibles"}
                     >
-                      {sellers.map(seller => (
-                        <Option key={seller.value} value={seller.value}>
-                          {seller.label}
+                      {vendedores.map(vendedor => (
+                        <Option key={vendedor.id} value={vendedor.id}>
+                          {vendedor.nombre} - {vendedor.cargo}
                         </Option>
                       ))}
                     </Select>
+                    {!usuario?.esAdmin && selectedSeller && (
+                      <Text type="secondary" style={{ fontSize: '12px', marginTop: '8px', display: 'block' }}>
+                        Auto-seleccionado según tu usuario
+                      </Text>
+                    )}
                   </Space>
                 </Card>
               </Col>
@@ -322,6 +504,8 @@ const POS: React.FC = () => {
           width={600}
           okText="Agregar Cliente"
           cancelText="Cancelar"
+          confirmLoading={creatingCliente}
+          okButtonProps={{ disabled: creatingCliente }}
         >
           <Form
             form={clientForm}
@@ -364,17 +548,10 @@ const POS: React.FC = () => {
               </Col>
               <Col span={12}>
                 <Form.Item
-                  label="Sucursal"
-                  name="branch"
-                  rules={[{ required: true, message: 'Por favor selecciona una sucursal' }]}
+                  label="Teléfono (Opcional)"
+                  name="telefono"
                 >
-                  <Select placeholder="Seleccionar sucursal">
-                    {BRANCHES.filter(branch => branch.active).map(branch => (
-                      <Option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </Option>
-                    ))}
-                  </Select>
+                  <Input placeholder="Ingresa el teléfono" />
                 </Form.Item>
               </Col>
             </Row>

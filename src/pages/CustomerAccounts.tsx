@@ -53,7 +53,7 @@ import {
   FileTextOutlined,
   BarChartOutlined,
   PieChartOutlined,
-  TrendingUpOutlined,
+  RiseOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -750,7 +750,7 @@ const CustomerAccounts: React.FC = () => {
       
       // Amount with color coding
       const amountColor = transaction.type === 'payment' ? [39, 174, 96] : [231, 76, 60];
-      doc.setTextColor(...amountColor);
+      doc.setTextColor(amountColor[0], amountColor[1], amountColor[2]);
       const prefix = transaction.type === 'payment' ? '+' : '-';
       doc.text(`${prefix}$${transaction.amount.toLocaleString()}`, 170, yPosition + 5);
       
@@ -1439,7 +1439,7 @@ const CustomerAccounts: React.FC = () => {
                   prefix={<DollarOutlined />}
                   placeholder="0.00"
                   formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                  parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
                   max={Math.abs(selectedCustomer.balance)}
                 />
               </Form.Item>

@@ -439,13 +439,9 @@ const Transfer: React.FC = () => {
         placeholder="0"
         style={{
           width: '60px',
-          textAlign: 'center'
-        }}
-        styles={{
-          input: {
-            color: hasPending ? '#fa8c16' : (hasTransferred ? '#1890ff' : undefined),
-            fontWeight: (hasPending || hasTransferred) ? 'bold' : undefined
-          }
+          textAlign: 'center',
+          color: hasPending ? '#fa8c16' : (hasTransferred ? '#1890ff' : undefined),
+          fontWeight: (hasPending || hasTransferred) ? 'bold' : undefined
         }}
         disabled={maxValue === 0 && transferredAmount === 0}
       />

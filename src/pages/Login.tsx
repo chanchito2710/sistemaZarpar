@@ -1,13 +1,39 @@
-import React from 'react';
-import { Card, Form, Input, Button, Typography, Space, Divider } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Form, Input, Button, Typography, Space, Divider, Spin } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Title, Text } = Typography;
 
 const Login: React.FC = () => {
-  const onFinish = (values: any) => {
-    console.log('Login values:', values);
-    // Aquí iría la lógica de autenticación
+  const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
+  const navigate = useNavigate();
+  const { login, isAuthenticated } = useAuth();
+
+  // Si ya está autenticado, redirigir al dashboard
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  const onFinish = async (values: { email: string; password: string }) => {
+    setLoading(true);
+    
+    try {
+      const success = await login(values.email, values.password);
+      
+      if (success) {
+        // Redirigir al dashboard
+        navigate('/', { replace: true });
+      }
+    } catch (error) {
+      console.error('Error en login:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,19 +76,24 @@ const Login: React.FC = () => {
         </div>
 
         <Form
+          form={form}
           name="login"
           onFinish={onFinish}
           layout="vertical"
           size="large"
         >
           <Form.Item
-            name="username"
-            rules={[{ required: true, message: 'Por favor ingresa tu usuario' }]}
+            name="email"
+            rules={[
+              { required: true, message: 'Por favor ingresa tu email' },
+              { type: 'email', message: 'Email inválido' }
+            ]}
           >
             <Input 
               prefix={<UserOutlined />} 
-              placeholder="Usuario" 
+              placeholder="Email (ej: pando@zarparuy.com)" 
               style={{ borderRadius: 8 }}
+              disabled={loading}
             />
           </Form.Item>
 
@@ -74,6 +105,7 @@ const Login: React.FC = () => {
               prefix={<LockOutlined />} 
               placeholder="Contraseña" 
               style={{ borderRadius: 8 }}
+              disabled={loading}
             />
           </Form.Item>
 
@@ -83,6 +115,7 @@ const Login: React.FC = () => {
               htmlType="submit" 
               block 
               icon={<LoginOutlined />}
+              loading={loading}
               style={{ 
                 height: 48, 
                 borderRadius: 8,
@@ -90,7 +123,7 @@ const Login: React.FC = () => {
                 border: 'none'
               }}
             >
-              Iniciar Sesión
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </Form.Item>
         </Form>
@@ -102,14 +135,32 @@ const Login: React.FC = () => {
         </Divider>
 
         <Space direction="vertical" style={{ width: '100%' }} size="small">
-          <Button block size="small" type="text">
+          <Button 
+            block 
+            size="small" 
+            type="text"
+            onClick={() => form.setFieldsValue({
+              email: 'admin@zarparuy.com',
+              password: 'zarpar123'
+            })}
+            disabled={loading}
+          >
             <Text type="secondary" style={{ fontSize: 12 }}>
-              👤 Admin: admin / admin123
+              👑 Admin: admin@zarparuy.com / zarpar123
             </Text>
           </Button>
-          <Button block size="small" type="text">
+          <Button 
+            block 
+            size="small" 
+            type="text"
+            onClick={() => form.setFieldsValue({
+              email: 'pando@zarparuy.com',
+              password: 'zarpar123'
+            })}
+            disabled={loading}
+          >
             <Text type="secondary" style={{ fontSize: 12 }}>
-              💼 Vendedor: vendedor / venta123
+              💼 Vendedor Pando: pando@zarparuy.com / zarpar123
             </Text>
           </Button>
         </Space>

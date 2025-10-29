@@ -1,33 +1,61 @@
 /**
- * This is a user authentication API route demo.
- * Handle user registration, login, token management, etc.
+ * Rutas de Autenticación
+ * Maneja login, logout, verificación de tokens y gestión de sesiones
  */
-import { Router, type Request, type Response } from 'express'
+import { Router } from 'express';
+import {
+  login,
+  logout,
+  verificarToken,
+  obtenerPerfil,
+  cambiarPassword
+} from '../controllers/authController.js';
+import { verificarAutenticacion } from '../middleware/auth.js';
 
-const router = Router()
+const router = Router();
 
 /**
- * User Login
- * POST /api/auth/register
- */
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
-  // TODO: Implement register logic
-})
-
-/**
- * User Login
+ * LOGIN - Autenticar usuario
  * POST /api/auth/login
+ * Body: { email, password }
+ * 
+ * Retorna: { token, usuario }
  */
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
-  // TODO: Implement login logic
-})
+router.post('/login', login);
 
 /**
- * User Logout
+ * LOGOUT - Cerrar sesión
  * POST /api/auth/logout
+ * Headers: Authorization: Bearer <token>
  */
-router.post('/logout', async (req: Request, res: Response): Promise<void> => {
-  // TODO: Implement logout logic
-})
+router.post('/logout', logout);
 
-export default router
+/**
+ * VERIFICAR TOKEN - Validar si el token es válido
+ * GET /api/auth/verificar
+ * Headers: Authorization: Bearer <token>
+ * 
+ * Retorna: { valido: true, usuario }
+ */
+router.get('/verificar', verificarToken);
+
+/**
+ * OBTENER PERFIL - Obtener datos del usuario actual
+ * GET /api/auth/perfil
+ * Headers: Authorization: Bearer <token>
+ * 
+ * Requiere autenticación
+ */
+router.get('/perfil', verificarAutenticacion, obtenerPerfil);
+
+/**
+ * CAMBIAR CONTRASEÑA - Cambiar la contraseña del usuario actual
+ * POST /api/auth/cambiar-password
+ * Headers: Authorization: Bearer <token>
+ * Body: { passwordActual, passwordNueva }
+ * 
+ * Requiere autenticación
+ */
+router.post('/cambiar-password', verificarAutenticacion, cambiarPassword);
+
+export default router;

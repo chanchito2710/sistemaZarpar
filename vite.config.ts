@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from "vite-tsconfig-paths";
 import { traeBadgePlugin } from 'vite-plugin-trae-solo-badge';
+import path from 'path';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -22,12 +23,16 @@ export default defineConfig({
       autoTheme: true,
       autoThemeTarget: '#root'
     }), 
-    tsconfigPaths(),
+    tsconfigPaths({
+      root: path.resolve(__dirname, '.'),
+      projects: [path.resolve(__dirname, 'tsconfig.json')],
+    }),
   ],
   server: {
+    port: 5678,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3456',
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {

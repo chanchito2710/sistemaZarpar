@@ -260,7 +260,7 @@ const MoneyTransfer: React.FC = () => {
                           min={0}
                           max={branch.balance}
                           formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                          parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                          parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
                           prefix={<DollarOutlined />}
                           status={validationError ? 'error' : undefined}
                         />
@@ -315,7 +315,7 @@ const MoneyTransfer: React.FC = () => {
                     title={
                       <Space>
                         <Text strong>{formatCurrency(transfer.amount)}</Text>
-                        <Tag color="green" size="small">Completado</Tag>
+                        <Tag color="green">Completado</Tag>
                       </Space>
                     }
                     description={

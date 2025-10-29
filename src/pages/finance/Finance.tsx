@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Typography, Row, Col, Statistic, Table, Progress, Space, Button } from 'antd';
-import { DollarOutlined, TrendingUpOutlined, TrendingDownOutlined, FileTextOutlined, DownloadOutlined } from '@ant-design/icons';
+import { DollarOutlined, RiseOutlined, FallOutlined, FileTextOutlined, DownloadOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
@@ -93,7 +93,7 @@ const Finance: React.FC = () => {
               prefix="$" 
               precision={2}
               valueStyle={{ color: '#3f8600' }}
-              suffix={<TrendingUpOutlined style={{ color: '#3f8600' }} />}
+              suffix={<RiseOutlined style={{ color: '#3f8600' }} />}
             />
           </Card>
         </Col>
@@ -105,7 +105,7 @@ const Finance: React.FC = () => {
               prefix="$" 
               precision={2}
               valueStyle={{ color: '#cf1322' }}
-              suffix={<TrendingDownOutlined style={{ color: '#cf1322' }} />}
+              suffix={<FallOutlined style={{ color: '#cf1322' }} />}
             />
           </Card>
         </Col>
