@@ -439,13 +439,25 @@ const Products: React.FC = () => {
       dataIndex: 'nombre',
       key: 'nombre',
       sorter: (a, b) => a.nombre.localeCompare(b.nombre),
-      render: (text: string, record: ProductoCompleto) => (
-        <Space direction="vertical" size="small">
-          <Text strong>{text}</Text>
-          {record.marca && <Text type="secondary">{record.marca}</Text>}
-          {record.tipo && <Tag color="blue">{record.tipo}</Tag>}
-        </Space>
-      )
+      render: (text: string) => <Text strong>{text}</Text>
+    },
+    {
+      title: 'Marca',
+      dataIndex: 'marca',
+      key: 'marca',
+      width: 120,
+      filters: marcas.map(m => ({ text: m, value: m })),
+      onFilter: (value, record) => record.marca === value,
+      render: (marca: string) => marca ? <Text>{marca}</Text> : <Text type="secondary">-</Text>
+    },
+    {
+      title: 'Tipo',
+      dataIndex: 'tipo',
+      key: 'tipo',
+      width: 120,
+      filters: tipos.map(t => ({ text: t, value: t })),
+      onFilter: (value, record) => record.tipo === value,
+      render: (tipo: string) => tipo ? <Tag color="blue">{tipo}</Tag> : <Text type="secondary">-</Text>
     },
     {
       title: 'Calidad',
@@ -672,7 +684,7 @@ const Products: React.FC = () => {
             <Space direction="vertical" style={{ width: '100%' }}>
               <Text strong>Buscar:</Text>
               <Search
-                placeholder="Buscar por nombre, marca o código"
+                placeholder="Buscar por nombre, marca, tipo o código"
                 allowClear
                 enterButton={<SearchOutlined />}
                 size="large"
@@ -702,7 +714,7 @@ const Products: React.FC = () => {
             showTotal: (total) => `Total: ${total} productos`,
             pageSizeOptions: ['10', '20', '50', '100']
             }}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1400 }}
           />
         </Card>
 

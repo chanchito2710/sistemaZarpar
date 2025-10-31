@@ -1,102 +1,187 @@
-# 🏪 Sistema ZARPAR - Sistema POS Multi-Sucursal
+# 🏪 Sistema Zarpar - POS y Gestión Empresarial
 
-Sistema completo de Punto de Venta (POS) para gestión de inventario, ventas, clientes y finanzas en múltiples sucursales.
+<div align="center">
+
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
+![TypeScript](https://img.shields.io/badge/typescript-5.0.0-blue.svg)
+![React](https://img.shields.io/badge/react-18.2.0-61dafb.svg)
+![MySQL](https://img.shields.io/badge/mysql-8.0-orange.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+
+**Sistema completo de Punto de Venta (POS) y gestión empresarial multi-sucursal**
+
+[Características](#-características) • [Instalación](#-instalación-rápida) • [Documentación](#-documentación) • [Tecnologías](#-tecnologías)
+
+</div>
 
 ---
 
-## 🚀 Características Principales
+## 📋 Tabla de Contenidos
 
-- ✅ **Multi-Sucursal**: Gestión de 7 sucursales independientes (Maldonado, Pando, Rivera, Melo, Paysandú, Salto, Tacuarembó)
-- ✅ **Control de Roles**: Administrador con acceso total, usuarios por sucursal con acceso limitado
-- ✅ **Gestión de Productos**: Catálogo de productos con stock y precios por sucursal
-- ✅ **Punto de Venta (POS)**: Interfaz para realizar ventas con selección de sucursal, cliente y vendedor
-- ✅ **Gestión de Clientes**: Base de datos de clientes por sucursal
-- ✅ **Inventario**: Control de stock en tiempo real por sucursal
-- ✅ **Finanzas**: Módulos de caja, bancos, gastos, sueldos y transferencias
-- ✅ **Reportes**: Dashboard con estadísticas y métricas
-- ✅ **Administración de BD**: Interfaz para gestionar tablas y datos directamente
+- [Acerca del Proyecto](#-acerca-del-proyecto)
+- [Características](#-características)
+- [Tecnologías](#-tecnologías)
+- [Instalación Rápida](#-instalación-rápida)
+- [Estructura del Proyecto](#-estructura-del-proyecto)
+- [Sistema de Sucursales](#-sistema-de-sucursales)
+- [Credenciales de Acceso](#-credenciales-de-acceso)
+- [Documentación](#-documentación)
+- [Comandos Útiles](#-comandos-útiles)
+- [Capturas de Pantalla](#-capturas-de-pantalla)
+- [Changelog](#-changelog)
+- [Contribuir](#-contribuir)
+- [Licencia](#-licencia)
 
 ---
 
-## 🛠️ Tecnologías Utilizadas
+## 🎯 Acerca del Proyecto
+
+**Sistema Zarpar** es una plataforma completa de gestión empresarial diseñada para empresas con múltiples sucursales. Incluye:
+
+- 🛒 **Punto de Venta (POS)** moderno y responsive
+- 👥 **Gestión de Clientes** por sucursal
+- 📦 **Control de Inventario** multi-sucursal
+- 🏢 **Gestión de Vendedores** con permisos
+- 📊 **Reportes y Estadísticas** en tiempo real
+- 🔐 **Sistema de Autenticación** con JWT
+- 🌐 **Multi-sucursal** (7 sucursales activas)
+
+### 🏆 ¿Qué lo hace especial?
+
+- ✅ **100% TypeScript** - Tipado fuerte en frontend y backend
+- ✅ **Docker** - Base de datos en contenedor para fácil deployment
+- ✅ **Responsive** - Funciona en móvil, tablet y desktop
+- ✅ **UI Moderna** - Ant Design 5 con animaciones suaves
+- ✅ **Seguro** - Prepared statements, JWT, validación de permisos
+- ✅ **Documentado** - Código y documentación 100% en español
+
+---
+
+## ✨ Características
+
+### 🔐 Autenticación y Permisos
+
+| Rol | Acceso | Permisos |
+|-----|--------|----------|
+| **Administrador** | 🌍 Todas las sucursales | ✅ CRUD completo en todo el sistema |
+| **Usuario Sucursal** | 🏢 Solo su sucursal | 👁️ Solo lectura de datos |
+
+### 🏪 Sistema Multi-Sucursal
+
+El sistema soporta **7 sucursales** con datos independientes:
+
+- 📍 Pando
+- 📍 Maldonado  
+- 📍 Rivera
+- 📍 Melo
+- 📍 Paysandú
+- 📍 Salto
+- 📍 Tacuarembó
+
+Cada sucursal tiene:
+- ✅ Su propia tabla de clientes (`clientes_[sucursal]`)
+- ✅ Sus propios vendedores
+- ✅ Control independiente de stock
+- ✅ Reportes individuales
+
+### 📦 Gestión de Productos
+
+- ✅ Catálogo unificado de productos
+- ✅ Stock por sucursal
+- ✅ Precios diferenciados
+- ✅ Categorías y subcategorías
+- ✅ Control de calidades (A, B, C)
+
+### 👥 Gestión de Vendedores (⭐ ACTUALIZADO)
+
+- ✅ CRUD completo de vendedores
+- ✅ **Sistema de eliminación inteligente**:
+  - Hard delete si no tiene relaciones
+  - Soft delete si tiene clientes/ventas asociadas
+- ✅ Advertencias visuales claras
+- ✅ Permisos solo para administradores
+
+### 🛒 Punto de Venta (POS)
+
+- ✅ Interfaz intuitiva y rápida
+- ✅ Búsqueda de productos en tiempo real
+- ✅ Cálculo automático de totales
+- ✅ Gestión de clientes integrada
+
+---
+
+## 🚀 Tecnologías
 
 ### Frontend
-- **React 18** con TypeScript
-- **Vite** (build tool ultra-rápido)
-- **Ant Design 5** (UI components)
-- **React Router** (navegación)
-- **Axios** (HTTP client)
+```json
+{
+  "react": "^18.2.0",
+  "typescript": "^5.0.0",
+  "vite": "^5.0.0",
+  "antd": "^5.10.0",
+  "axios": "^1.5.0",
+  "react-router-dom": "^6.17.0"
+}
+```
 
 ### Backend
-- **Node.js 18+**
-- **Express** (API REST)
-- **TypeScript**
-- **MySQL2** (cliente de base de datos)
-- **JWT** (autenticación)
-- **bcrypt** (encriptación de contraseñas)
+```json
+{
+  "express": "^4.18.2",
+  "typescript": "^5.0.0",
+  "mysql2": "^3.6.0",
+  "dotenv": "^16.3.1",
+  "jsonwebtoken": "^9.0.2",
+  "cors": "^2.8.5"
+}
+```
 
 ### Base de Datos
-- **MySQL 8.0** en **Docker**
+- **MySQL 8.0** (Docker)
+- **7 tablas de clientes** (una por sucursal)
+- **Foreign Keys** para integridad referencial
+- **Triggers y Stored Procedures**
 
-### Herramientas de Desarrollo
-- **ESLint** (linter)
-- **Nodemon** (auto-restart en desarrollo)
-- **Concurrently** (ejecutar frontend y backend simultáneamente)
+### DevOps
+- **Docker** para MySQL
+- **Vite** para build optimizado
+- **ESLint** para linting
+- **TypeScript** para type checking
 
 ---
 
-## 📦 Instalación Rápida
+## 🔧 Instalación Rápida
 
 ### Prerequisitos
-- Node.js 18+ ([Descargar](https://nodejs.org/))
-- Docker Desktop ([Descargar](https://www.docker.com/products/docker-desktop/))
-- Git ([Descargar](https://git-scm.com/))
+
+Antes de empezar, asegúrate de tener instalado:
+
+- ✅ Node.js 18+ ([descargar](https://nodejs.org/))
+- ✅ Docker Desktop ([descargar](https://www.docker.com/products/docker-desktop/))
+- ✅ Git ([descargar](https://git-scm.com/))
 
 ### Pasos de Instalación
 
+#### 1. Clonar el Repositorio
+
 ```bash
-# 1. Clonar el repositorio
 git clone https://github.com/TU_USUARIO/sistema-zarpar.git
 cd sistema-zarpar
-
-# 2. Instalar dependencias
-npm install
-
-# 3. Crear archivo .env en la raíz del proyecto
-# Ver sección "Configuración" abajo para el contenido
-
-# 4. Levantar MySQL con Docker
-docker run -d \
-  --name zarpar-mysql \
-  -e MYSQL_ROOT_PASSWORD=zarpar2025 \
-  -e MYSQL_DATABASE=zarparDataBase \
-  -p 3307:3306 \
-  --restart unless-stopped \
-  mysql:8.0
-
-# Esperar 30 segundos para que MySQL se inicialice
-
-# 5. Restaurar la base de datos
-docker exec -i zarpar-mysql mysql -u root -pzarpar2025 < database/backup_completo.sql
-
-# 6. Levantar el proyecto
-npm run dev
-
-# ¡Listo! 🎉
-# Frontend: http://localhost:5678
-# Backend: http://localhost:3456
 ```
 
----
+#### 2. Instalar Dependencias
 
-## ⚙️ Configuración
+```bash
+npm install
+```
 
-### Archivo `.env`
+#### 3. Configurar Variables de Entorno
 
-Crear un archivo `.env` en la raíz del proyecto con el siguiente contenido:
+Crear archivo `.env` en la raíz:
 
 ```env
-# Base de Datos (MySQL en Docker)
+# Base de Datos
 DB_HOST=localhost
 DB_PORT=3307
 DB_USER=root
@@ -106,277 +191,319 @@ DB_NAME=zarparDataBase
 # Backend
 PORT=3456
 
-# JWT Secret (para autenticación)
-JWT_SECRET=tu_secreto_super_seguro_cambialo_en_produccion_zarpar2025
+# JWT
+JWT_SECRET=tu_secreto_super_seguro_cambialo_en_produccion
 
-# Frontend (Vite)
+# Frontend
 VITE_API_URL=http://localhost:3456/api
 ```
 
-**⚠️ IMPORTANTE:** En producción, cambia `JWT_SECRET` por una cadena aleatoria segura.
+#### 4. Levantar MySQL con Docker
+
+**Windows (PowerShell):**
+```powershell
+docker run -d `
+  --name zarpar-mysql `
+  -e MYSQL_ROOT_PASSWORD=zarpar2025 `
+  -e MYSQL_DATABASE=zarparDataBase `
+  -p 3307:3306 `
+  --restart unless-stopped `
+  mysql:8.0
+```
+
+**macOS/Linux:**
+```bash
+docker run -d \
+  --name zarpar-mysql \
+  -e MYSQL_ROOT_PASSWORD=zarpar2025 \
+  -e MYSQL_DATABASE=zarparDataBase \
+  -p 3307:3306 \
+  --restart unless-stopped \
+  mysql:8.0
+```
+
+**Esperar 20-30 segundos** para que MySQL inicialice.
+
+#### 5. Restaurar la Base de Datos
+
+```bash
+# Importar backup completo
+docker exec -i zarpar-mysql mysql -u root -pzarpar2025 < database/backup_completo.sql
+
+# Verificar
+docker exec -i zarpar-mysql mysql -u root -pzarpar2025 -e "USE zarparDataBase; SHOW TABLES;"
+```
+
+#### 6. Levantar el Proyecto
+
+```bash
+npm run dev
+```
+
+El proyecto estará disponible en:
+- 🌐 **Frontend**: http://localhost:5678
+- 🔌 **Backend**: http://localhost:3456/api
+- 🗄️ **MySQL**: localhost:3307
 
 ---
 
-## 🔐 Usuarios y Credenciales
-
-### Administrador (Acceso Total)
-- **Email**: `admin@zarparuy.com`
-- **Contraseña**: `admin123`
-- **Permisos**: ✅ Acceso a todas las sucursales, puede crear/editar productos, ver todos los reportes
-
-### Usuarios por Sucursal (Acceso Limitado)
-
-| Sucursal | Email | Contraseña | Permisos |
-|----------|-------|------------|----------|
-| Pando | `pando@zarparuy.com` | `pando123` | Solo sucursal Pando |
-| Maldonado | `maldonado@zarparuy.com` | `maldonado123` | Solo sucursal Maldonado |
-| Rivera | `rivera@zarparuy.com` | `rivera123` | Solo sucursal Rivera |
-| Melo | `melo@zarparuy.com` | `melo123` | Solo sucursal Melo |
-| Paysandú | `paysandu@zarparuy.com` | `paysandu123` | Solo sucursal Paysandú |
-| Salto | `salto@zarparuy.com` | `salto123` | Solo sucursal Salto |
-| Tacuarembó | `tacuarembo@zarparuy.com` | `tacuarembo123` | Solo sucursal Tacuarembó |
-
----
-
-## 🌐 URLs del Sistema
-
-| Servicio | URL | Descripción |
-|----------|-----|-------------|
-| **Frontend** | http://localhost:5678 | Interfaz de usuario principal |
-| **Login** | http://localhost:5678/login | Página de inicio de sesión |
-| **Dashboard** | http://localhost:5678/dashboard | Panel principal con estadísticas |
-| **POS** | http://localhost:5678/pos | Punto de Venta |
-| **Productos** | http://localhost:5678/products | Gestión de productos y stock |
-| **Clientes** | http://localhost:5678/customers | Base de clientes |
-| **Admin DB** | http://localhost:5678/admin/database | Administrador de base de datos |
-| **Backend API** | http://localhost:3456/api | API REST del backend |
-| **MySQL** | localhost:3307 | Base de datos (usar cliente MySQL) |
-
----
-
-## 📂 Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```
 sistema-zarpar/
-├── api/                          # Backend (Node.js + Express + TypeScript)
+├── api/                          # Backend (Express + TypeScript)
 │   ├── config/
-│   │   └── database.ts          # Configuración de MySQL
-│   ├── controllers/             # Controladores de la API
-│   │   ├── clientesController.ts
-│   │   ├── vendedoresController.ts
-│   │   ├── productosController.ts
-│   │   └── databaseController.ts
-│   ├── middleware/              # Middlewares (autenticación, etc.)
-│   ├── routes/                  # Rutas de la API
-│   ├── app.ts                   # Configuración de Express
-│   └── server.ts                # Punto de entrada del backend
+│   │   └── database.ts          # Conexión MySQL
+│   ├── controllers/
+│   │   ├── vendedoresController.ts   # ⭐ CRUD vendedores
+│   │   ├── clientesController.ts     # Gestión clientes
+│   │   └── productosController.ts    # Gestión productos
+│   ├── routes/
+│   │   ├── vendedores.ts        # ⭐ Rutas vendedores
+│   │   ├── clientes.ts          # Rutas clientes
+│   │   └── productos.ts         # Rutas productos
+│   ├── middleware/
+│   │   └── auth.ts              # JWT + permisos
+│   └── index.ts                 # Servidor Express
 │
-├── src/                         # Frontend (React + TypeScript + Vite)
-│   ├── components/              # Componentes reutilizables
-│   │   └── layout/
-│   │       └── MainLayout.tsx   # Layout principal con sidebar
-│   ├── contexts/
-│   │   └── AuthContext.tsx      # Contexto de autenticación
-│   ├── pages/                   # Páginas de la aplicación
-│   │   ├── Login.tsx
-│   │   ├── dashboard/
-│   │   │   └── Dashboard.tsx
+├── src/                          # Frontend (React + TypeScript)
+│   ├── pages/
+│   │   ├── staff/
+│   │   │   └── StaffSellers.tsx      # ⭐ Gestión vendedores
+│   │   ├── admin/
+│   │   │   └── DatabaseManager.tsx   # Admin BD
 │   │   ├── pos/
-│   │   │   └── POS.tsx          # Punto de Venta
-│   │   ├── products/
-│   │   │   └── Products.tsx     # Gestión de productos
-│   │   ├── customers/
-│   │   ├── finance/
-│   │   ├── inventory/
-│   │   └── admin/
-│   │       └── DatabaseManager.tsx  # Admin de BD
+│   │   │   └── POS.tsx              # Punto de venta
+│   │   └── products/
+│   │       └── Products.tsx         # Gestión productos
 │   ├── services/
-│   │   └── api.ts               # Cliente HTTP (Axios)
-│   ├── types/                   # Tipos TypeScript
-│   ├── utils/                   # Utilidades
-│   ├── App.tsx                  # Componente principal
-│   └── main.tsx                 # Punto de entrada del frontend
+│   │   └── api.ts               # ⭐ Servicios API
+│   ├── components/              # Componentes reutilizables
+│   └── App.tsx                  # Router principal
 │
-├── database/                    # Base de datos
-│   ├── backup_completo.sql      # Backup completo de la BD
-│   ├── schema_zarpar_pos.sql    # Esquema inicial
-│   └── schema_productos.sql     # Esquema de productos
+├── database/                     # Base de Datos
+│   ├── backup_completo.sql      # ⭐ Backup principal
+│   ├── schema.sql               # Esquema de tablas
+│   └── *.sql                    # Otros scripts
 │
-├── public/                      # Archivos estáticos
-├── .env                         # Variables de entorno (NO en Git)
-├── .gitignore                   # Archivos ignorados por Git
-├── package.json                 # Dependencias y scripts
-├── tsconfig.json                # Configuración de TypeScript
-├── vite.config.ts               # Configuración de Vite
-├── nodemon.json                 # Configuración de Nodemon
-├── START.bat                    # Script de inicio (Windows)
-├── start-backend.ps1            # Script backend (PowerShell)
-├── start-frontend.ps1           # Script frontend (PowerShell)
-├── CONTEXTO_AGENTE.md           # Documentación para IA (IMPORTANTE)
-└── README.md                    # Este archivo
+├── .cursorrules                  # ⭐ Reglas para agentes IA
+├── CHANGELOG.md                  # ⭐ Historial de cambios
+├── README.md                     # Este archivo
+├── package.json                  # Dependencias
+├── tsconfig.json                 # Config TypeScript
+└── vite.config.ts               # Config Vite
 ```
 
 ---
 
-## 🎯 Scripts Disponibles
+## 🏢 Sistema de Sucursales
+
+### Mapeo Email → Sucursal → Tabla de Clientes
+
+| Sucursal | Email | Tabla de Clientes | Acceso |
+|----------|-------|-------------------|--------|
+| **Administrador** | admin@zarparuy.com | ✅ TODAS | 🌍 Global |
+| Pando | pando@zarparuy.com | `clientes_pando` | 🏢 Solo Pando |
+| Maldonado | maldonado@zarparuy.com | `clientes_maldonado` | 🏢 Solo Maldonado |
+| Rivera | rivera@zarparuy.com | `clientes_rivera` | 🏢 Solo Rivera |
+| Melo | melo@zarparuy.com | `clientes_melo` | 🏢 Solo Melo |
+| Paysandú | paysandu@zarparuy.com | `clientes_paysandu` | 🏢 Solo Paysandú |
+| Salto | salto@zarparuy.com | `clientes_salto` | 🏢 Solo Salto |
+| Tacuarembó | tacuarembo@zarparuy.com | `clientes_tacuarembo` | 🏢 Solo Tacuarembó |
+
+### ⚠️ IMPORTANTE
+
+- **"Administrador"** es un **ROL**, NO una sucursal física
+- ❌ NO incluir "Administrador" en selectores de sucursales
+- ✅ El admin puede **seleccionar** cualquier sucursal para trabajar
+
+---
+
+## 🔑 Credenciales de Acceso
+
+### Administrador (Acceso Total)
+```
+Email: admin@zarparuy.com
+Contraseña: admin123
+Permisos: ✅ TODAS las sucursales y funcionalidades
+```
+
+### Usuarios por Sucursal (Solo Lectura)
+
+| Usuario | Email | Contraseña |
+|---------|-------|------------|
+| Pando | pando@zarparuy.com | pando123 |
+| Maldonado | maldonado@zarparuy.com | maldonado123 |
+| Rivera | rivera@zarparuy.com | rivera123 |
+| Melo | melo@zarparuy.com | melo123 |
+| Paysandú | paysandu@zarparuy.com | paysandu123 |
+| Salto | salto@zarparuy.com | salto123 |
+| Tacuarembó | tacuarembo@zarparuy.com | tacuarembo123 |
+
+---
+
+## 📚 Documentación
+
+### Documentos Disponibles
+
+| Archivo | Descripción |
+|---------|-------------|
+| [`.cursorrules`](.cursorrules) | ⭐ **Reglas completas para agentes IA** - Contexto del proyecto |
+| [`CHANGELOG.md`](CHANGELOG.md) | 📝 Historial detallado de cambios |
+| [`COMO_FUNCIONA_CURSORRULES.md`](COMO_FUNCIONA_CURSORRULES.md) | 📖 Guía de uso de reglas |
+| [`README.md`](README.md) | 📄 Este archivo |
+
+### Características Documentadas
+
+- ✅ Instalación desde cero
+- ✅ Sistema de sucursales y permisos
+- ✅ Gestión de vendedores (incluye eliminación inteligente)
+- ✅ Foreign Key Constraints
+- ✅ Estructura de base de datos
+- ✅ API endpoints
+- ✅ Componentes del frontend
+
+---
+
+## 🔧 Comandos Útiles
 
 ### Desarrollo
 
 ```bash
-# Levantar frontend y backend simultáneamente
+# Iniciar proyecto completo (frontend + backend)
 npm run dev
 
-# Solo frontend (puerto 5678)
-npm run dev:frontend
-
-# Solo backend (puerto 3456)
+# Solo backend
 npm run dev:api
+
+# Solo frontend
+npm run dev:client
+
+# Build para producción
+npm run build
 ```
 
-### Producción
+### Docker (MySQL)
 
 ```bash
-# Build del frontend
-npm run build
+# Ver contenedores activos
+docker ps
 
-# Preview del build
-npm run preview
+# Iniciar contenedor
+docker start zarpar-mysql
+
+# Detener contenedor
+docker stop zarpar-mysql
+
+# Ver logs
+docker logs zarpar-mysql
+
+# Acceder a MySQL
+docker exec -it zarpar-mysql mysql -u root -pzarpar2025
 ```
 
 ### Base de Datos
 
 ```bash
-# Hacer backup de la base de datos
-npm run db:backup
+# Hacer backup
+docker exec zarpar-mysql mysqldump -u root -pzarpar2025 zarparDataBase > backup_$(date +%Y%m%d).sql
 
 # Restaurar backup
-npm run db:restore
+docker exec -i zarpar-mysql mysql -u root -pzarpar2025 zarparDataBase < backup.sql
+
+# Ver tablas
+docker exec -i zarpar-mysql mysql -u root -pzarpar2025 -e "USE zarparDataBase; SHOW TABLES;"
 ```
 
 ---
 
-## 📊 Base de Datos
+## 🖼️ Capturas de Pantalla
 
-### Estructura Principal
+### Dashboard Principal
+> Vista general del sistema con estadísticas
 
-#### Tablas de Clientes (por sucursal)
-- `clientes_pando`
-- `clientes_maldonado`
-- `clientes_rivera`
-- `clientes_melo`
-- `clientes_paysandu`
-- `clientes_salto`
-- `clientes_tacuarembo`
+### Gestión de Vendedores
+> CRUD completo con eliminación inteligente
 
-#### Tabla de Vendedores
-- `vendedores` (con campo `sucursal` y `cargo`)
+### Punto de Venta (POS)
+> Interfaz moderna y responsive
 
-#### Tablas de Productos
-- `productos` (información general del producto)
-- `productos_sucursal` (stock y precio por sucursal)
-- `categorias_productos` (marcas, tipos y calidades)
-
-#### Backup y Restauración
-
-**Hacer backup:**
-```bash
-docker exec zarpar-mysql mysqldump -u root -pzarpar2025 zarparDataBase > database/backup_$(date +%Y%m%d).sql
-```
-
-**Restaurar backup:**
-```bash
-docker exec -i zarpar-mysql mysql -u root -pzarpar2025 < database/backup_completo.sql
-```
+### Gestión de Productos
+> Catálogo con control de stock por sucursal
 
 ---
 
-## 🔧 Solución de Problemas
+## 📄 Changelog
 
-### Puerto 3307 ya está en uso
-```bash
-# Ver qué proceso usa el puerto
-netstat -ano | findstr :3307  # Windows
-lsof -i :3307                 # macOS/Linux
+### Versión 2.0.0 - 31 de Octubre, 2025
 
-# Detener el contenedor
-docker stop zarpar-mysql
-docker rm zarpar-mysql
+**Nuevas Características:**
+- ✅ Sistema de eliminación inteligente de vendedores
+- ✅ Hard delete con fallback a soft delete
+- ✅ UI mejorada con advertencias visuales
+- ✅ Análisis de Foreign Key Constraints
 
-# Volver a crear
-docker run -d --name zarpar-mysql ...
-```
+**Mejoras:**
+- ✅ Mensajes descriptivos según tipo de eliminación
+- ✅ Documentación completa actualizada
+- ✅ Backup automático de base de datos
 
-### Error: Cannot connect to MySQL
-```bash
-# Verificar que el contenedor está corriendo
-docker ps | grep zarpar-mysql
-
-# Ver logs
-docker logs zarpar-mysql
-
-# Reiniciar contenedor
-docker restart zarpar-mysql
-```
-
-### Error: Module not found
-```bash
-# Limpiar y reinstalar
-rm -rf node_modules package-lock.json
-npm install
-```
-
----
-
-## 📚 Documentación Adicional
-
-- **`CONTEXTO_AGENTE.md`** → Documentación completa para agentes IA (instrucciones de instalación paso a paso, reglas del proyecto, estructura de BD)
-- **`COMO_FUNCIONA_PRODUCTOS_EXPLICACION_VISUAL.md`** → Explicación detallada del sistema de productos
-- **`ANALISIS_ESTRUCTURA_PRODUCTOS_Y_STOCK.md`** → Análisis técnico de la base de datos
+[Ver changelog completo](CHANGELOG.md)
 
 ---
 
 ## 🤝 Contribuir
 
+### ¿Cómo contribuir?
+
 1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -m 'Agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+2. Crea una rama (`git checkout -b feature/NuevaCaracteristica`)
+3. Commit tus cambios (`git commit -m 'Agregar nueva característica'`)
+4. Push a la rama (`git push origin feature/NuevaCaracteristica`)
 5. Abre un Pull Request
+
+### Convenciones de Código
+
+- ✅ Todo en español (código, comentarios, docs)
+- ✅ TypeScript obligatorio
+- ✅ ESLint para linting
+- ✅ Prepared statements para SQL
+- ✅ Comentarios explicativos
+
+---
+
+## 📞 Soporte
+
+¿Problemas? ¿Preguntas? 
+
+1. Revisa la [documentación](.cursorrules)
+2. Consulta el [changelog](CHANGELOG.md)
+3. Abre un [issue](https://github.com/TU_USUARIO/sistema-zarpar/issues)
 
 ---
 
 ## 📝 Licencia
 
-Este proyecto es privado y de uso exclusivo para Zarpar Uruguay.
-
----
-
-## 👤 Autor
-
-**Zarpar Uruguay**
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
 
 ---
 
 ## 🙏 Agradecimientos
 
-- Ant Design por los componentes UI
-- React y Vite por el stack moderno de frontend
-- Docker por simplificar el deployment de MySQL
+- **Ant Design** - Por los componentes UI
+- **React** - Por el framework frontend
+- **Express** - Por el framework backend
+- **MySQL** - Por la base de datos
+- **Docker** - Por la containerización
 
 ---
 
-## 🔄 Changelog
+<div align="center">
 
-### v1.0.0 (Octubre 2025)
-- ✅ Sistema de autenticación con JWT
-- ✅ Control de roles (Admin vs Sucursal)
-- ✅ Gestión de productos con stock y precio por sucursal
-- ✅ POS funcional con selección de sucursal, cliente y vendedor
-- ✅ Administrador de base de datos (CRUD completo)
-- ✅ Dashboard con estadísticas
-- ✅ Gestión de clientes por sucursal
-- ✅ Sistema multi-sucursal completo
+**⭐ Si te gusta este proyecto, dale una estrella en GitHub ⭐**
 
----
+**Hecho con ❤️ por el equipo de Zarpar**
 
-**¿Preguntas o problemas?** Consulta el archivo `CONTEXTO_AGENTE.md` para más detalles técnicos.
+[🔝 Volver arriba](#-sistema-zarpar---pos-y-gestión-empresarial)
+
+</div>

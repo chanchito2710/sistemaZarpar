@@ -1,0 +1,167 @@
+/* Animación del pulgar hacia arriba */
+.thumbs-up-animation {
+  font-size: 80px;
+  color: #52c41a;
+  opacity: 0;
+  transform: scale(0) rotate(-45deg);
+  transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  display: inline-block;
+  filter: drop-shadow(0 8px 16px rgba(82, 196, 26, 0.3));
+}
+
+.thumbs-up-animation.active {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  animation: bounce-thumbs 1s ease-out, glow-pulse 2s ease-in-out infinite 1s;
+}
+
+/* Efecto de rebote para el pulgar */
+@keyframes bounce-thumbs {
+  0% {
+    transform: scale(0) rotate(-45deg);
+  }
+  50% {
+    transform: scale(1.2) rotate(5deg);
+  }
+  70% {
+    transform: scale(0.9) rotate(-5deg);
+  }
+  85% {
+    transform: scale(1.05) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* Efecto de brillo pulsante */
+@keyframes glow-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 8px 16px rgba(82, 196, 26, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 8px 24px rgba(82, 196, 26, 0.6));
+    transform: scale(1.03);
+  }
+}
+
+/* Animación sutil de entrada para el modal */
+.ant-modal {
+  animation: modal-fade-in 0.4s ease-out;
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Efecto hover para botones */
+.ant-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ant-btn:active {
+  transform: translateY(0) !important;
+}
+
+/* Animación de entrada para las filas de información */
+.ant-space-item {
+  animation: slide-in-up 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.ant-space-item:nth-child(1) { animation-delay: 0.1s; }
+.ant-space-item:nth-child(2) { animation-delay: 0.2s; }
+.ant-space-item:nth-child(3) { animation-delay: 0.3s; }
+.ant-space-item:nth-child(4) { animation-delay: 0.4s; }
+.ant-space-item:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Efecto de brillo en el número de venta */
+.ant-modal-body > div > div:first-child > div {
+  animation: number-glow 2s ease-in-out infinite;
+}
+
+@keyframes number-glow {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+  50% {
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  }
+}
+
+/* Responsive: ajustes para móviles */
+@media (max-width: 576px) {
+  .thumbs-up-animation {
+    font-size: 60px;
+  }
+  
+  .ant-modal {
+    width: 95% !important;
+    max-width: 95% !important;
+  }
+}
+
+/* Smooth transitions para dividers */
+.ant-divider {
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.ant-divider:hover {
+  opacity: 1;
+}
+
+/* Quitar scroll lateral del modal */
+.venta-exitosa-modal .ant-modal-body {
+  overflow-x: hidden !important;
+}
+
+.venta-exitosa-modal .ant-modal-content {
+  overflow-x: hidden !important;
+}
+
+.venta-exitosa-modal {
+  overflow-x: hidden !important;
+}
+
+/* Personalizar scrollbar de productos */
+.venta-exitosa-modal ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.venta-exitosa-modal ::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.venta-exitosa-modal ::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.venta-exitosa-modal ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

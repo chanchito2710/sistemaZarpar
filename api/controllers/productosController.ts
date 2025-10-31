@@ -58,11 +58,6 @@ interface ProductoSucursalInput {
 }
 
 /**
- * Sucursales válidas del sistema
- */
-const SUCURSALES_VALIDAS = ['maldonado', 'pando', 'rivera', 'melo', 'paysandu', 'salto', 'tacuarembo'];
-
-/**
  * Helper: Ejecutar query con manejo de errores
  */
 const executeQuery = async <T extends RowDataPacket[] | ResultSetHeader>(
@@ -79,10 +74,28 @@ const executeQuery = async <T extends RowDataPacket[] | ResultSetHeader>(
 };
 
 /**
- * Helper: Validar sucursal
+ * Helper: Validar sucursal (DINÁMICO)
+ * Verifica si la sucursal existe en productos_sucursal
  */
-const validarSucursal = (sucursal: string): boolean => {
-  return SUCURSALES_VALIDAS.includes(sucursal.toLowerCase().trim());
+const validarSucursal = async (sucursal: string): Promise<boolean> => {
+  try {
+    const sucursalNormalizada = sucursal.toLowerCase().trim();
+    
+    // Consultar si existe al menos un producto para esa sucursal
+    const [rows] = await pool.execute(
+      `SELECT COUNT(*) as total 
+       FROM productos_sucursal 
+       WHERE sucursal = ? 
+       LIMIT 1`,
+      [sucursalNormalizada]
+    );
+    
+    const resultado = rows as { total: number }[];
+    return resultado[0]?.total > 0;
+  } catch (error) {
+    console.error('❌ Error al validar sucursal:', error);
+    return false;
+  }
 };
 
 // ============================================
@@ -137,10 +150,11 @@ export const obtenerProductosPorSucursal = async (req: Request, res: Response): 
       return;
     }
 
-    if (!validarSucursal(sucursal)) {
+    const sucursalValida = await validarSucursal(sucursal);
+    if (!sucursalValida) {
       res.status(400).json({
         success: false,
-        message: `Sucursal inválida. Sucursales válidas: ${SUCURSALES_VALIDAS.join(', ')}`
+        message: `Sucursal inválida: "${sucursal}". No hay productos registrados para esta sucursal.`
       });
       return;
     }
@@ -467,7 +481,8 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
       return;
     }
 
-    if (!validarSucursal(sucursal)) {
+    const sucursalValida = await validarSucursal(sucursal);
+    if (!sucursalValida) {
       res.status(400).json({
         success: false,
         message: 'Sucursal inválida'

@@ -16,6 +16,8 @@ import vendedoresRoutes from './routes/vendedores.js'
 import clientesRoutes from './routes/clientes.js'
 import databaseRoutes from './routes/database.js'
 import productosRoutes from './routes/productos.js'
+import ventasRoutes from './routes/ventas.js'
+import sucursalesRoutes from './routes/sucursales.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -35,9 +37,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
  */
 app.use('/api/auth', authRoutes)
 app.use('/api/vendedores', vendedoresRoutes)
+app.use('/api/sucursales', sucursalesRoutes)
 app.use('/api/clientes', clientesRoutes)
 app.use('/api/productos', productosRoutes)
 app.use('/api/database', databaseRoutes)
+app.use('/api/ventas', ventasRoutes)
 
 /**
  * health

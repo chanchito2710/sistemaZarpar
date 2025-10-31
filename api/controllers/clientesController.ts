@@ -4,7 +4,7 @@
  */
 
 import { Request, Response } from 'express';
-import { executeQuery } from '../config/database';
+import { executeQuery, pool } from '../config/database';
 
 /**
  * Interfaz para el tipo Cliente
@@ -42,24 +42,33 @@ interface ClienteInput {
 }
 
 /**
- * Mapeo de sucursales a nombres de tablas
- */
-const TABLAS_CLIENTES: { [key: string]: string } = {
-  'pando': 'clientes_pando',
-  'maldonado': 'clientes_maldonado',
-  'rivera': 'clientes_rivera',
-  'melo': 'clientes_melo',
-  'paysandu': 'clientes_paysandu',
-  'salto': 'clientes_salto',
-  'tacuarembo': 'clientes_tacuarembo'
-};
-
-/**
  * Validar nombre de sucursal y obtener nombre de tabla
+ * DINÁMICO: Verifica que la tabla exista en la base de datos
  */
-const obtenerNombreTabla = (sucursal: string): string | null => {
-  const sucursalNormalizada = sucursal.toLowerCase().trim();
-  return TABLAS_CLIENTES[sucursalNormalizada] || null;
+const obtenerNombreTabla = async (sucursal: string): Promise<string | null> => {
+  try {
+    const sucursalNormalizada = sucursal.toLowerCase().trim();
+    const nombreTabla = `clientes_${sucursalNormalizada}`;
+    
+    // Verificar si la tabla existe en la base de datos
+    const [tablas] = await pool.execute(
+      `SELECT TABLE_NAME 
+       FROM information_schema.TABLES 
+       WHERE TABLE_SCHEMA = DATABASE() 
+       AND TABLE_NAME = ?`,
+      [nombreTabla]
+    );
+    
+    // Si la tabla existe, retornar el nombre con backticks para seguridad
+    if ((tablas as any[]).length > 0) {
+      return `\`${nombreTabla}\``;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Error al verificar tabla de clientes:', error);
+    return null;
+  }
 };
 
 /**
@@ -78,12 +87,12 @@ export const obtenerClientesPorSucursal = async (req: Request, res: Response): P
       return;
     }
 
-    const nombreTabla = obtenerNombreTabla(sucursal);
+    const nombreTabla = await obtenerNombreTabla(sucursal);
 
     if (!nombreTabla) {
       res.status(400).json({
         success: false,
-        message: `Sucursal inválida. Sucursales válidas: ${Object.keys(TABLAS_CLIENTES).join(', ')}`
+        message: `Sucursal inválida: "${sucursal}". Verifica que la tabla clientes_${sucursal.toLowerCase()} exista.`
       });
       return;
     }
@@ -142,7 +151,7 @@ export const obtenerClientePorId = async (req: Request, res: Response): Promise<
       return;
     }
 
-    const nombreTabla = obtenerNombreTabla(sucursal);
+    const nombreTabla = await obtenerNombreTabla(sucursal);
 
     if (!nombreTabla) {
       res.status(400).json({
@@ -197,7 +206,7 @@ export const crearCliente = async (req: Request, res: Response): Promise<void> =
     const clienteData: ClienteInput = req.body;
 
     // Validar sucursal
-    const nombreTabla = obtenerNombreTabla(sucursal);
+    const nombreTabla = await obtenerNombreTabla(sucursal);
 
     if (!nombreTabla) {
       res.status(400).json({
@@ -280,7 +289,7 @@ export const actualizarCliente = async (req: Request, res: Response): Promise<vo
     const clienteData: Partial<ClienteInput> = req.body;
 
     // Validar sucursal
-    const nombreTabla = obtenerNombreTabla(sucursal);
+    const nombreTabla = await obtenerNombreTabla(sucursal);
 
     if (!nombreTabla) {
       res.status(400).json({
@@ -409,7 +418,7 @@ export const buscarClientes = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const nombreTabla = obtenerNombreTabla(sucursal);
+    const nombreTabla = await obtenerNombreTabla(sucursal);
 
     if (!nombreTabla) {
       res.status(400).json({

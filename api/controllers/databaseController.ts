@@ -617,29 +617,66 @@ export const eliminarRegistro = async (req: Request, res: Response): Promise<voi
       return;
     }
     
-    // ⚠️ HARD DELETE - Eliminación permanente
-    const [result] = await pool.execute<ResultSetHeader>(
-      `DELETE FROM \`${tableName}\` WHERE id = ?`,
-      [id]
-    );
-    
-    if (result.affectedRows === 0) {
-      res.status(404).json({
-        success: false,
-        error: 'Registro no encontrado'
+    // 🔹 SOFT DELETE para tabla vendedores (tiene foreign keys)
+    if (tableName === 'vendedores') {
+      // Marcar como inactivo en lugar de eliminar
+      const [result] = await pool.execute<ResultSetHeader>(
+        `UPDATE \`${tableName}\` SET activo = 0 WHERE id = ?`,
+        [id]
+      );
+      
+      if (result.affectedRows === 0) {
+        res.status(404).json({
+          success: false,
+          error: 'Registro no encontrado'
+        });
+        return;
+      }
+      
+      res.json({
+        success: true,
+        message: '✅ Vendedor desactivado exitosamente (soft delete)'
       });
       return;
     }
     
-    res.json({
-      success: true,
-      message: '⚠️ Registro eliminado permanentemente'
-    });
-  } catch (error) {
+    // ⚠️ HARD DELETE - Eliminación permanente para otras tablas
+    try {
+      const [result] = await pool.execute<ResultSetHeader>(
+        `DELETE FROM \`${tableName}\` WHERE id = ?`,
+        [id]
+      );
+      
+      if (result.affectedRows === 0) {
+        res.status(404).json({
+          success: false,
+          error: 'Registro no encontrado'
+        });
+        return;
+      }
+      
+      res.json({
+        success: true,
+        message: '⚠️ Registro eliminado permanentemente'
+      });
+    } catch (deleteError: any) {
+      // Si falla por foreign key constraint
+      if (deleteError.code === 'ER_ROW_IS_REFERENCED_2') {
+        res.status(400).json({
+          success: false,
+          error: 'No se puede eliminar este registro porque está siendo referenciado por otros registros',
+          details: 'Este registro tiene relaciones activas con otros datos del sistema'
+        });
+      } else {
+        throw deleteError;
+      }
+    }
+  } catch (error: any) {
     console.error('Error al eliminar registro:', error);
     res.status(500).json({
       success: false,
-      error: 'Error al eliminar el registro'
+      error: 'Error al eliminar el registro',
+      details: error.message
     });
   }
 };

@@ -203,17 +203,14 @@ const POS: React.FC = () => {
         ? selectedBranch.charAt(0).toUpperCase() + selectedBranch.slice(1).toLowerCase()
         : selectedBranch;
       
-      // Navegar a la página de productos con los datos seleccionados
-      navigate('/products', {
+      // Navegar a la página del carrito con los datos seleccionados
+      navigate('/pos/cart', {
         state: {
-          branch: sucursalCapitalizada,
-          branchId: selectedBranch,
-          client: `${cliente?.nombre} ${cliente?.apellido}`,
-          clientId: selectedClient,
-          clientData: cliente,
-          seller: vendedor?.nombre,
-          sellerId: selectedSeller,
-          sellerData: vendedor
+          sucursal: selectedBranch,
+          clienteId: selectedClient,
+          clienteNombre: `${cliente?.nombre} ${cliente?.apellido}`,
+          vendedorId: selectedSeller,
+          vendedorNombre: vendedor?.nombre
         }
       });
     }

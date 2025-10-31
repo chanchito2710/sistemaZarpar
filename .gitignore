@@ -1,82 +1,118 @@
-# Dependencies
-node_modules/
-package-lock.json
+# 🚫 .gitignore - Sistema Zarpar
+# Archivos y carpetas que NO se subirán a GitHub
 
-# Environment variables
+# ==========================================
+# 🔐 ARCHIVOS DE CONFIGURACIÓN SENSIBLES
+# ==========================================
 .env
 .env.local
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Build outputs
-dist/
-build/
-*.log
-*.tgz
-
-# Editor directories
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Test coverage
-coverage/
-
-# Temporary files
-*.tmp
-temp/
-tmp/
-
-# Logs
-logs/
-*.log
+# ==========================================
+# 📦 NODE_MODULES
+# ==========================================
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
-pnpm-debug.log*
 
-# Runtime data
-pids/
+# ==========================================
+# 🗄️ BASE DE DATOS
+# ==========================================
+# Backups con timestamp (generados automáticamente)
+database/backup_completo_*.sql
+
+# NOTA: database/backup_completo.sql SÍ se sube (backup principal)
+# Solo se ignoran los backups con timestamp
+
+# ==========================================
+# 🏗️ BUILD Y DIST
+# ==========================================
+dist/
+build/
+*.local
+
+# ==========================================
+# 📝 LOGS
+# ==========================================
+logs/
+*.log
+pids
 *.pid
 *.seed
 *.pid.lock
 
-# TypeScript cache
+# ==========================================
+# 🔍 DIRECTORIOS DE SISTEMA
+# ==========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# 🧪 TESTING
+# ==========================================
+coverage/
+.nyc_output
+
+# ==========================================
+# 🔧 EDITORES E IDEs
+# ==========================================
+# VSCode
+.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Cursor AI
+.cursor/
+
+# JetBrains (WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==========================================
+# 🐳 DOCKER
+# ==========================================
+# Ignorar datos de Docker (si usas volumes locales)
+docker-data/
+mysql-data/
+
+# ==========================================
+# 🔐 TYPESCRIPT
+# ==========================================
 *.tsbuildinfo
 
-# Optional npm cache directory
-.npm
+# ==========================================
+# 📱 OTROS
+# ==========================================
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
 
-# Optional eslint cache
-.eslintcache
+# OS generated files
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# Playwright
-playwright-report/
-test-results/
-
-# Database backups (excepto el backup inicial)
-database/backup_*.sql
-!database/backup_completo.sql
-
-# Archivos temporales de documentación (ya están consolidados)
-*_TEMPORAL.md
-*_OLD.md
+# ==========================================
+# ✅ ARCHIVOS QUE SÍ SE SUBEN
+# ==========================================
+# - database/backup_completo.sql (backup principal)
+# - .cursorrules (reglas del proyecto)
+# - CHANGELOG.md
+# - README.md
+# - Todos los archivos de código fuente
+# - package.json y package-lock.json

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Table, Tag, Button, Space, Statistic, Row, Col, Input, Select, Tabs, Modal, Form, message, Popconfirm } from 'antd';
 import { 
   UserOutlined, 
@@ -15,6 +15,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { BRANCHES, SELLERS, getBranchById, getSellersByBranch, getBranchOptions, getSellerOptions } from '../../data/branches';
 import type { Branch, User } from '../../types';
+import { vendedoresService, type Vendedor } from '../../services/api';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -41,13 +42,59 @@ const Staff: React.FC = () => {
   const [branchForm] = Form.useForm();
 
   // Estados para vendedores
-  const [sellers, setSellers] = useState<User[]>(SELLERS);
+  const [sellers, setSellers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
   const [sellerSearchText, setSellerSearchText] = useState('');
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | undefined>(undefined);
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string | undefined>(undefined);
   const [sellerModalVisible, setSellerModalVisible] = useState(false);
   const [editingSeller, setEditingSeller] = useState<User | null>(null);
   const [sellerForm] = Form.useForm();
+
+  /**
+   * 🔄 Convertir Vendedor (API) a User (Frontend)
+   */
+  const vendedorToUser = (vendedor: Vendedor): User => {
+    // Mapear cargo a role
+    const cargoToRole = (cargo: string): 'admin' | 'manager' | 'seller' | 'cashier' => {
+      const cargoLower = cargo.toLowerCase();
+      if (cargoLower.includes('gerente') || cargoLower.includes('manager')) return 'manager';
+      if (cargoLower.includes('cajero') || cargoLower.includes('cashier')) return 'cashier';
+      if (cargoLower.includes('admin')) return 'admin';
+      return 'seller';
+    };
+
+    return {
+      id: vendedor.id.toString(),
+      name: vendedor.nombre,
+      email: vendedor.email || '',
+      role: cargoToRole(vendedor.cargo),
+      branchId: vendedor.sucursal,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  };
+
+  /**
+   * 🔄 Cargar vendedores desde la API
+   */
+  useEffect(() => {
+    cargarVendedores();
+  }, []);
+
+  const cargarVendedores = async () => {
+    try {
+      setLoading(true);
+      const vendedores = await vendedoresService.obtenerTodos();
+      const usuarios = vendedores.map(vendedorToUser);
+      setSellers(usuarios);
+    } catch (error) {
+      console.error('Error al cargar vendedores:', error);
+      message.error('Error al cargar vendedores');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filtros para sucursales
   const filteredBranches = branches.filter(branch => 
@@ -173,9 +220,19 @@ const Staff: React.FC = () => {
     }
   };
 
-  const handleDeleteSeller = (sellerId: string) => {
-    setSellers(prev => prev.filter(seller => seller.id !== sellerId));
-    message.success('Vendedor eliminado correctamente');
+  const handleDeleteSeller = async (sellerId: string) => {
+    try {
+      setLoading(true);
+      await vendedoresService.eliminar(Number(sellerId));
+      message.success('✅ Vendedor desactivado exitosamente');
+      // Recargar la lista de vendedores
+      await cargarVendedores();
+    } catch (error) {
+      console.error('Error al eliminar vendedor:', error);
+      message.error('❌ Error al desactivar el vendedor');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Utilidades
@@ -329,13 +386,14 @@ const Staff: React.FC = () => {
             Editar
           </Button>
           <Popconfirm
-            title="¿Estás seguro de eliminar este vendedor?"
+            title="¿Desactivar este vendedor?"
+            description="El vendedor será desactivado pero no se eliminará de la base de datos. Podrá reactivarse después."
             onConfirm={() => handleDeleteSeller(record.id)}
-            okText="Sí"
-            cancelText="No"
+            okText="Sí, desactivar"
+            cancelText="Cancelar"
           >
             <Button type="link" danger icon={<DeleteOutlined />} size="small">
-              Eliminar
+              Desactivar
             </Button>
           </Popconfirm>
         </Space>
@@ -490,6 +548,7 @@ const Staff: React.FC = () => {
               columns={sellerColumns}
               dataSource={filteredSellers}
               rowKey="id"
+              loading={loading}
               pagination={{
                 pageSize: 10,
                 showSizeChanger: true,

@@ -191,6 +191,63 @@ export const vendedoresService = {
       throw error;
     }
   },
+
+  /**
+   * Crear un nuevo vendedor
+   * @param vendedorData - Datos del vendedor a crear
+   */
+  crear: async (vendedorData: Partial<Vendedor> & { password: string }): Promise<Vendedor> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Vendedor>> = await apiClient.post(
+        '/vendedores',
+        vendedorData
+      );
+      if (!response.data.data) {
+        throw new Error('No se recibieron datos del vendedor creado');
+      }
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al crear vendedor:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Actualizar un vendedor existente
+   * @param id - ID del vendedor
+   * @param vendedorData - Datos del vendedor a actualizar
+   */
+  actualizar: async (
+    id: number,
+    vendedorData: Partial<Vendedor>
+  ): Promise<Vendedor> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Vendedor>> = await apiClient.put(
+        `/vendedores/${id}`,
+        vendedorData
+      );
+      if (!response.data.data) {
+        throw new Error('No se recibieron datos del vendedor actualizado');
+      }
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al actualizar vendedor:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Eliminar (desactivar) un vendedor
+   * @param id - ID del vendedor
+   */
+  eliminar: async (id: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/vendedores/${id}`);
+    } catch (error) {
+      console.error('Error al eliminar vendedor:', error);
+      throw error;
+    }
+  },
 };
 
 /**
@@ -675,6 +732,272 @@ export const healthCheck = async (): Promise<boolean> => {
     console.error('Error en health check:', error);
     return false;
   }
+};
+
+// ============================================================
+// SERVICIOS DE VENTAS
+// ============================================================
+
+/**
+ * Interfaces para Ventas
+ */
+export interface Venta {
+  id: number;
+  numero_venta: string;
+  sucursal: string;
+  cliente_id: number;
+  cliente_nombre: string;
+  vendedor_id: number;
+  vendedor_nombre: string;
+  subtotal: number;
+  descuento: number;
+  total: number;
+  metodo_pago: 'efectivo' | 'transferencia' | 'cuenta_corriente';
+  estado_pago: 'pagado' | 'pendiente' | 'parcial';
+  saldo_pendiente: number;
+  fecha_venta: string;
+  fecha_vencimiento?: string;
+  observaciones?: string;
+  total_productos?: number; // Agregado por JOIN
+}
+
+export interface VentaDetalle {
+  id?: number;
+  venta_id?: number;
+  producto_id: number;
+  producto_nombre: string;
+  producto_marca?: string;
+  producto_codigo?: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+export interface CrearVentaInput {
+  sucursal: string;
+  cliente_id: number;
+  cliente_nombre: string;
+  vendedor_id: number;
+  vendedor_nombre: string;
+  subtotal: number;
+  descuento: number;
+  total: number;
+  metodo_pago: 'efectivo' | 'transferencia' | 'cuenta_corriente';
+  productos: VentaDetalle[];
+  observaciones?: string;
+  fecha_vencimiento?: string;
+}
+
+export interface MovimientoCuentaCorriente {
+  id: number;
+  sucursal: string;
+  cliente_id: number;
+  cliente_nombre: string;
+  tipo: 'venta' | 'pago' | 'ajuste';
+  debe: number;
+  haber: number;
+  saldo: number;
+  venta_id?: number;
+  pago_id?: number;
+  descripcion?: string;
+  fecha_movimiento: string;
+}
+
+export interface ResumenCuentaCorriente {
+  total_debe: number;
+  total_haber: number;
+  saldo_actual: number;
+}
+
+export interface PagoCuentaCorriente {
+  sucursal: string;
+  cliente_id: number;
+  cliente_nombre: string;
+  monto: number;
+  metodo_pago: 'efectivo' | 'transferencia';
+  comprobante?: string;
+  observaciones?: string;
+}
+
+export interface ReporteVentas {
+  periodo: {
+    desde: string;
+    hasta: string;
+  };
+  resumen: {
+    total_ventas: number;
+    total_vendido: number;
+    total_descuentos: number;
+    promedio_venta: number;
+  };
+  metodos_pago: Array<{
+    metodo_pago: string;
+    cantidad: number;
+    total: number;
+  }>;
+  ventas_por_dia: Array<{
+    fecha: string;
+    cantidad: number;
+    total: number;
+  }>;
+  top_productos: Array<{
+    producto_nombre: string;
+    producto_marca?: string;
+    cantidad_vendida: number;
+    total_vendido: number;
+  }>;
+  top_clientes: Array<{
+    cliente_id: number;
+    cliente_nombre: string;
+    total_compras: number;
+    total_gastado: number;
+  }>;
+}
+
+/**
+ * Servicios de Ventas
+ */
+export const ventasService = {
+  /**
+   * Crear una nueva venta
+   */
+  crear: async (venta: CrearVentaInput): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/ventas', venta);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al crear venta:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener ventas por sucursal con filtros opcionales
+   */
+  obtenerPorSucursal: async (
+    sucursal: string,
+    filtros?: {
+      fecha_inicio?: string;
+      fecha_fin?: string;
+      cliente_id?: number;
+      metodo_pago?: string;
+      estado_pago?: string;
+    }
+  ): Promise<Venta[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros) {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const url = `/ventas/sucursal/${sucursal}${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<Venta[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener ventas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener detalle completo de una venta
+   */
+  obtenerDetalle: async (id: number): Promise<Venta & { productos: VentaDetalle[] }> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Venta & { productos: VentaDetalle[] }>> = 
+        await apiClient.get(`/ventas/${id}`);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al obtener detalle de venta:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener ventas de un cliente específico
+   */
+  obtenerPorCliente: async (sucursal: string, clienteId: number): Promise<Venta[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Venta[]>> = 
+        await apiClient.get(`/ventas/cliente/${sucursal}/${clienteId}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener ventas del cliente:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener reportes de ventas por rango de fechas
+   */
+  obtenerReportes: async (
+    sucursal: string,
+    fechaInicio: string,
+    fechaFin: string
+  ): Promise<ReporteVentas> => {
+    try {
+      const response: AxiosResponse<ApiResponse<ReporteVentas>> = 
+        await apiClient.get(`/ventas/reportes/${sucursal}?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al obtener reportes:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * Servicios de Cuenta Corriente
+ */
+export const cuentaCorrienteService = {
+  /**
+   * Obtener estado de cuenta de un cliente
+   */
+  obtenerEstadoCuenta: async (sucursal: string, clienteId: number): Promise<{
+    movimientos: MovimientoCuentaCorriente[];
+    resumen: ResumenCuentaCorriente;
+  }> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = 
+        await apiClient.get(`/ventas/cuenta-corriente/${sucursal}/${clienteId}`);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al obtener estado de cuenta:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener todos los clientes con saldo en cuenta corriente
+   */
+  obtenerClientesConSaldo: async (sucursal: string): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = 
+        await apiClient.get(`/ventas/clientes-cuenta-corriente/${sucursal}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener clientes con saldo:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Registrar un pago en cuenta corriente
+   */
+  registrarPago: async (pago: PagoCuentaCorriente): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = 
+        await apiClient.post('/ventas/pago-cuenta-corriente', pago);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al registrar pago:', error);
+      throw error;
+    }
+  },
 };
 
 export default apiClient;
