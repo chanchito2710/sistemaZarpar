@@ -18,6 +18,7 @@ import databaseRoutes from './routes/database.js'
 import productosRoutes from './routes/productos.js'
 import ventasRoutes from './routes/ventas.js'
 import sucursalesRoutes from './routes/sucursales.js'
+import transferenciasRoutes from './routes/transferencias.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -42,6 +43,7 @@ app.use('/api/clientes', clientesRoutes)
 app.use('/api/productos', productosRoutes)
 app.use('/api/database', databaseRoutes)
 app.use('/api/ventas', ventasRoutes)
+app.use('/api/transferencias', transferenciasRoutes)
 
 /**
  * health

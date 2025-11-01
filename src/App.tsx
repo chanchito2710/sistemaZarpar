@@ -20,6 +20,7 @@ import Payroll from './pages/finance/Payroll';
 import Banks from './pages/finance/Banks';
 import Cash from './pages/finance/Cash';
 import Transfer from './pages/inventory/Transfer';
+import ReceiveTransfers from './pages/inventory/ReceiveTransfers';
 import CustomerAccounts from './pages/CustomerAccounts';
 import Customers from './pages/customers/Customers';
 import Profile from './pages/Profile';
@@ -54,6 +55,7 @@ function App() {
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="inventory/log" element={<InventoryLog />} />
                 <Route path="inventory/transfer" element={<Transfer />} />
+                <Route path="inventory/receive" element={<ReceiveTransfers />} />
                 
                 {/* Módulo de Productos */}
                 <Route path="products" element={<Products />} />

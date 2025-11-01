@@ -38,7 +38,10 @@ import {
   ReloadOutlined,
   SaveOutlined,
   BarcodeOutlined,
-  TagOutlined
+  TagOutlined,
+  SettingOutlined,
+  ThunderboltOutlined,
+  RocketOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth } from '../../contexts/AuthContext';
@@ -54,9 +57,42 @@ const { Title, Text } = Typography;
 const { Search } = Input;
 
 /**
- * Sucursales disponibles
+ * Interfaz para Sucursal
  */
-const SUCURSALES = ['maldonado', 'pando', 'rivera', 'melo', 'paysandu', 'salto', 'tacuarembo'];
+interface Sucursal {
+  sucursal: string;
+  total_vendedores: number;
+}
+
+/**
+ * UTILIDADES PARA NOMBRES DE SUCURSALES
+ */
+
+/**
+ * Formatear nombre de sucursal para mostrar: capitaliza cada palabra
+ * "rionegro" → "Rio Negro"
+ * "cerrolargo" → "Cerro Largo"
+ */
+const formatearNombreSucursal = (nombre: string): string => {
+  const normalizado = nombre.toLowerCase().trim();
+  
+  // Lista de sucursales conocidas con espacios
+  const sucursalesConEspacios: { [key: string]: string } = {
+    'rionegro': 'Rio Negro',
+    'cerrolargo': 'Cerro Largo',
+    'treintaytres': 'Treinta Y Tres',
+    'floresdalsur': 'Flores Dal Sur',
+    // Agregar más según necesites
+  };
+  
+  // Si está en la lista, usar el formato conocido
+  if (sucursalesConEspacios[normalizado]) {
+    return sucursalesConEspacios[normalizado];
+  }
+  
+  // Si no, capitalizar la primera letra
+  return normalizado.charAt(0).toUpperCase() + normalizado.slice(1);
+};
 
 const Products: React.FC = () => {
   const { usuario } = useAuth();
@@ -66,8 +102,10 @@ const Products: React.FC = () => {
 
   // Estados principales
   const [productos, setProductos] = useState<ProductoCompleto[]>([]);
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('maldonado');
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Estados para categorías (marcas, tipos y calidades)
@@ -83,6 +121,11 @@ const Products: React.FC = () => {
   const [modalEditarVisible, setModalEditarVisible] = useState(false);
   const [modalStockVisible, setModalStockVisible] = useState(false);
   const [modalAgregarMarca, setModalAgregarMarca] = useState(false);
+  const [modalGestionarPrecios, setModalGestionarPrecios] = useState(false);
+  
+  // Estados para filtros del modal de gestión
+  const [busquedaModalGestion, setBusquedaModalGestion] = useState('');
+  const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
   const [modalAgregarTipo, setModalAgregarTipo] = useState(false);
   const [modalAgregarCalidad, setModalAgregarCalidad] = useState(false);
   const [productoEditando, setProductoEditando] = useState<ProductoCompleto | null>(null);
@@ -94,6 +137,33 @@ const Products: React.FC = () => {
   const [formCrear] = Form.useForm();
   const [formEditar] = Form.useForm();
   const [formStock] = Form.useForm();
+
+  /**
+   * Cargar sucursales disponibles desde la base de datos
+   */
+  const cargarSucursales = async () => {
+    setLoadingSucursales(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3456/api'}/sucursales`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setSucursales(data.data);
+        
+        // Si no hay sucursal seleccionada y hay sucursales disponibles, seleccionar la primera
+        if (!sucursalSeleccionada && data.data.length > 0) {
+          setSucursalSeleccionada(data.data[0].sucursal);
+        }
+        
+        console.log(`✅ ${data.data.length} sucursales cargadas`);
+      }
+    } catch (error) {
+      console.error('Error al cargar sucursales:', error);
+      message.error('Error al cargar sucursales');
+    } finally {
+      setLoadingSucursales(false);
+    }
+  };
 
   /**
    * Cargar productos de la sucursal seleccionada
@@ -244,9 +314,10 @@ const Products: React.FC = () => {
   }, [sucursalSeleccionada]);
 
   /**
-   * Efecto: Cargar marcas, tipos y calidades al montar el componente
+   * Efecto: Cargar sucursales, marcas, tipos y calidades al montar el componente
    */
   useEffect(() => {
+    cargarSucursales();
     cargarMarcas();
     cargarTipos();
     cargarCalidades();
@@ -319,7 +390,8 @@ const Products: React.FC = () => {
       await productosService.actualizar(productoEditando.id, datosActualizados);
 
       // 2. 🆕 Actualizar stock y precio de CADA sucursal
-      for (const sucursal of SUCURSALES) {
+      for (const sucursalObj of sucursales) {
+        const sucursal = sucursalObj.sucursal;
         const datos: Partial<ProductoSucursalInput> = {
           stock: values[`stock_${sucursal}`] || 0,
           precio: values[`precio_${sucursal}`] || 0,
@@ -398,7 +470,8 @@ const Products: React.FC = () => {
       if (productoCompleto) {
         // Cargar stock y precio de cada sucursal en el formulario
         const sucursalesData: any = {};
-        SUCURSALES.forEach(sucursal => {
+        sucursales.forEach(sucursalObj => {
+          const sucursal = sucursalObj.sucursal;
           const sucursalData = productoCompleto.sucursales?.find(s => s.sucursal === sucursal);
           sucursalesData[`stock_${sucursal}`] = sucursalData?.stock || 0;
           sucursalesData[`precio_${sucursal}`] = sucursalData?.precio || 0;
@@ -599,19 +672,48 @@ const Products: React.FC = () => {
             <Space>
               {/* 🔐 Solo administradores pueden crear productos */}
               {esAdministrador && (
-        <Button 
-          type="primary" 
-                  icon={<PlusOutlined />}
-                  onClick={() => setModalCrearVisible(true)}
-                  size="large"
-                >
-                  Nuevo Producto
-                </Button>
+                <>
+                  <Button 
+                    type="primary" 
+                    icon={<PlusOutlined />}
+                    onClick={() => setModalCrearVisible(true)}
+                    size="large"
+                  >
+                    Nuevo Producto
+                  </Button>
+                  
+                  {/* 🎯 Botón Gestionar Precios y Stock */}
+                  <Button
+                    icon={<SettingOutlined />}
+                    onClick={() => {
+                      // Limpiar filtros al abrir el modal
+                      setBusquedaModalGestion('');
+                      setTipoFiltroModalGestion('todos');
+                      setModalGestionarPrecios(true);
+                    }}
+                    size="large"
+                    style={{
+                      background: 'linear-gradient(135deg, #2c2416 0%, #3e2723 50%, #4a3728 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      boxShadow: '0 4px 12px rgba(62, 39, 35, 0.4)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    className="price-management-btn"
+                  >
+                    Gestionar Precios
+                  </Button>
+                </>
               )}
               <Button
           icon={<ReloadOutlined />} 
-                onClick={cargarProductos}
+                onClick={() => {
+                  cargarSucursales();
+                  cargarProductos();
+                }}
                 size="large"
+                loading={loadingSucursales || loading}
         >
           Actualizar
         </Button>
@@ -620,40 +722,40 @@ const Products: React.FC = () => {
         </Row>
       </Card>
       
-        {/* Estadísticas */}
+      {/* Estadísticas */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={8}>
-            <Card>
-              <Statistic
-                title="Total Productos"
+          <Card>
+            <Statistic
+              title="Total Productos"
               value={estadisticas.totalProductos}
               prefix={<TagOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
-            </Card>
-          </Col>
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
         <Col xs={24} sm={8}>
-            <Card>
-              <Statistic
+          <Card>
+            <Statistic
               title="Stock Bajo"
               value={estadisticas.stockBajo}
               prefix={<WarningOutlined />}
               valueStyle={{ color: estadisticas.stockBajo > 0 ? '#ff4d4f' : '#52c41a' }}
-              />
-            </Card>
-          </Col>
+            />
+          </Card>
+        </Col>
         <Col xs={24} sm={8}>
-            <Card>
-              <Statistic
+          <Card>
+            <Statistic
               title="Valor Total Inventario"
               value={estadisticas.valorTotal}
               prefix={<DollarOutlined />}
               precision={2}
               valueStyle={{ color: '#52c41a' }}
-              />
-            </Card>
-          </Col>
-        </Row>
+            />
+          </Card>
+        </Col>
+      </Row>
 
       {/* Filtros y búsqueda */}
       <Card style={{ marginBottom: '24px' }}>
@@ -667,10 +769,10 @@ const Products: React.FC = () => {
                 style={{ width: '100%' }}
                 size="large"
               >
-                {SUCURSALES.map(sucursal => (
-                  <Option key={sucursal} value={sucursal}>
-                    {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
-                    {sucursal === 'maldonado' && (
+                {sucursales.map(sucursalObj => (
+                  <Option key={sucursalObj.sucursal} value={sucursalObj.sucursal}>
+                    {formatearNombreSucursal(sucursalObj.sucursal)}
+                    {sucursalObj.sucursal === 'maldonado' && (
                       <Tag color="gold" style={{ marginLeft: '8px' }}>
                         Stock Principal
                       </Tag>
@@ -887,72 +989,17 @@ const Products: React.FC = () => {
             </Row>
           </Card>
 
-          {/* 🆕 Stock y Precio por Sucursal */}
-          <Card size="small" title="🏪 Stock y Precio por Sucursal">
-            <Collapse accordion>
-              {SUCURSALES.map((sucursal) => (
-                <Collapse.Panel
-                  key={sucursal}
-                  header={
-                    <Space>
-                      <ShopOutlined />
-                      <Text strong style={{ textTransform: 'capitalize' }}>
-                        {sucursal}
-                        {sucursal === 'maldonado' && (
-                          <Tag color="blue" style={{ marginLeft: 8 }}>
-                            Stock Principal
-                          </Tag>
-                        )}
-                      </Text>
-                    </Space>
-                  }
-                >
-            <Row gutter={16}>
-                    <Col span={8}>
-                  <Form.Item
-                        label="Stock Disponible"
-                        name={`stock_${sucursal}`}
-                        rules={[{ required: true, message: 'Requerido' }]}
-                  >
-                    <InputNumber
-                          min={0}
-                      style={{ width: '100%' }}
-                      placeholder="0"
-                          prefix="#"
-                    />
-                  </Form.Item>
-                </Col>
-              <Col span={8}>
-                <Form.Item
-                        label="Precio de Venta"
-                        name={`precio_${sucursal}`}
-                        rules={[{ required: true, message: 'Requerido' }]}
-                >
-                  <InputNumber
-                          min={0}
-                          step={0.01}
-                    style={{ width: '100%' }}
-                          placeholder="0.00"
-                    prefix="$"
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item
-                        label="Stock Mínimo"
-                        name={`stock_minimo_${sucursal}`}
-                      >
-                        <InputNumber
-                    min={0}
-                          style={{ width: '100%' }}
-                          placeholder="10"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-                </Collapse.Panel>
-              ))}
-            </Collapse>
+          {/* 📝 Nota: Stock y Precio se configuran desde "Gestionar Precios y Stock" */}
+          <Card size="small" style={{ background: '#f0f5ff', border: '1px solid #adc6ff' }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text strong style={{ color: '#1890ff' }}>
+                ℹ️ Stock y Precios por Sucursal
+              </Text>
+              <Text type="secondary">
+                Una vez creado el producto, podrás configurar stock y precios para cada sucursal 
+                usando el botón <Text strong>"Gestionar Precios y Stock"</Text> en la parte superior.
+              </Text>
+            </Space>
           </Card>
         </Form>
       </Modal>
@@ -1013,7 +1060,7 @@ const Products: React.FC = () => {
 
           <Space direction="vertical" style={{ width: '100%' }}>
             <Text type="secondary">
-              Sucursal: <Text strong>{sucursalSeleccionada.toUpperCase()}</Text>
+              Sucursal: <Text strong>{formatearNombreSucursal(sucursalSeleccionada)}</Text>
             </Text>
             {sucursalSeleccionada === 'maldonado' && (
               <Tag color="gold">Stock Principal</Tag>
@@ -1084,6 +1131,283 @@ const Products: React.FC = () => {
           autoFocus
         />
         </Modal>
+
+      {/* 🎯 Modal: Gestionar Precios y Stock por Sucursal */}
+      <Modal
+        title={
+          <Space>
+            <RocketOutlined style={{ color: '#667eea' }} />
+            <span>Gestionar Precios y Stock por Sucursal</span>
+          </Space>
+        }
+        open={modalGestionarPrecios}
+        onCancel={() => setModalGestionarPrecios(false)}
+        footer={[
+          <Button key="close" onClick={() => setModalGestionarPrecios(false)}>
+            Cerrar
+          </Button>
+        ]}
+        width={900}
+        style={{ top: 20 }}
+      >
+        <Spin spinning={loading}>
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            {/* Descripción */}
+            <Card size="small" style={{ background: '#f0f5ff', border: '1px solid #adc6ff' }}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Text strong style={{ color: '#1890ff' }}>
+                  💡 Gestión Centralizada
+                </Text>
+                <Text type="secondary">
+                  Configura stock, precios y stock mínimo para cada producto en todas las sucursales.
+                  Usa el selector de sucursal y la tabla de productos para hacer los cambios.
+                </Text>
+              </Space>
+            </Card>
+
+            {/* Selector de Sucursal */}
+            <Card size="small" title="🏪 Seleccionar Sucursal">
+              <Select
+                value={sucursalSeleccionada}
+                onChange={setSucursalSeleccionada}
+                style={{ width: '100%' }}
+                size="large"
+              >
+                {sucursales.map(sucursalObj => (
+                  <Option key={sucursalObj.sucursal} value={sucursalObj.sucursal}>
+                    <Space>
+                      <ShopOutlined />
+                      {formatearNombreSucursal(sucursalObj.sucursal)}
+                      {sucursalObj.sucursal === 'maldonado' && (
+                        <Tag color="gold">Stock Principal</Tag>
+                      )}
+                    </Space>
+                  </Option>
+                ))}
+              </Select>
+            </Card>
+
+            {/* 🔍 Filtros: Búsqueda y Tipo */}
+            <Card size="small" title="🔍 Buscar y Filtrar">
+              <Row gutter={[16, 16]}>
+                <Col xs={24} md={14}>
+                  <Input
+                    placeholder="Buscar por nombre, marca o código..."
+                    prefix={<SearchOutlined style={{ color: '#1890ff' }} />}
+                    value={busquedaModalGestion}
+                    onChange={(e) => setBusquedaModalGestion(e.target.value)}
+                    size="large"
+                    allowClear
+                    style={{
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                    }}
+                  />
+                </Col>
+                <Col xs={24} md={10}>
+                  <Select
+                    placeholder="Filtrar por tipo"
+                    value={tipoFiltroModalGestion}
+                    onChange={setTipoFiltroModalGestion}
+                    style={{ width: '100%' }}
+                    size="large"
+                  >
+                    <Option value="todos">
+                      <Space>
+                        <TagOutlined />
+                        Todos los tipos
+                      </Space>
+                    </Option>
+                    {tipos.map(tipo => (
+                      <Option key={tipo} value={tipo}>
+                        <Space>
+                          <TagOutlined />
+                          {tipo}
+                        </Space>
+                      </Option>
+                    ))}
+                  </Select>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* Lista de Productos con Stock y Precio */}
+            <Card 
+              size="small" 
+              title={
+                <Space>
+                  <TagOutlined />
+                  <Text>Productos - {formatearNombreSucursal(sucursalSeleccionada)}</Text>
+                  <Badge 
+                    count={
+                      productos.filter((producto) => {
+                        const terminoBusqueda = busquedaModalGestion.toLowerCase();
+                        const cumpleBusqueda = !terminoBusqueda || 
+                          producto.nombre.toLowerCase().includes(terminoBusqueda) ||
+                          producto.marca.toLowerCase().includes(terminoBusqueda) ||
+                          producto.codigo_barras?.toLowerCase().includes(terminoBusqueda);
+                        const cumpleTipo = tipoFiltroModalGestion === 'todos' || 
+                          producto.tipo === tipoFiltroModalGestion;
+                        return cumpleBusqueda && cumpleTipo;
+                      }).length
+                    } 
+                    style={{ backgroundColor: '#667eea' }}
+                  />
+                </Space>
+              }
+            >
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                {(() => {
+                  // Filtrar productos según búsqueda y tipo
+                  const productosFiltrados = productos.filter((producto) => {
+                    // Filtro de búsqueda
+                    const terminoBusqueda = busquedaModalGestion.toLowerCase();
+                    const cumpleBusqueda = !terminoBusqueda || 
+                      producto.nombre.toLowerCase().includes(terminoBusqueda) ||
+                      producto.marca.toLowerCase().includes(terminoBusqueda) ||
+                      producto.codigo_barras?.toLowerCase().includes(terminoBusqueda);
+                    
+                    // Filtro de tipo
+                    const cumpleTipo = tipoFiltroModalGestion === 'todos' || 
+                      producto.tipo === tipoFiltroModalGestion;
+                    
+                    return cumpleBusqueda && cumpleTipo;
+                  });
+
+                  // Mostrar mensaje si no hay productos
+                  if (productos.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px' }}>
+                        <Text type="secondary">
+                          No hay productos disponibles. Crea productos primero usando el botón "Nuevo Producto".
+                        </Text>
+                      </div>
+                    );
+                  }
+
+                  // Mostrar mensaje si no hay resultados del filtro
+                  if (productosFiltrados.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px' }}>
+                        <Text type="secondary" style={{ fontSize: '16px' }}>
+                          🔍 No se encontraron productos con los filtros aplicados
+                        </Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: '14px', marginTop: '8px' }}>
+                          Intenta con otros términos de búsqueda o cambia el filtro de tipo
+                        </Text>
+                      </div>
+                    );
+                  }
+
+                  // Mostrar productos filtrados
+                  return productosFiltrados.map((producto) => {
+                    const sucursalData = producto.sucursales?.find(
+                      s => s.sucursal === sucursalSeleccionada
+                    );
+
+                    return (
+                      <Card 
+                        key={producto.id}
+                        size="small"
+                        style={{ 
+                          background: '#fafafa',
+                          borderLeft: `4px solid ${sucursalData?.stock && sucursalData.stock > 0 ? '#52c41a' : '#ff4d4f'}`
+                        }}
+                      >
+                        <Row gutter={[16, 16]} align="middle">
+                          {/* Información del Producto */}
+                          <Col span={8}>
+                            <Space direction="vertical" size="small">
+                              <Text strong style={{ fontSize: '15px' }}>
+                                {producto.nombre}
+                              </Text>
+                              <Space size="small">
+                                <Tag color="blue">{producto.marca}</Tag>
+                                <Tag color="cyan">{producto.tipo}</Tag>
+                                <Tag color="purple">{producto.calidad}</Tag>
+                              </Space>
+                            </Space>
+                          </Col>
+
+                          {/* Stock Actual */}
+                          <Col span={5}>
+                            <Space direction="vertical" size={0}>
+                              <Text type="secondary" style={{ fontSize: '12px' }}>
+                                Stock Actual
+                              </Text>
+                              <Text 
+                                strong 
+                                style={{ 
+                                  fontSize: '20px',
+                                  color: sucursalData?.stock && sucursalData.stock > (sucursalData.stock_minimo || 10) 
+                                    ? '#52c41a' 
+                                    : '#ff4d4f'
+                                }}
+                              >
+                                {sucursalData?.stock || 0}
+                              </Text>
+                            </Space>
+                          </Col>
+
+                          {/* Precio */}
+                          <Col span={5}>
+                            <Space direction="vertical" size={0}>
+                              <Text type="secondary" style={{ fontSize: '12px' }}>
+                                Precio
+                              </Text>
+                              <Text strong style={{ fontSize: '18px', color: '#52c41a' }}>
+                                ${sucursalData?.precio?.toFixed(2) || '0.00'}
+                              </Text>
+                            </Space>
+                          </Col>
+
+                          {/* Botón de Editar */}
+                          <Col span={6} style={{ textAlign: 'right' }}>
+                            <Button
+                              type="primary"
+                              icon={<EditOutlined />}
+                              onClick={() => {
+                                setProductoEditando(producto);
+                                setModalStockVisible(true);
+                                formStock.setFieldsValue({
+                                  stock: sucursalData?.stock || 0,
+                                  precio: sucursalData?.precio || 0,
+                                  stock_minimo: sucursalData?.stock_minimo || 10
+                                });
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                border: 'none'
+                              }}
+                            >
+                              Editar
+                            </Button>
+                          </Col>
+                        </Row>
+                      </Card>
+                    );
+                  });
+                })()}
+              </Space>
+            </Card>
+          </Space>
+        </Spin>
+      </Modal>
+
+      {/* Estilos para el botón de gestión */}
+      <style>{`
+        .price-management-btn:hover {
+          background: linear-gradient(135deg, #3e2723 0%, #4a3728 50%, #5d4037 100%) !important;
+          box-shadow: 0 6px 20px rgba(74, 55, 40, 0.6) !important;
+          transform: translateY(-2px);
+        }
+        
+        .price-management-btn:active {
+          transform: translateY(0px);
+          box-shadow: 0 2px 8px rgba(62, 39, 35, 0.4) !important;
+        }
+      `}</style>
     </div>
   );
 };

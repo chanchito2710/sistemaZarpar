@@ -374,13 +374,13 @@ export const eliminarVendedor = async (req: Request, res: Response): Promise<voi
         console.log(`⚠️ No se puede eliminar permanentemente a "${vendedor.nombre}" porque tiene datos relacionados. Haciendo soft delete...`);
 
         // Desactivar en vez de eliminar
-        await executeQuery(
-          'UPDATE vendedores SET activo = 0, updated_at = NOW() WHERE id = ?',
-          [id]
-        );
+    await executeQuery(
+      'UPDATE vendedores SET activo = 0, updated_at = NOW() WHERE id = ?',
+      [id]
+    );
 
-        res.json({
-          success: true,
+    res.json({
+      success: true,
           message: `⚠️ El vendedor "${vendedor.nombre}" tiene clientes o ventas asociadas. Se ha DESACTIVADO en vez de eliminarse permanentemente para preservar el historial.`,
           data: {
             id: vendedor.id,

@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import { executeQuery, pool } from '../config/database';
+import { tablaClientesExiste } from '../utils/database.js';
 
 /**
  * Interfaz para el tipo Cliente
@@ -50,20 +51,16 @@ const obtenerNombreTabla = async (sucursal: string): Promise<string | null> => {
     const sucursalNormalizada = sucursal.toLowerCase().trim();
     const nombreTabla = `clientes_${sucursalNormalizada}`;
     
-    // Verificar si la tabla existe en la base de datos
-    const [tablas] = await pool.execute(
-      `SELECT TABLE_NAME 
-       FROM information_schema.TABLES 
-       WHERE TABLE_SCHEMA = DATABASE() 
-       AND TABLE_NAME = ?`,
-      [nombreTabla]
-    );
+    // Usar función helper de database.ts para verificar existencia
+    const existe = await tablaClientesExiste(sucursalNormalizada);
     
-    // Si la tabla existe, retornar el nombre con backticks para seguridad
-    if ((tablas as any[]).length > 0) {
+    if (existe) {
+      console.log(`✅ Tabla ${nombreTabla} validada para operación de clientes`);
+      // Retornar el nombre con backticks para seguridad SQL
       return `\`${nombreTabla}\``;
     }
     
+    console.log(`❌ Tabla ${nombreTabla} NO existe`);
     return null;
   } catch (error) {
     console.error('❌ Error al verificar tabla de clientes:', error);

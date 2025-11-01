@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import {
   obtenerProductos,
+  obtenerProductosConSucursales,
   obtenerProductosPorSucursal,
   obtenerProductoPorId,
   crearProducto,
@@ -14,7 +15,11 @@ import {
   actualizarProductoSucursal,
   buscarProductos,
   obtenerCategorias,
-  agregarCategoria
+  agregarCategoria,
+  obtenerSucursalPrincipalEndpoint,
+  prepararTransferencia,
+  confirmarTransferencia,
+  ajustarTransferencia
 } from '../controllers/productosController.js';
 import { verificarAutenticacion } from '../middleware/auth.js';
 
@@ -31,6 +36,18 @@ router.get(
   '/buscar',
   verificarAutenticacion,
   buscarProductos
+);
+
+/**
+ * @route   GET /api/productos/con-sucursales
+ * @desc    Obtener TODOS los productos con información de TODAS las sucursales
+ * @access  Private (requiere autenticación)
+ * @returns Array de productos con array de sucursales para cada uno
+ */
+router.get(
+  '/con-sucursales',
+  verificarAutenticacion,
+  obtenerProductosConSucursales
 );
 
 /**
@@ -121,6 +138,63 @@ router.post(
   '/categorias',
   verificarAutenticacion,
   agregarCategoria
+);
+
+/**
+ * ===================================
+ * RUTAS PARA TRANSFERENCIAS DINÁMICAS
+ * ===================================
+ */
+
+/**
+ * @route   GET /api/productos/sucursal-principal
+ * @desc    Obtener la sucursal principal (identificada por es_stock_principal = 1)
+ * @access  Private (requiere autenticación)
+ * @returns { sucursal: string } - Nombre de la sucursal principal
+ */
+router.get(
+  '/sucursal-principal',
+  verificarAutenticacion,
+  obtenerSucursalPrincipalEndpoint
+);
+
+/**
+ * @route   POST /api/productos/preparar-transferencia
+ * @desc    Descontar stock de sucursal principal y agregarlo a stock_en_transito de destino
+ * @access  Private (requiere autenticación)
+ * @body    { producto_id: number, sucursal_destino: string, cantidad: number }
+ * @returns Confirmación de transferencia preparada
+ */
+router.post(
+  '/preparar-transferencia',
+  verificarAutenticacion,
+  prepararTransferencia
+);
+
+/**
+ * @route   POST /api/productos/ajustar-transferencia
+ * @desc    Ajustar cantidad en stock_en_transito (devolver sobrante a principal o descontar más)
+ * @access  Private (requiere autenticación)
+ * @body    { producto_id: number, sucursal_destino: string, cantidad_anterior: number, cantidad_nueva: number }
+ * @returns Confirmación de ajuste
+ */
+router.post(
+  '/ajustar-transferencia',
+  verificarAutenticacion,
+  ajustarTransferencia
+);
+
+/**
+ * @route   POST /api/productos/confirmar-transferencia
+ * @desc    Confirmar transferencia: pasar de stock_en_transito a stock real en destino
+ * @access  Private (requiere autenticación)
+ * @body    { transferencias: Array<{ producto_id: number, sucursal: string, cantidad: number }> }
+ * @returns Confirmación de transferencias completadas
+ */
+router.post(
+  '/confirmar-transferencia',
+  verificarAutenticacion,
+  confirmarTransferencia
 );
 
 export default router;

@@ -7,6 +7,22 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { tablaClientesExiste } from '../utils/database.js';
+
+/**
+ * Helper: Obtener sucursal principal dinámica
+ */
+const obtenerSucursalPrincipal = async (): Promise<string | null> => {
+  const connection = await pool.getConnection();
+  try {
+    const [rows] = await connection.query<RowDataPacket[]>(
+      'SELECT DISTINCT sucursal FROM productos_sucursal WHERE es_stock_principal = 1 LIMIT 1'
+    );
+    return rows.length > 0 ? rows[0].sucursal : null;
+  } finally {
+    connection.release();
+  }
+};
 
 /**
  * Interfaces
@@ -75,23 +91,22 @@ const executeQuery = async <T extends RowDataPacket[] | ResultSetHeader>(
 
 /**
  * Helper: Validar sucursal (DINÁMICO)
- * Verifica si la sucursal existe en productos_sucursal
+ * Verifica si la sucursal existe consultando la tabla clientes_[sucursal]
  */
 const validarSucursal = async (sucursal: string): Promise<boolean> => {
   try {
     const sucursalNormalizada = sucursal.toLowerCase().trim();
     
-    // Consultar si existe al menos un producto para esa sucursal
-    const [rows] = await pool.execute(
-      `SELECT COUNT(*) as total 
-       FROM productos_sucursal 
-       WHERE sucursal = ? 
-       LIMIT 1`,
-      [sucursalNormalizada]
-    );
+    // Verificar si existe la tabla clientes_[sucursal] dinámicamente
+    const existe = await tablaClientesExiste(sucursalNormalizada);
     
-    const resultado = rows as { total: number }[];
-    return resultado[0]?.total > 0;
+    if (existe) {
+      console.log(`✅ Sucursal "${sucursalNormalizada}" validada correctamente`);
+    } else {
+      console.log(`❌ Sucursal "${sucursalNormalizada}" NO existe`);
+    }
+    
+    return existe;
   } catch (error) {
     console.error('❌ Error al validar sucursal:', error);
     return false;
@@ -135,6 +150,70 @@ export const obtenerProductos = async (req: Request, res: Response): Promise<voi
 };
 
 /**
+ * Obtener TODOS los productos con información de TODAS las sucursales
+ * GET /api/productos/con-sucursales
+ */
+export const obtenerProductosConSucursales = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Obtener todos los productos
+    const queryProductos = `
+      SELECT 
+        id, nombre, marca, tipo, calidad, 
+        codigo_barras, activo, 
+        created_at, updated_at
+      FROM productos
+      WHERE activo = 1
+      ORDER BY nombre ASC
+    `;
+    const productos = await executeQuery<Producto[]>(queryProductos);
+
+    // Para cada producto, obtener información de todas las sucursales
+    const productosConSucursales = await Promise.all(
+      productos.map(async (producto) => {
+        const querySucursales = `
+          SELECT 
+            sucursal,
+            stock,
+            precio,
+            stock_minimo,
+            es_stock_principal,
+            activo,
+            stock_en_transito,
+            updated_at
+          FROM productos_sucursal
+          WHERE producto_id = ?
+          ORDER BY 
+            CASE 
+              WHEN es_stock_principal = 1 THEN 0 
+              ELSE 1 
+            END,
+            sucursal ASC
+        `;
+        const sucursales = await executeQuery<ProductoSucursal[]>(querySucursales, [producto.id]);
+
+        return {
+          ...producto,
+          sucursales: sucursales
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      data: productosConSucursales,
+      count: productosConSucursales.length
+    });
+  } catch (error) {
+    console.error('Error al obtener productos con sucursales:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener productos con sucursales',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
  * Obtener productos de una sucursal específica (con stock y precio)
  * GET /api/productos/sucursal/:sucursal
  */
@@ -154,7 +233,7 @@ export const obtenerProductosPorSucursal = async (req: Request, res: Response): 
     if (!sucursalValida) {
       res.status(400).json({
         success: false,
-        message: `Sucursal inválida: "${sucursal}". No hay productos registrados para esta sucursal.`
+        message: `Sucursal inválida: "${sucursal}". La sucursal no existe en el sistema.`
       });
       return;
     }
@@ -485,7 +564,7 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
     if (!sucursalValida) {
       res.status(400).json({
         success: false,
-        message: 'Sucursal inválida'
+        message: `Sucursal inválida: "${sucursal}". La sucursal no existe en el sistema.`
       });
       return;
     }
@@ -606,10 +685,11 @@ export const buscarProductos = async (req: Request, res: Response): Promise<void
 
     if (sucursal && typeof sucursal === 'string') {
       // Buscar con información de sucursal
-      if (!validarSucursal(sucursal)) {
+      const sucursalValida = await validarSucursal(sucursal);
+      if (!sucursalValida) {
         res.status(400).json({
           success: false,
-          message: 'Sucursal inválida'
+          message: `Sucursal inválida: "${sucursal}". La sucursal no existe en el sistema.`
         });
         return;
       }
@@ -803,6 +883,322 @@ export const agregarCategoria = async (req: Request, res: Response): Promise<voi
       message: 'Error al agregar categoría',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
+  }
+};
+
+/**
+ * ===================================
+ * ENDPOINTS PARA TRANSFERENCIAS DINÁMICAS
+ * ===================================
+ */
+
+/**
+ * GET /api/productos/sucursal-principal
+ * Obtener la sucursal principal (es_stock_principal = 1)
+ */
+export const obtenerSucursalPrincipalEndpoint = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sucursalPrincipal = await obtenerSucursalPrincipal();
+    
+    if (!sucursalPrincipal) {
+      res.status(404).json({
+        success: false,
+        message: 'No se encontró una sucursal principal configurada'
+      });
+      return;
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        sucursal: sucursalPrincipal
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener sucursal principal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener sucursal principal',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * POST /api/productos/preparar-transferencia
+ * Descontar de sucursal principal y agregar a stock_en_transito
+ * Body: { producto_id, sucursal_destino, cantidad }
+ */
+export const prepararTransferencia = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { producto_id, sucursal_destino, cantidad } = req.body;
+    
+    // Validaciones
+    if (!producto_id || !sucursal_destino || !cantidad || cantidad <= 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Datos inválidos: producto_id, sucursal_destino y cantidad son requeridos'
+      });
+      return;
+    }
+    
+    // Obtener sucursal principal dinámicamente
+    const sucursalPrincipal = await obtenerSucursalPrincipal();
+    
+    if (!sucursalPrincipal) {
+      res.status(404).json({
+        success: false,
+        message: 'No se encontró una sucursal principal configurada'
+      });
+      return;
+    }
+    
+    await connection.beginTransaction();
+    
+    // 1. Verificar stock disponible en sucursal principal
+    const [stockRows] = await connection.query<RowDataPacket[]>(
+      'SELECT stock FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?',
+      [producto_id, sucursalPrincipal]
+    );
+    
+    if (stockRows.length === 0) {
+      await connection.rollback();
+      res.status(404).json({
+        success: false,
+        message: `Producto no encontrado en sucursal principal (${sucursalPrincipal})`
+      });
+      return;
+    }
+    
+    const stockDisponible = stockRows[0].stock;
+    
+    if (stockDisponible < cantidad) {
+      await connection.rollback();
+      res.status(400).json({
+        success: false,
+        message: `Stock insuficiente en ${sucursalPrincipal}. Disponible: ${stockDisponible}, Solicitado: ${cantidad}`
+      });
+      return;
+    }
+    
+    // 2. Descontar de sucursal principal
+    await connection.query(
+      'UPDATE productos_sucursal SET stock = stock - ? WHERE producto_id = ? AND sucursal = ?',
+      [cantidad, producto_id, sucursalPrincipal]
+    );
+    
+    // 3. Agregar a stock_en_transito en sucursal destino
+    await connection.query(
+      'UPDATE productos_sucursal SET stock_en_transito = stock_en_transito + ? WHERE producto_id = ? AND sucursal = ?',
+      [cantidad, producto_id, sucursal_destino]
+    );
+    
+    await connection.commit();
+    
+    res.json({
+      success: true,
+      message: `Transferencia preparada: ${cantidad} unidades de ${sucursalPrincipal} a ${sucursal_destino}`,
+      data: {
+        producto_id,
+        sucursal_origen: sucursalPrincipal,
+        sucursal_destino,
+        cantidad,
+        stock_restante: stockDisponible - cantidad
+      }
+    });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al preparar transferencia:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al preparar transferencia',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * POST /api/productos/confirmar-transferencia
+ * Pasar de stock_en_transito a stock real
+ * Body: { transferencias: [{ producto_id, sucursal, cantidad }] }
+ */
+export const confirmarTransferencia = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { transferencias } = req.body;
+    
+    if (!Array.isArray(transferencias) || transferencias.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Datos inválidos: se requiere un array de transferencias'
+      });
+      return;
+    }
+    
+    await connection.beginTransaction();
+    
+    for (const transfer of transferencias) {
+      const { producto_id, sucursal, cantidad } = transfer;
+      
+      // Verificar que hay suficiente stock_en_transito
+      const [rows] = await connection.query<RowDataPacket[]>(
+        'SELECT stock_en_transito FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?',
+        [producto_id, sucursal]
+      );
+      
+      if (rows.length === 0 || rows[0].stock_en_transito < cantidad) {
+        await connection.rollback();
+        res.status(400).json({
+          success: false,
+          message: `Stock en tránsito insuficiente para producto ${producto_id} en ${sucursal}`
+        });
+        return;
+      }
+      
+      // Pasar de stock_en_transito a stock
+      await connection.query(
+        `UPDATE productos_sucursal 
+         SET stock = stock + ?, 
+             stock_en_transito = stock_en_transito - ? 
+         WHERE producto_id = ? AND sucursal = ?`,
+        [cantidad, cantidad, producto_id, sucursal]
+      );
+    }
+    
+    await connection.commit();
+    
+    res.json({
+      success: true,
+      message: `${transferencias.length} transferencias confirmadas exitosamente`,
+      data: { transferencias_confirmadas: transferencias.length }
+    });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al confirmar transferencia:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al confirmar transferencia',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * POST /api/productos/ajustar-transferencia
+ * Ajustar cantidad en stock_en_transito (devolver sobrante a principal o descontar más)
+ * Body: { producto_id, sucursal_destino, cantidad_anterior, cantidad_nueva }
+ */
+export const ajustarTransferencia = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { producto_id, sucursal_destino, cantidad_anterior, cantidad_nueva } = req.body;
+    
+    if (!producto_id || !sucursal_destino || cantidad_anterior === undefined || cantidad_nueva === undefined) {
+      res.status(400).json({
+        success: false,
+        message: 'Datos inválidos'
+      });
+      return;
+    }
+    
+    const diferencia = cantidad_nueva - cantidad_anterior;
+    
+    if (diferencia === 0) {
+      res.json({
+        success: true,
+        message: 'Sin cambios',
+        data: { diferencia: 0 }
+      });
+      return;
+    }
+    
+    const sucursalPrincipal = await obtenerSucursalPrincipal();
+    
+    if (!sucursalPrincipal) {
+      res.status(404).json({
+        success: false,
+        message: 'No se encontró una sucursal principal'
+      });
+      return;
+    }
+    
+    await connection.beginTransaction();
+    
+    if (diferencia > 0) {
+      // Aumentar: descontar más de principal y agregar a en_transito
+      const [stockRows] = await connection.query<RowDataPacket[]>(
+        'SELECT stock FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?',
+        [producto_id, sucursalPrincipal]
+      );
+      
+      if (stockRows.length === 0 || stockRows[0].stock < diferencia) {
+        await connection.rollback();
+        res.status(400).json({
+          success: false,
+          message: `Stock insuficiente en ${sucursalPrincipal}`
+        });
+        return;
+      }
+      
+      await connection.query(
+        'UPDATE productos_sucursal SET stock = stock - ? WHERE producto_id = ? AND sucursal = ?',
+        [diferencia, producto_id, sucursalPrincipal]
+      );
+      
+      await connection.query(
+        'UPDATE productos_sucursal SET stock_en_transito = stock_en_transito + ? WHERE producto_id = ? AND sucursal = ?',
+        [diferencia, producto_id, sucursal_destino]
+      );
+      
+    } else {
+      // Disminuir: devolver a principal y quitar de en_transito
+      const cantidadDevolver = Math.abs(diferencia);
+      
+      await connection.query(
+        'UPDATE productos_sucursal SET stock = stock + ? WHERE producto_id = ? AND sucursal = ?',
+        [cantidadDevolver, producto_id, sucursalPrincipal]
+      );
+      
+      await connection.query(
+        'UPDATE productos_sucursal SET stock_en_transito = stock_en_transito - ? WHERE producto_id = ? AND sucursal = ?',
+        [cantidadDevolver, producto_id, sucursal_destino]
+      );
+    }
+    
+    await connection.commit();
+    
+    res.json({
+      success: true,
+      message: `Transferencia ajustada: ${diferencia > 0 ? '+' : ''}${diferencia} unidades`,
+      data: {
+        producto_id,
+        sucursal_origen: sucursalPrincipal,
+        sucursal_destino,
+        diferencia,
+        cantidad_nueva
+      }
+    });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al ajustar transferencia:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al ajustar transferencia',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  } finally {
+    connection.release();
   }
 };
 

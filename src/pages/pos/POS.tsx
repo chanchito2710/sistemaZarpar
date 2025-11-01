@@ -27,7 +27,35 @@ import { vendedoresService, clientesService, type Cliente, type Vendedor } from 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+/**
+ * UTILIDADES PARA NOMBRES DE SUCURSALES
+ */
 
+/**
+ * Formatear nombre de sucursal para mostrar: capitaliza cada palabra
+ * "rionegro" → "Rio Negro"
+ * "cerrolargo" → "Cerro Largo"
+ */
+const formatearNombreSucursal = (nombre: string): string => {
+  const normalizado = nombre.toLowerCase().trim();
+  
+  // Lista de sucursales conocidas con espacios
+  const sucursalesConEspacios: { [key: string]: string } = {
+    'rionegro': 'Rio Negro',
+    'cerrolargo': 'Cerro Largo',
+    'treintaytres': 'Treinta Y Tres',
+    'floresdalsur': 'Flores Dal Sur',
+    // Agregar más según necesites
+  };
+  
+  // Si está en la lista, usar el formato conocido
+  if (sucursalesConEspacios[normalizado]) {
+    return sucursalesConEspacios[normalizado];
+  }
+  
+  // Si no, capitalizar la primera letra
+  return normalizado.charAt(0).toUpperCase() + normalizado.slice(1);
+};
 
 const POS: React.FC = () => {
   const navigate = useNavigate();
@@ -336,7 +364,7 @@ const POS: React.FC = () => {
                     >
                       {sucursales.map(sucursal => (
                         <Option key={sucursal} value={sucursal.toLowerCase()}>
-                          {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
+                          {formatearNombreSucursal(sucursal)}
                         </Option>
                       ))}
                     </Select>

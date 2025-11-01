@@ -45,3 +45,4 @@ router.delete('/:nombre', verificarAutenticacion, verificarAdmin, eliminarSucurs
 export default router;
 
 
+

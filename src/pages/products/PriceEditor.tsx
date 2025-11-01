@@ -27,6 +27,8 @@ import jsPDF from 'jspdf';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+
 interface Product {
   id: string;
   name: string;
@@ -45,6 +47,26 @@ interface Branch {
   name: string;
   location: string;
 }
+
+/**
+ * Formatear nombre de sucursal para mostrar
+ */
+const formatearNombreSucursal = (nombre: string): string => {
+  const normalizado = nombre.toLowerCase().trim();
+  
+  const sucursalesConEspacios: { [key: string]: string } = {
+    'rionegro': 'Rio Negro',
+    'cerrolargo': 'Cerro Largo',
+    'treintaytres': 'Treinta Y Tres',
+    'floresdalsur': 'Flores Dal Sur',
+  };
+  
+  if (sucursalesConEspacios[normalizado]) {
+    return sucursalesConEspacios[normalizado];
+  }
+  
+  return normalizado.charAt(0).toUpperCase() + normalizado.slice(1);
+};
 
 const PriceEditor: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -91,130 +113,48 @@ const PriceEditor: React.FC = () => {
     });
   };
 
-  // Datos de ejemplo
-  const mockBranches: Branch[] = [
-    { id: 'maldonado', name: 'Maldonado', location: 'Maldonado Centro' },
-    { id: 'pando', name: 'Pando', location: 'Pando Centro' },
-    { id: 'melo', name: 'Melo', location: 'Melo Centro' },
-    { id: 'paysandu', name: 'Paysandú', location: 'Paysandú Centro' },
-    { id: 'salto', name: 'Salto', location: 'Salto Centro' },
-    { id: 'rivera', name: 'Rivera', location: 'Rivera Centro' }
-  ];
-
-  const mockProducts: Product[] = [
-    {
-      id: '1',
-      name: 'Display iPhone 12',
-      brand: 'Apple',
-      model: 'iPhone 12',
-      category: 'Display',
-      isNew: true,
-      basePrice: 150,
-      prices: {
-        maldonado: 150,
-        pando: 145,
-        melo: 148,
-        paysandu: 152,
-        salto: 149,
-        rivera: 151
+  /**
+   * Cargar sucursales desde la base de datos (DINÁMICO)
+   */
+  const cargarSucursales = async () => {
+    try {
+      const response = await fetch(`${API_URL}/sucursales`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const sucursalesCargadas: Branch[] = data.data.map((s: any) => ({
+          id: s.sucursal,
+          name: formatearNombreSucursal(s.sucursal),
+          location: s.sucursal
+        }));
+        setBranches(sucursalesCargadas);
+        console.log(`✅ ${sucursalesCargadas.length} sucursales cargadas dinámicamente`);
       }
-    },
-    {
-      id: '2',
-      name: 'Display Samsung A54',
-      brand: 'Samsung',
-      model: 'Galaxy A54',
-      category: 'Display',
-      basePrice: 80,
-      prices: {
-        maldonado: 80,
-        pando: 78,
-        melo: 82,
-        paysandu: 85,
-        salto: 79,
-        rivera: 83
-      }
-    },
-    {
-      id: '3',
-      name: 'Display Xiaomi Redmi Note 12',
-      brand: 'Xiaomi',
-      model: 'Redmi Note 12',
-      category: 'Display',
-      isNew: true,
-      basePrice: 60,
-      prices: {
-        maldonado: 60,
-        pando: 58,
-        melo: 62,
-        paysandu: 65,
-        salto: 59,
-        rivera: 63
-      }
-    },
-    {
-      id: '4',
-      name: 'Batería iPhone 13',
-      brand: 'Apple',
-      model: 'iPhone 13',
-      category: 'Baterías',
-      basePrice: 45,
-      prices: {
-        maldonado: 45,
-        pando: 43,
-        melo: 47,
-        paysandu: 48,
-        salto: 44,
-        rivera: 46
-      }
-    },
-    {
-      id: '5',
-      name: 'Batería Samsung S23',
-      brand: 'Samsung',
-      model: 'Galaxy S23',
-      category: 'Baterías',
-      basePrice: 35,
-      prices: {
-        maldonado: 35,
-        pando: 33,
-        melo: 37,
-        paysandu: 38,
-        salto: 34,
-        rivera: 36
-      }
-    },
-    {
-      id: '6',
-      name: 'Placa Carga iPhone 14',
-      brand: 'Apple',
-      model: 'iPhone 14',
-      category: 'Placa Carga',
-      isNew: true,
-      basePrice: 30,
-      prices: {
-        maldonado: 30,
-        pando: 28,
-        melo: 32,
-        paysandu: 33,
-        salto: 29,
-        rivera: 31
-      }
+    } catch (error) {
+      console.error('❌ Error al cargar sucursales:', error);
+      notification.error({
+        message: 'Error',
+        description: 'No se pudieron cargar las sucursales'
+      });
     }
-  ];
+  };
+
+  // ❌ ELIMINADO: mockProducts - Ahora los productos deben cargarse desde la API
+  // o desde localStorage si el usuario los guardó previamente
 
   useEffect(() => {
+    // Cargar sucursales dinámicamente desde la API
+    cargarSucursales();
+    
     // Cargar datos desde localStorage o usar datos de ejemplo
     const savedProducts = localStorage.getItem('priceEditor_products');
     if (savedProducts) {
       const parsedProducts = JSON.parse(savedProducts);
       setProducts(parsedProducts);
       setOriginalPrices(JSON.parse(JSON.stringify(parsedProducts)));
-    } else {
-      setProducts(mockProducts);
-      setOriginalPrices(JSON.parse(JSON.stringify(mockProducts)));
     }
-    setBranches(mockBranches);
+    // Nota: Se eliminaron los mockProducts hardcodeados
+    // Si necesitas productos, deberían cargarse desde la API
   }, []);
 
   const handlePriceChange = (productId: string, branchId: string, value: number | null) => {

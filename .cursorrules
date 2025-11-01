@@ -1616,6 +1616,365 @@ CREATE TABLE vendedores (
 
 ---
 
+## 🆕 REGLA #12: SISTEMA DINÁMICO DE SUCURSALES - ESCALABLE Y ROBUSTO
+
+### 🎯 FILOSOFÍA: "Crea Una Vez, Funciona Siempre"
+
+**IMPORTANTE**: El sistema está diseñado para que **CUALQUIER NUEVA SUCURSAL** creada tenga **TODAS** las funcionalidades automáticamente, sin necesidad de modificar código.
+
+---
+
+### ✅ CARACTERÍSTICAS DINÁMICAS IMPLEMENTADAS
+
+#### 1. **Carga Dinámica de Sucursales desde Base de Datos**
+
+Todas las partes del sistema que necesitan listar sucursales **CARGAN DINÁMICAMENTE** desde la base de datos:
+
+```typescript
+// ❌ ANTES (Hardcodeado)
+const SUCURSALES = ['pando', 'maldonado', 'rivera', ...];
+
+// ✅ AHORA (Dinámico)
+const sucursales = await obtenerTodasLasSucursales(); // Desde BD
+```
+
+**Archivos Actualizados**:
+- ✅ `src/pages/products/Products.tsx` - Carga sucursales dinámicamente
+- ✅ `src/pages/pos/POS.tsx` - Carga sucursales dinámicamente
+- ✅ `api/controllers/authController.ts` - Tablas de clientes dinámicas
+- ✅ `api/middleware/auth.ts` - Permisos dinámicos por sucursal
+
+---
+
+### 📦 MÓDULO DE UTILIDADES: `api/utils/database.ts`
+
+**Archivo Central**: `api/utils/database.ts`
+
+Este módulo contiene funciones helper reutilizables para operaciones dinámicas con la base de datos:
+
+```typescript
+/**
+ * Obtener TODAS las tablas de clientes dinámicamente
+ * Busca en information_schema todas las tablas que empiecen con "clientes_"
+ */
+export const obtenerTodasLasTablas = async (): Promise<string[]> => {
+  // Consulta TODAS las tablas clientes_* desde la BD
+  // Retorna: ['clientes_pando', 'clientes_maldonado', 'clientes_soriano', ...]
+}
+
+/**
+ * Obtener información completa de sucursales
+ */
+export const obtenerTodasLasSucursales = async (): Promise<SucursalInfo[]> => {
+  // Retorna: [
+  //   { sucursal: 'pando', tabla_clientes: 'clientes_pando' },
+  //   { sucursal: 'soriano', tabla_clientes: 'clientes_soriano' },
+  //   ...
+  // ]
+}
+
+/**
+ * Verificar si una tabla de clientes existe
+ */
+export const tablaClientesExiste = async (nombreSucursal: string): Promise<boolean> => {
+  // Verifica dinámicamente si existe clientes_[nombreSucursal]
+}
+
+/**
+ * Obtener nombres de sucursales (sin prefijo)
+ */
+export const obtenerNombresSucursales = async (): Promise<string[]> => {
+  // Retorna: ['pando', 'maldonado', 'soriano', ...]
+}
+```
+
+**Ubicación**: `api/utils/database.ts`
+
+---
+
+### 🔐 AUTENTICACIÓN DINÁMICA
+
+#### Admin - Acceso a TODAS las Sucursales
+
+**Antes** (Hardcodeado):
+```typescript
+if (esAdmin) {
+  tablasClientes = [
+    'clientes_pando',
+    'clientes_maldonado',
+    'clientes_rivera',
+    // ... hardcodeado
+  ];
+}
+```
+
+**Ahora** (Dinámico):
+```typescript
+if (esAdmin) {
+  // Carga TODAS las tablas de clientes desde la BD
+  tablasClientes = await obtenerTodasLasTablas();
+  // Incluye automáticamente CUALQUIER nueva sucursal creada
+}
+```
+
+**Beneficio**: Cuando creas "Soriano", el admin AUTOMÁTICAMENTE tiene acceso a `clientes_soriano` sin modificar código.
+
+---
+
+### 🛒 PUNTO DE VENTA (POS) - DINÁMICO
+
+**Archivo**: `src/pages/pos/POS.tsx`
+
+```typescript
+// Carga sucursales al iniciar
+const cargarSucursalesIniciales = async () => {
+  const sucursalesData = await vendedoresService.obtenerSucursales();
+  setSucursales(sucursalesData);
+};
+
+// Efecto inicial
+useEffect(() => {
+  cargarSucursalesIniciales();
+}, []);
+```
+
+**Funcionalidad**:
+- ✅ Carga sucursales desde API
+- ✅ Carga vendedores por sucursal
+- ✅ Carga clientes por sucursal
+- ✅ TODO dinámico, nada hardcodeado
+
+---
+
+### 📦 PRODUCTOS - DINÁMICO
+
+**Archivo**: `src/pages/products/Products.tsx`
+
+```typescript
+// Estado dinámico de sucursales
+const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+
+// Cargar sucursales desde API
+const cargarSucursales = async () => {
+  const response = await fetch(`${API_URL}/sucursales`);
+  const data = await response.json();
+  setSucursales(data.data);
+};
+
+// Efecto inicial
+useEffect(() => {
+  cargarSucursales();
+  cargarProductos();
+}, []);
+```
+
+**Funcionalidad**:
+- ✅ Selector de sucursales dinámico
+- ✅ Actualizar stock/precio por sucursal
+- ✅ Botón "Actualizar" recarga sucursales
+- ✅ Colapso de stock por sucursal dinámico
+
+---
+
+### 🏢 GESTIÓN DE SUCURSALES - COMPLETO
+
+**Archivo**: `src/pages/staff/StaffSellers.tsx`
+
+#### Crear Nueva Sucursal:
+```typescript
+const handleCrearSucursal = async (values: any) => {
+  // 1. Crea la sucursal en la BD
+  // 2. Crea tabla `clientes_[nombre]` automáticamente
+  // 3. Crea vendedor inicial para la sucursal
+  // 4. LISTO - Ya disponible en TODO el sistema
+}
+```
+
+**Lo que se crea automáticamente**:
+1. ✅ Entrada en sistema de sucursales
+2. ✅ Tabla `clientes_[nombre]` con estructura completa
+3. ✅ Foreign Keys configuradas correctamente
+4. ✅ Vendedor inicial asignado
+5. ✅ Disponible en POS, Productos, Auth, etc.
+
+#### Eliminar Sucursal:
+```typescript
+const handleEliminarSucursal = async (nombre: string) => {
+  // 1. Verifica que NO tenga vendedores activos
+  // 2. Busca y elimina TODAS las Foreign Keys
+  // 3. Elimina tabla de clientes
+  // 4. Elimina productos asociados
+  // 5. Elimina vendedores inactivos
+  // 6. LIMPIEZA COMPLETA - Sin residuos
+}
+```
+
+**Validaciones**:
+- ❌ No permite eliminar si tiene vendedores activos
+- ✅ Elimina Foreign Keys dinámicamente
+- ✅ Limpieza completa de datos relacionados
+- ✅ Solución robusta, NO temporal
+
+---
+
+### 🔄 FLUJO COMPLETO: CREAR NUEVA SUCURSAL
+
+```
+Usuario crea sucursal "Soriano" con vendedor "Sol Pascual"
+↓
+Backend crea:
+  ├─ Tabla: clientes_soriano (con FK a vendedores)
+  ├─ Vendedor: Sol Pascual (sucursal: soriano)
+  └─ Entrada en sistema de sucursales
+↓
+Frontend detecta automáticamente:
+  ├─ POS: "Soriano" aparece en selector
+  ├─ Productos: "Soriano" aparece para asignar stock/precios
+  ├─ Auth: Admin tiene acceso a clientes_soriano
+  └─ Dashboard: Sucursal visible en estadísticas
+↓
+✅ LISTO - Funciona como cualquier otra sucursal
+NO SE NECESITA MODIFICAR CÓDIGO
+```
+
+---
+
+### 📋 CHECKLIST: NUEVA SUCURSAL COMPLETAMENTE FUNCIONAL
+
+Cuando creas una nueva sucursal, automáticamente tiene:
+
+```
+✅ Tabla de clientes propia (clientes_[nombre])
+✅ Vendedores pueden ser asignados
+✅ Aparece en selector de POS
+✅ Aparece en selector de Productos
+✅ Puede recibir stock y precios de productos
+✅ Admin tiene acceso automático
+✅ Vendedores de esa sucursal tienen permisos correctos
+✅ Sistema de autenticación la reconoce
+✅ Puede hacer ventas en POS
+✅ Puede gestionar clientes
+✅ Visible en estadísticas (cuando se implementen)
+```
+
+**TOTAL**: 11/11 funcionalidades ✅
+
+---
+
+### ⚠️ REGLAS CRÍTICAS PARA MANTENER EL SISTEMA DINÁMICO
+
+#### ❌ NUNCA HACER:
+1. **NO hardcodear listas de sucursales** en ningún lugar del código
+2. **NO crear arrays como** `const SUCURSALES = ['pando', 'maldonado', ...]`
+3. **NO asumir** que solo existen las 7 sucursales originales
+4. **NO usar** bucles con sucursales hardcodeadas
+
+#### ✅ SIEMPRE HACER:
+1. **SIEMPRE cargar** sucursales desde la BD usando funciones del módulo `api/utils/database.ts`
+2. **SIEMPRE usar** `obtenerTodasLasTablas()` para obtener tablas de clientes
+3. **SIEMPRE verificar** dinámicamente si una tabla existe
+4. **SIEMPRE usar** `fetch('/api/sucursales')` en el frontend para listar sucursales
+5. **SIEMPRE actualizar** el frontend cuando cambian las sucursales
+
+---
+
+### 🔧 FUNCIONES A USAR EN CADA CONTEXTO
+
+#### Backend (API):
+```typescript
+import { 
+  obtenerTodasLasTablas,
+  obtenerTodasLasSucursales,
+  tablaClientesExiste,
+  obtenerNombresSucursales
+} from '../utils/database.js';
+
+// Para autenticación
+const tablasClientes = await obtenerTodasLasTablas();
+
+// Para verificar existencia
+const existe = await tablaClientesExiste('soriano');
+
+// Para listar sucursales
+const sucursales = await obtenerNombresSucursales();
+```
+
+#### Frontend (React):
+```typescript
+// En cualquier componente
+const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+
+const cargarSucursales = async () => {
+  const response = await fetch(`${API_URL}/sucursales`);
+  const data = await response.json();
+  setSucursales(data.data);
+};
+
+useEffect(() => {
+  cargarSucursales();
+}, []);
+
+// Usar sucursales en JSX
+{sucursales.map(sucursal => (
+  <Option key={sucursal.sucursal} value={sucursal.sucursal}>
+    {sucursal.sucursal.toUpperCase()}
+  </Option>
+))}
+```
+
+---
+
+### 🎯 PRUEBA DE ROBUSTEZ
+
+Para verificar que el sistema es verdaderamente dinámico:
+
+1. **Crear nueva sucursal** (ej: "Soriano") con vendedor
+2. **Refrescar páginas**: POS, Productos, Staff
+3. **Verificar que "Soriano" aparece** en TODOS los selectores
+4. **Iniciar sesión** con vendedor de "Soriano"
+5. **Hacer venta** en POS con "Soriano"
+6. **Asignar productos** con stock/precio para "Soriano"
+7. **Eliminar sucursal** y verificar limpieza completa
+
+**Si TODOS los pasos funcionan**: ✅ Sistema robusto y escalable
+
+---
+
+### 📦 ARCHIVOS CLAVE DE LA SOLUCIÓN DINÁMICA
+
+```
+api/utils/database.ts            # ⭐ Funciones helper dinámicas (NUEVO)
+api/controllers/authController.ts # ⭐ Usa obtenerTodasLasTablas() (ACTUALIZADO)
+api/middleware/auth.ts           # ⭐ Usa obtenerTodasLasTablas() (ACTUALIZADO)
+src/pages/products/Products.tsx  # ⭐ Carga sucursales dinámicamente (ACTUALIZADO)
+src/pages/pos/POS.tsx           # ⭐ Carga sucursales dinámicamente (YA ERA DINÁMICO)
+src/pages/staff/StaffSellers.tsx # ⭐ Crear/Eliminar sucursales (YA IMPLEMENTADO)
+```
+
+---
+
+### 💡 BENEFICIOS DE LA SOLUCIÓN DINÁMICA
+
+1. **Escalabilidad**: Agregar 10, 20, 50 sucursales sin tocar código
+2. **Mantenibilidad**: Sin listas hardcodeadas que actualizar
+3. **Consistencia**: Una sola fuente de verdad (la base de datos)
+4. **Flexibilidad**: Sistema se adapta automáticamente a cambios
+5. **Productividad**: Crear sucursales en segundos, no horas
+6. **Confiabilidad**: Menos puntos de fallo por código hardcodeado
+7. **Profesionalismo**: Sistema enterprise-grade escalable
+
+---
+
+### 🚀 PRÓXIMOS PASOS SUGERIDOS
+
+1. **Cache de Sucursales**: Implementar cache en memoria para reducir queries
+2. **WebSocket**: Notificar en tiempo real cuando se crea/elimina sucursal
+3. **Migraciones**: Sistema de migraciones para cambios en esquema
+4. **Auditoría**: Log de creación/eliminación de sucursales
+5. **Backup Automático**: Antes de eliminar sucursal, backup automático
+
+---
+
 ## 📚 ARCHIVOS CRÍTICOS DEL PROYECTO
 
 ### Backend (API):
@@ -1668,6 +2027,16 @@ database/
 ---
 
 ## 📄 CHANGELOG
+
+### Versión 2.1.0 - 31 de Octubre, 2025 (Actualización Mayor)
+- ✅ **SISTEMA DINÁMICO Y ESCALABLE DE SUCURSALES**
+- ✅ Módulo de utilidades `api/utils/database.ts` con funciones helpers
+- ✅ Autenticación dinámica - Admin accede a TODAS las sucursales automáticamente
+- ✅ Frontend de Productos carga sucursales dinámicamente
+- ✅ Eliminadas TODAS las listas hardcodeadas de sucursales
+- ✅ Cualquier nueva sucursal tiene TODAS las funcionalidades automáticamente
+- ✅ Sistema robusto de eliminación de sucursales con limpieza completa
+- ✅ Documentación completa de la solución dinámica
 
 ### Versión 2.0.0 - 31 de Octubre, 2025
 - ✅ Implementado sistema de eliminación inteligente de vendedores

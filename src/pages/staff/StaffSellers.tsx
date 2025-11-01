@@ -99,6 +99,48 @@ interface SucursalFormData {
   ciudad?: string;
 }
 
+/**
+ * UTILIDADES PARA NOMBRES DE SUCURSALES
+ */
+
+/**
+ * Normalizar nombre de sucursal: quita espacios, convierte a minúsculas
+ * "Rio Negro" → "rionegro"
+ * "Cerro Largo" → "cerrolargo"
+ */
+const normalizarNombreSucursal = (nombre: string): string => {
+  return nombre
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ''); // Quitar todos los espacios
+};
+
+/**
+ * Formatear nombre de sucursal para mostrar: capitaliza cada palabra
+ * "rionegro" → "Rio Negro"
+ * "cerrolargo" → "Cerro Largo"
+ */
+const formatearNombreSucursal = (nombre: string): string => {
+  const normalizado = nombre.toLowerCase().trim();
+  
+  // Lista de sucursales conocidas con espacios
+  const sucursalesConEspacios: { [key: string]: string } = {
+    'rionegro': 'Rio Negro',
+    'cerrolargo': 'Cerro Largo',
+    'treintaytres': 'Treinta Y Tres',
+    'floresdalsur': 'Flores Dal Sur',
+    // Agregar más según necesites
+  };
+  
+  // Si está en la lista, usar el formato conocido
+  if (sucursalesConEspacios[normalizado]) {
+    return sucursalesConEspacios[normalizado];
+  }
+  
+  // Si no, capitalizar la primera letra
+  return normalizado.charAt(0).toUpperCase() + normalizado.slice(1);
+};
+
 const StaffSellers: React.FC = () => {
   const navigate = useNavigate();
   const { usuario } = useAuth();
@@ -313,21 +355,34 @@ const StaffSellers: React.FC = () => {
         return;
       }
 
-      console.log('📤 Creando nueva sucursal:', values);
+      // ⭐ NORMALIZAR el nombre antes de enviar (quitar espacios, minúsculas)
+      const nombreOriginal = values.nombre; // "Rio Negro"
+      const nombreNormalizado = normalizarNombreSucursal(nombreOriginal); // "rionegro"
+      
+      const datosParaEnviar = {
+        ...values,
+        nombre: nombreNormalizado // Enviar normalizado al backend
+      };
+
+      console.log('📤 Creando nueva sucursal:');
+      console.log('  - Nombre ingresado:', nombreOriginal);
+      console.log('  - Nombre normalizado:', nombreNormalizado);
+      console.log('  - Datos a enviar:', datosParaEnviar);
 
       const response = await axios.post(
         `${API_URL}/sucursales`,
-        values,
+        datosParaEnviar,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
       );
 
       if (response.data.success) {
-        const nuevaSucursal = response.data.data.nombre;
+        const nuevaSucursal = response.data.data.nombre; // "rionegro" (del backend)
+        const nombreFormateado = formatearNombreSucursal(nuevaSucursal); // "Rio Negro"
         
         messageApi.success(
-          `✅ Sucursal "${nuevaSucursal}" creada exitosamente con tabla de clientes`,
+          `✅ Sucursal "${nombreFormateado}" creada exitosamente con tabla de clientes`,
           5
         );
         
@@ -343,12 +398,64 @@ const StaffSellers: React.FC = () => {
         // Seleccionar automáticamente la nueva sucursal en el formulario de vendedor
         vendedorForm.setFieldsValue({ sucursal: nuevaSucursal });
         
-        console.log(`✅ Sucursal "${nuevaSucursal}" seleccionada automáticamente en el formulario`);
+        console.log(`✅ Sucursal "${nombreFormateado}" (${nuevaSucursal}) seleccionada automáticamente en el formulario`);
       }
     } catch (error: any) {
       console.error('❌ Error al crear sucursal:', error);
       const errorMsg = error.response?.data?.message || 'Error al crear sucursal';
       messageApi.error(errorMsg);
+    }
+  };
+
+  /**
+   * Eliminar sucursal PERMANENTEMENTE
+   */
+  const handleEliminarSucursal = async (nombreSucursal: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        messageApi.error('No hay sesión activa');
+        return;
+      }
+
+      console.log(`🗑️ Eliminando sucursal: ${nombreSucursal}`);
+
+      const response = await axios.delete(
+        `${API_URL}/sucursales/${nombreSucursal}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        const data = response.data.data;
+        
+        // Mostrar mensaje con detalles de lo que se eliminó
+        messageApi.success({
+          content: (
+            <div>
+              <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+                🗑️ Sucursal "{nombreSucursal.toUpperCase()}" eliminada PERMANENTEMENTE
+              </div>
+              <div style={{ fontSize: '12px' }}>
+                • Tabla de clientes: {data.tabla_clientes_eliminada ? '✅ Eliminada' : '⚠️ No existía'}<br />
+                • Clientes eliminados: {data.clientes_eliminados}<br />
+                • Productos eliminados: {data.productos_eliminados}<br />
+                • Vendedores inactivos eliminados: {data.vendedores_inactivos_eliminados}
+              </div>
+            </div>
+          ),
+          duration: 8
+        });
+
+        // Recargar sucursales y vendedores
+        await cargarSucursales();
+        await cargarVendedores();
+      }
+    } catch (error: any) {
+      console.error('❌ Error al eliminar sucursal:', error);
+      const errorMsg = error.response?.data?.message || 'Error al eliminar sucursal';
+      messageApi.error(errorMsg, 6);
     }
   };
 
@@ -461,7 +568,7 @@ const StaffSellers: React.FC = () => {
       key: 'sucursal',
       render: (sucursal: string) => (
         <Tag color="green">
-          <ShopOutlined /> {sucursal.toUpperCase()}
+          <ShopOutlined /> {formatearNombreSucursal(sucursal)}
         </Tag>
       ),
     },
@@ -673,7 +780,7 @@ const StaffSellers: React.FC = () => {
                       >
                         {sucursales.map((s) => (
                           <Option key={s.sucursal} value={s.sucursal}>
-                            {s.sucursal.toUpperCase()} ({s.total_vendedores})
+                            {formatearNombreSucursal(s.sucursal)} ({s.total_vendedores})
                           </Option>
                         ))}
                       </Select>
@@ -782,11 +889,67 @@ const StaffSellers: React.FC = () => {
                             <Text type="secondary" key="tabla">
                               📊 clientes_{sucursal.sucursal}
                             </Text>,
+                            <Popconfirm
+                              key="eliminar"
+                              title={
+                                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#ff4d4f' }}>
+                                  🚨 ¡ELIMINAR SUCURSAL PERMANENTEMENTE!
+                                </span>
+                              }
+                              description={
+                                <div style={{ maxWidth: '380px' }}>
+                                  <p style={{ margin: '8px 0', fontWeight: 'bold', fontSize: '14px' }}>
+                                    ¿Estás seguro de eliminar <strong style={{ color: '#ff4d4f' }}>"{formatearNombreSucursal(sucursal.sucursal)}"</strong>?
+                                  </p>
+                                  <Alert
+                                    message="⚠️ ADVERTENCIA CRÍTICA: Esta acción es IRREVERSIBLE"
+                                    description={
+                                      <div style={{ fontSize: '12px', marginTop: 8 }}>
+                                        <p style={{ margin: '4px 0', fontWeight: 'bold' }}>Se eliminará PERMANENTEMENTE:</p>
+                                        <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
+                                          <li>📊 Tabla de clientes completa</li>
+                                          <li>👥 Todos los clientes de la sucursal</li>
+                                          <li>📦 Productos asignados a la sucursal</li>
+                                          <li>🗑️ La sucursal del sistema</li>
+                                        </ul>
+                                        <p style={{ margin: '4px 0', color: '#ff4d4f', fontWeight: 'bold' }}>
+                                          ⚠️ Los datos NO se podrán recuperar
+                                        </p>
+                                        {sucursal.total_vendedores > 0 && (
+                                          <p style={{ margin: '8px 0', color: '#fa8c16', fontWeight: 'bold' }}>
+                                            ⚠️ Esta sucursal tiene {sucursal.total_vendedores} vendedor(es). Debes eliminarlos o reasignarlos primero.
+                                          </p>
+                                        )}
+                                      </div>
+                                    }
+                                    type="error"
+                                    showIcon
+                                    style={{ marginTop: 8 }}
+                                  />
+                                </div>
+                              }
+                              onConfirm={() => handleEliminarSucursal(sucursal.sucursal)}
+                              okText={sucursal.total_vendedores > 0 ? "❌ NO SE PUEDE ELIMINAR" : "🗑️ SÍ, ELIMINAR TODO"}
+                              cancelText="❌ Cancelar"
+                              okButtonProps={{
+                                danger: true,
+                                size: 'large',
+                                style: { fontWeight: 'bold' },
+                                disabled: sucursal.total_vendedores > 0
+                              }}
+                              cancelButtonProps={{
+                                size: 'large'
+                              }}
+                            >
+                              <Button type="link" danger icon={<DeleteOutlined />} size="small">
+                                Eliminar
+                              </Button>
+                            </Popconfirm>
                           ]}
                         >
                           <Card.Meta
                             avatar={<ShopOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
-                            title={<Title level={4}>{sucursal.sucursal.toUpperCase()}</Title>}
+                            title={<Title level={4}>{formatearNombreSucursal(sucursal.sucursal)}</Title>}
                             description={
                               <Space direction="vertical">
                                 <Tag color="success">Activa</Tag>
@@ -884,7 +1047,7 @@ const StaffSellers: React.FC = () => {
                 >
                   {sucursales.map((s) => (
                     <Option key={s.sucursal} value={s.sucursal}>
-                      {s.sucursal.toUpperCase()}
+                      {formatearNombreSucursal(s.sucursal)}
                     </Option>
                   ))}
                 </Select>
@@ -965,15 +1128,14 @@ const StaffSellers: React.FC = () => {
             label="Nombre de la Sucursal"
             rules={[
               { required: true, message: 'Por favor ingresa el nombre' },
-              { pattern: /^[a-záéíóúñ]+$/i, message: 'Solo letras sin espacios ni caracteres especiales' },
+              { pattern: /^[a-záéíóúñ\s]+$/i, message: 'Solo letras y espacios' },
             ]}
-            extra="Solo letras, sin espacios (Ej: pando, salto, melo)"
+            extra="Puedes usar espacios (Ej: Rio Negro, Cerro Largo). Se guardará automáticamente sin espacios en la base de datos."
           >
             <Input
               prefix={<ShopOutlined />}
-              placeholder="Ej: minas"
+              placeholder="Ej: Rio Negro"
               size="large"
-              onChange={(e) => sucursalForm.setFieldsValue({ nombre: e.target.value.toLowerCase() })}
             />
           </Form.Item>
 
@@ -993,7 +1155,17 @@ const StaffSellers: React.FC = () => {
             message="📋 Vista Previa"
             description={
               <div>
-                <Text>Nombre Tabla: <Text code>clientes_{sucursalForm.getFieldValue('nombre') || 'nombre'}</Text></Text>
+                <Text>
+                  Nombre ingresado: <Text strong>{sucursalForm.getFieldValue('nombre') || 'nombre'}</Text>
+                </Text>
+                <br />
+                <Text>
+                  Tabla en BD: <Text code>clientes_{normalizarNombreSucursal(sucursalForm.getFieldValue('nombre') || 'nombre')}</Text>
+                </Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  (Ejemplo: "Rio Negro" se guardará como "rionegro" y se mostrará como "Rio Negro")
+                </Text>
               </div>
             }
             type="info"

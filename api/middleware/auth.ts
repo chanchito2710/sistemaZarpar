@@ -7,6 +7,7 @@ import { type Request, type Response, type NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 import type { RowDataPacket } from 'mysql2';
+import { obtenerTodasLasTablas } from '../utils/database.js';
 
 // Secret para JWT (debe coincidir con el del controlador)
 const JWT_SECRET = process.env.JWT_SECRET || 'zarpar_secret_key_2025_change_in_production';
@@ -285,16 +286,11 @@ export const obtenerTablaClientes = (sucursal: string): string => {
 
 /**
  * Función auxiliar para obtener todas las tablas de clientes (para admin)
+ * AHORA DINÁMICO: Carga tablas desde la base de datos
+ * 
+ * @deprecated Usar directamente la función del módulo utils/database.ts
  */
-export const obtenerTodasLasTablas = (): string[] => {
-  return [
-    'clientes_pando',
-    'clientes_maldonado',
-    'clientes_rivera',
-    'clientes_melo',
-    'clientes_paysandu',
-    'clientes_salto',
-    'clientes_tacuarembo'
-  ];
+export const obtenerTodasLasTablasDEPRECATED = async (): Promise<string[]> => {
+  return await obtenerTodasLasTablas();
 };
 

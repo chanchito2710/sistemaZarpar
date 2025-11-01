@@ -102,9 +102,13 @@ const verificarTablaClientes = async (nombreSucursal: string): Promise<boolean> 
 
 /**
  * Crear tabla de clientes para una nueva sucursal
+ * IMPORTANTE: Crea una FK con nombre predecible para facilitar eliminación
  */
 const crearTablaClientes = async (nombreSucursal: string): Promise<void> => {
   const nombreTabla = `clientes_${nombreSucursal.toLowerCase()}`;
+  const nombreFK = `fk_${nombreTabla}_vendedor`;
+  
+  console.log(`📝 Creando tabla ${nombreTabla} con FK: ${nombreFK}`);
   
   // SQL para crear la tabla con estructura COMPLETA (idéntica a clientes_pando)
   const createTableSQL = `
@@ -127,13 +131,13 @@ const crearTablaClientes = async (nombreSucursal: string): Promise<void> => {
       KEY \`idx_nombre\` (\`nombre\`, \`apellido\`),
       KEY \`idx_vendedor\` (\`vendedor_id\`),
       KEY \`idx_rut\` (\`rut\`),
-      CONSTRAINT \`${nombreTabla}_ibfk_1\` FOREIGN KEY (\`vendedor_id\`) REFERENCES \`vendedores\` (\`id\`) ON DELETE SET NULL
+      CONSTRAINT \`${nombreFK}\` FOREIGN KEY (\`vendedor_id\`) REFERENCES \`vendedores\` (\`id\`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
     COMMENT='Clientes de sucursal ${nombreSucursal}';
   `;
 
   await pool.execute(createTableSQL);
-  console.log(`✅ Tabla ${nombreTabla} creada exitosamente con estructura completa`);
+  console.log(`✅ Tabla ${nombreTabla} creada exitosamente con FK: ${nombreFK}`);
 };
 
 /**
@@ -293,9 +297,25 @@ export const crearSucursal = async (req: Request, res: Response): Promise<void> 
 };
 
 /**
- * Eliminar una sucursal (requiere que no tenga vendedores asociados)
+ * Eliminar una sucursal PERMANENTEMENTE
  * DELETE /api/sucursales/:nombre
  * Requiere autenticación y permisos de administrador
+ * 
+ * PROCESO DE ELIMINACIÓN (en orden):
+ * 1. Verifica que NO tenga vendedores activos (si tiene, rechaza)
+ * 2. Elimina productos de productos_sucursal
+ * 3. Detecta y elimina TODAS las foreign keys de la tabla de clientes
+ * 4. Elimina la tabla de clientes completa (DROP TABLE)
+ * 5. Elimina vendedores inactivos de la sucursal
+ * 
+ * IMPORTANTE: Esta implementación es robusta y maneja correctamente:
+ * - Foreign keys con nombres generados automáticamente por MySQL
+ * - Foreign keys con nombres personalizados
+ * - Múltiples foreign keys en una tabla
+ * - Errores parciales (continúa eliminando lo posible)
+ * 
+ * NO usa SET FOREIGN_KEY_CHECKS = 0 (solución temporal)
+ * En su lugar, detecta y elimina FKs de forma explícita
  */
 export const eliminarSucursal = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -310,33 +330,140 @@ export const eliminarSucursal = async (req: Request, res: Response): Promise<voi
     }
 
     const nombreNormalizado = nombre.toLowerCase();
+    const nombreTabla = `clientes_${nombreNormalizado}`;
 
-    // Verificar si hay vendedores activos en esta sucursal
+    console.log(`🗑️ Iniciando eliminación de sucursal: ${nombreNormalizado}`);
+
+    // 1. Verificar si hay vendedores activos en esta sucursal
     const vendedores = await executeQuery<{ total: number }[]>(
       'SELECT COUNT(*) as total FROM vendedores WHERE sucursal = ? AND activo = 1',
       [nombreNormalizado]
     );
 
     if (vendedores[0].total > 0) {
+      console.log(`⚠️ Sucursal ${nombreNormalizado} tiene ${vendedores[0].total} vendedor(es) activo(s)`);
       res.status(400).json({
         success: false,
-        message: `No se puede eliminar la sucursal "${nombreNormalizado}" porque tiene ${vendedores[0].total} vendedor(es) activo(s)`
+        message: `❌ No se puede eliminar la sucursal "${nombreNormalizado.toUpperCase()}" porque tiene ${vendedores[0].total} vendedor(es) activo(s). Por favor, elimina o reasigna los vendedores primero.`
       });
       return;
     }
 
-    // IMPORTANTE: NO eliminamos la tabla de clientes automáticamente por seguridad
-    // El administrador debe hacerlo manualmente si está seguro
+    // 2. Verificar si la tabla de clientes existe y tiene datos
+    let totalClientes = 0;
+    let tablaExiste = false;
+
+    try {
+      const clientes = await executeQuery<{ total: number }[]>(
+        `SELECT COUNT(*) as total FROM \`${nombreTabla}\``
+      );
+      totalClientes = clientes[0]?.total || 0;
+      tablaExiste = true;
+      console.log(`📊 La tabla ${nombreTabla} tiene ${totalClientes} cliente(s)`);
+    } catch (error: any) {
+      // Si la tabla no existe, está bien, continuamos
+      if (error.code !== 'ER_NO_SUCH_TABLE') {
+        throw error;
+      }
+      console.log(`⚠️ La tabla ${nombreTabla} no existe`);
+    }
+
+    // 3. Contar productos de esta sucursal
+    const productos = await executeQuery<{ total: number }[]>(
+      'SELECT COUNT(*) as total FROM productos_sucursal WHERE sucursal = ?',
+      [nombreNormalizado]
+    );
+    const totalProductos = productos[0]?.total || 0;
+    console.log(`📦 La sucursal ${nombreNormalizado} tiene ${totalProductos} producto(s) asignado(s)`);
+
+    // ELIMINACIÓN EN ORDEN:
+
+    // 4. Eliminar productos de la sucursal
+    if (totalProductos > 0) {
+      try {
+        await executeQuery(
+          'DELETE FROM productos_sucursal WHERE sucursal = ?',
+          [nombreNormalizado]
+        );
+        console.log(`✅ ${totalProductos} producto(s) eliminado(s) de ${nombreNormalizado}`);
+      } catch (error: any) {
+        console.error(`⚠️ Error al eliminar productos: ${error.message}`);
+        // Continuar de todas formas
+      }
+    }
+
+    // 5. Eliminar la tabla de clientes (si existe)
+    if (tablaExiste) {
+      try {
+        console.log(`🔍 Buscando foreign keys en tabla ${nombreTabla}...`);
+        
+        // Obtener todas las foreign keys de la tabla
+        const [constraints] = await pool.execute(
+          `SELECT CONSTRAINT_NAME 
+           FROM information_schema.TABLE_CONSTRAINTS 
+           WHERE TABLE_SCHEMA = DATABASE() 
+           AND TABLE_NAME = ? 
+           AND CONSTRAINT_TYPE = 'FOREIGN KEY'`,
+          [nombreTabla]
+        );
+
+        const fks = constraints as { CONSTRAINT_NAME: string }[];
+        console.log(`📋 Encontradas ${fks.length} foreign key(s) en ${nombreTabla}`);
+        
+        // Eliminar cada foreign key de forma ordenada
+        for (const fk of fks) {
+          try {
+            console.log(`🗑️ Eliminando FK: ${fk.CONSTRAINT_NAME}`);
+            await pool.execute(
+              `ALTER TABLE \`${nombreTabla}\` DROP FOREIGN KEY \`${fk.CONSTRAINT_NAME}\``
+            );
+            console.log(`✅ FK ${fk.CONSTRAINT_NAME} eliminada exitosamente`);
+          } catch (fkError: any) {
+            console.error(`⚠️ Error al eliminar FK ${fk.CONSTRAINT_NAME}:`, fkError.message);
+            // Si falla, intentar continuar con las demás
+          }
+        }
+
+        // Ahora eliminar la tabla (sin foreign keys)
+        console.log(`🗑️ Eliminando tabla ${nombreTabla}...`);
+        await pool.execute(`DROP TABLE IF EXISTS \`${nombreTabla}\``);
+        console.log(`✅ Tabla ${nombreTabla} eliminada PERMANENTEMENTE`);
+        
+      } catch (error: any) {
+        console.error(`❌ Error al eliminar tabla ${nombreTabla}:`, error);
+        throw new Error(`No se pudo eliminar la tabla ${nombreTabla}: ${error.message}`);
+      }
+    }
+
+    // 6. Eliminar vendedores inactivos de la sucursal (si los hay)
+    const vendedoresInactivos = await executeQuery<{ total: number }[]>(
+      'SELECT COUNT(*) as total FROM vendedores WHERE sucursal = ? AND activo = 0',
+      [nombreNormalizado]
+    );
+
+    if (vendedoresInactivos[0].total > 0) {
+      await executeQuery(
+        'DELETE FROM vendedores WHERE sucursal = ? AND activo = 0',
+        [nombreNormalizado]
+      );
+      console.log(`✅ ${vendedoresInactivos[0].total} vendedor(es) inactivo(s) eliminado(s)`);
+    }
+
+    console.log(`🎉 Sucursal ${nombreNormalizado} ELIMINADA PERMANENTEMENTE`);
 
     res.json({
       success: true,
-      message: `Sucursal "${nombreNormalizado}" lista para eliminar. NOTA: La tabla clientes_${nombreNormalizado} debe eliminarse manualmente si es necesario.`,
+      message: `🗑️ Sucursal "${nombreNormalizado.toUpperCase()}" eliminada PERMANENTEMENTE de la base de datos`,
       data: {
         sucursal: nombreNormalizado,
-        tabla_clientes: `clientes_${nombreNormalizado}`
+        tabla_clientes_eliminada: tablaExiste,
+        clientes_eliminados: totalClientes,
+        productos_eliminados: totalProductos,
+        vendedores_inactivos_eliminados: vendedoresInactivos[0].total,
+        eliminado_permanentemente: true
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error al eliminar sucursal:', error);
     res.status(500).json({
       success: false,

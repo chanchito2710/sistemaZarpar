@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { obtenerTodasLasTablas } from '../utils/database.js';
 
 // Interfaz para el usuario de la base de datos
 interface VendedorDB extends RowDataPacket {
@@ -114,16 +115,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     let tablasClientes: string[] = [];
     
     if (esAdmin) {
-      // Admin tiene acceso a TODAS las tablas de clientes
-      tablasClientes = [
-        'clientes_pando',
-        'clientes_maldonado',
-        'clientes_rivera',
-        'clientes_melo',
-        'clientes_paysandu',
-        'clientes_salto',
-        'clientes_tacuarembo'
-      ];
+      // Admin tiene acceso a TODAS las tablas de clientes (dinámico desde BD)
+      tablasClientes = await obtenerTodasLasTablas();
+      console.log(`🔑 Admin tiene acceso a ${tablasClientes.length} tablas de clientes`);
     } else {
       // Vendedor normal solo su tabla de clientes
       const sucursalLower = usuario.sucursal.toLowerCase();
@@ -200,15 +194,8 @@ export const verificarToken = async (req: Request, res: Response): Promise<void>
     let tablasClientes: string[] = [];
     
     if (esAdmin) {
-      tablasClientes = [
-        'clientes_pando',
-        'clientes_maldonado',
-        'clientes_rivera',
-        'clientes_melo',
-        'clientes_paysandu',
-        'clientes_salto',
-        'clientes_tacuarembo'
-      ];
+      // Admin tiene acceso a TODAS las tablas de clientes (dinámico desde BD)
+      tablasClientes = await obtenerTodasLasTablas();
     } else {
       const sucursalLower = usuario.sucursal.toLowerCase();
       tablasClientes = [`clientes_${sucursalLower}`];

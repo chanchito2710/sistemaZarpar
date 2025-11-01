@@ -525,6 +525,7 @@ export interface ProductoSucursal {
   stock_minimo: number;
   es_stock_principal: boolean;
   activo: boolean;
+  stock_en_transito?: number;
   updated_at: string;
 }
 
@@ -564,6 +565,19 @@ export const productosService = {
       return response.data.data || [];
     } catch (error) {
       console.error('Error al obtener productos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener TODOS los productos con información de TODAS las sucursales
+   */
+  obtenerConSucursales: async (): Promise<ProductoCompleto[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<ProductoCompleto[]>> = await apiClient.get('/productos/con-sucursales');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener productos con sucursales:', error);
       throw error;
     }
   },
@@ -716,6 +730,83 @@ export const productosService = {
       await apiClient.post('/productos/categorias', { tipo, valor });
     } catch (error) {
       console.error(`Error al agregar ${tipo}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * ===================================
+   * TRANSFERENCIAS DINÁMICAS
+   * ===================================
+   */
+
+  /**
+   * Obtener la sucursal principal (identificada por es_stock_principal = 1)
+   */
+  obtenerSucursalPrincipal: async (): Promise<string> => {
+    try {
+      const response: AxiosResponse<ApiResponse<{ sucursal: string }>> = await apiClient.get('/productos/sucursal-principal');
+      return response.data.data?.sucursal || '';
+    } catch (error) {
+      console.error('Error al obtener sucursal principal:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Preparar transferencia: descontar de sucursal principal y agregar a stock_en_transito
+   * @param producto_id - ID del producto
+   * @param sucursal_destino - Sucursal de destino
+   * @param cantidad - Cantidad a transferir
+   */
+  prepararTransferencia: async (producto_id: number, sucursal_destino: string, cantidad: number): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/productos/preparar-transferencia', {
+        producto_id,
+        sucursal_destino,
+        cantidad
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al preparar transferencia:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Ajustar transferencia: editar cantidad (devolver sobrante o descontar más)
+   * @param producto_id - ID del producto
+   * @param sucursal_destino - Sucursal de destino
+   * @param cantidad_anterior - Cantidad anterior
+   * @param cantidad_nueva - Nueva cantidad
+   */
+  ajustarTransferencia: async (producto_id: number, sucursal_destino: string, cantidad_anterior: number, cantidad_nueva: number): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/productos/ajustar-transferencia', {
+        producto_id,
+        sucursal_destino,
+        cantidad_anterior,
+        cantidad_nueva
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al ajustar transferencia:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Confirmar transferencia: pasar de stock_en_transito a stock real
+   * @param transferencias - Array de transferencias a confirmar
+   */
+  confirmarTransferencia: async (transferencias: { producto_id: number; sucursal: string; cantidad: number }[]): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/productos/confirmar-transferencia', {
+        transferencias
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al confirmar transferencia:', error);
       throw error;
     }
   },
@@ -995,6 +1086,220 @@ export const cuentaCorrienteService = {
       return response.data.data;
     } catch (error) {
       console.error('Error al registrar pago:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * ===================================
+ * INTERFACES: Transferencias
+ * ===================================
+ */
+export interface Transferencia {
+  id: number;
+  codigo: string;
+  fecha_envio: string;
+  fecha_recepcion: string | null;
+  sucursal_origen: string;
+  sucursal_destino: string;
+  estado: 'pendiente' | 'en_transito' | 'recibida' | 'completada' | 'cancelada';
+  usuario_envio: string;
+  usuario_recepcion: string | null;
+  total_productos: number;
+  total_unidades: number;
+  notas_envio: string | null;
+  notas_recepcion: string | null;
+  diferencias: string | null;
+  dias_en_transito?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransferenciaDetalle {
+  id: number;
+  transferencia_id: number;
+  producto_id: number;
+  producto_nombre: string;
+  producto_marca: string;
+  producto_tipo: string;
+  cantidad_enviada: number;
+  cantidad_recibida: number | null;
+  cantidad_faltante: number;
+  cantidad_sobrante: number;
+  stock_origen_antes: number;
+  stock_origen_despues: number;
+  stock_destino_antes: number;
+  stock_destino_despues: number | null;
+  ventas_periodo: number;
+  fecha_inicio_ventas: string | null;
+  fecha_fin_ventas: string | null;
+}
+
+export interface ProductoTransferencia {
+  producto_id: number;
+  cantidad: number;
+  ventas_periodo?: number;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+}
+
+export interface CrearTransferenciaInput {
+  sucursal_destino: string;
+  productos: ProductoTransferencia[];
+  notas_envio?: string;
+}
+
+export interface ConfirmarRecepcionInput {
+  productos: {
+    producto_id: number;
+    cantidad_recibida: number;
+  }[];
+  notas_recepcion?: string;
+}
+
+export interface VentasPorProducto {
+  producto_id: number;
+  producto_nombre: string;
+  producto_marca: string;
+  cantidad_vendida: number;
+  stock_actual: number;
+}
+
+export interface ResumenTransferencias {
+  total_mes: number;
+  en_transito: number;
+  tiempo_promedio_dias: number;
+  diferencias_detectadas: number;
+  por_sucursal: {
+    sucursal_destino: string;
+    total_transferencias: number;
+    total_unidades: number;
+  }[];
+}
+
+/**
+ * ===================================
+ * SERVICIOS: Transferencias
+ * ===================================
+ */
+export const transferenciasService = {
+  /**
+   * Crear nueva transferencia (enviar mercadería)
+   */
+  crear: async (data: CrearTransferenciaInput): Promise<Transferencia> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Transferencia>> = 
+        await apiClient.post('/transferencias', data);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al crear transferencia:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener lista de transferencias con filtros
+   */
+  obtener: async (filtros?: {
+    estado?: string;
+    sucursal?: string;
+    desde?: string;
+    hasta?: string;
+  }): Promise<Transferencia[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros?.estado) params.append('estado', filtros.estado);
+      if (filtros?.sucursal) params.append('sucursal', filtros.sucursal);
+      if (filtros?.desde) params.append('desde', filtros.desde);
+      if (filtros?.hasta) params.append('hasta', filtros.hasta);
+
+      const response: AxiosResponse<ApiResponse<Transferencia[]>> = 
+        await apiClient.get(`/transferencias?${params.toString()}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener transferencias:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener detalle completo de una transferencia
+   */
+  obtenerDetalle: async (id: number): Promise<Transferencia & { productos: TransferenciaDetalle[] }> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Transferencia & { productos: TransferenciaDetalle[] }>> = 
+        await apiClient.get(`/transferencias/${id}`);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al obtener detalle de transferencia:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Confirmar recepción de transferencia
+   */
+  confirmarRecepcion: async (id: number, data: ConfirmarRecepcionInput): Promise<Transferencia> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Transferencia>> = 
+        await apiClient.put(`/transferencias/${id}/confirmar`, data);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al confirmar recepción:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Cancelar transferencia
+   */
+  cancelar: async (id: number): Promise<Transferencia> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Transferencia>> = 
+        await apiClient.put(`/transferencias/${id}/cancelar`);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al cancelar transferencia:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener ventas por rango de fechas y sucursal
+   */
+  obtenerVentas: async (sucursal: string, desde: string, hasta: string): Promise<{
+    sucursal: string;
+    desde: string;
+    hasta: string;
+    ventas_por_producto: VentasPorProducto[];
+  }> => {
+    try {
+      const params = new URLSearchParams({
+        sucursal,
+        desde,
+        hasta
+      });
+      
+      const response: AxiosResponse<ApiResponse<any>> = 
+        await apiClient.get(`/transferencias/ventas?${params.toString()}`);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al obtener ventas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener resumen y estadísticas
+   */
+  obtenerResumen: async (): Promise<ResumenTransferencias> => {
+    try {
+      const response: AxiosResponse<ApiResponse<ResumenTransferencias>> = 
+        await apiClient.get('/transferencias/resumen');
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al obtener resumen:', error);
       throw error;
     }
   },
