@@ -339,3 +339,8 @@ Para reportar bugs o solicitar nuevas funcionalidades, contactar al equipo de de
 **Estado del Sistema**: 🟢 Operacional (con bug menor en investigación)
 
 
+
+
+
+
+

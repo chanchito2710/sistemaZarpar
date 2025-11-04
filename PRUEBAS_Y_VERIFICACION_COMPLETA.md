@@ -370,3 +370,8 @@ docker exec zarpar-mysql mysqldump -u root -pzarpar2025 zarparDataBase > backup_
 **Estado**: ✅ SISTEMA FUNCIONANDO CORRECTAMENTE
 
 
+
+
+
+
+

@@ -23,6 +23,21 @@ interface Sucursal {
 }
 
 /**
+ * Interfaz para Configuración de Sucursal
+ */
+interface ConfiguracionSucursal {
+  id: number;
+  sucursal: string;
+  es_principal: boolean;
+  direccion?: string;
+  telefono?: string;
+  ciudad?: string;
+  activa: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
  * Obtener todas las sucursales activas
  * GET /api/sucursales
  */
@@ -51,9 +66,16 @@ export const obtenerSucursales = async (req: Request, res: Response): Promise<vo
           [nombreSucursal]
         );
         
+        // Obtener configuración de la sucursal (incluyendo si es principal)
+        const config = await executeQuery<{ es_principal: number }[]>(
+          'SELECT es_principal FROM configuracion_sucursales WHERE sucursal = ? LIMIT 1',
+          [nombreSucursal]
+        );
+        
         return {
           sucursal: nombreSucursal,
-          total_vendedores: vendedores[0]?.total || 0
+          total_vendedores: vendedores[0]?.total || 0,
+          es_principal: config[0]?.es_principal === 1 || false
         };
       })
     );
@@ -62,6 +84,13 @@ export const obtenerSucursales = async (req: Request, res: Response): Promise<vo
     const sucursalesFiltradas = sucursales.filter(
       s => s.sucursal.toLowerCase() !== 'administrador'
     );
+
+    // Ordenar: Principal primero, luego alfabético
+    sucursalesFiltradas.sort((a, b) => {
+      if (a.es_principal && !b.es_principal) return -1;
+      if (!a.es_principal && b.es_principal) return 1;
+      return a.sucursal.localeCompare(b.sucursal);
+    });
 
     res.json({
       success: true,
@@ -516,6 +545,139 @@ export const obtenerEstadisticasSucursal = async (req: Request, res: Response): 
     res.status(500).json({
       success: false,
       message: 'Error al obtener estadísticas',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener la sucursal principal (Casa Central)
+ * GET /api/sucursales/principal
+ */
+export const obtenerSucursalPrincipal = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sucursalPrincipal = await executeQuery<ConfiguracionSucursal[]>(
+      'SELECT * FROM configuracion_sucursales WHERE es_principal = 1 AND activa = 1 LIMIT 1'
+    );
+
+    if (sucursalPrincipal.length === 0) {
+      // Si no hay ninguna principal, establecer Maldonado por defecto
+      console.log('⚠️ No hay sucursal principal configurada, estableciendo Maldonado...');
+      
+      await executeQuery(
+        'INSERT INTO configuracion_sucursales (sucursal, es_principal, activa) VALUES (?, 1, 1) ON DUPLICATE KEY UPDATE es_principal = 1',
+        ['maldonado']
+      );
+      
+      const nuevaPrincipal = await executeQuery<ConfiguracionSucursal[]>(
+        'SELECT * FROM configuracion_sucursales WHERE sucursal = ? LIMIT 1',
+        ['maldonado']
+      );
+      
+      res.json({
+        success: true,
+        data: nuevaPrincipal[0],
+        message: 'Sucursal principal establecida (Maldonado por defecto)'
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: sucursalPrincipal[0],
+      message: 'Sucursal principal obtenida exitosamente'
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener sucursal principal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener sucursal principal',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Establecer una sucursal como principal (Casa Central)
+ * PUT /api/sucursales/:nombre/principal
+ * Requiere autenticación y permisos de administrador
+ * 
+ * IMPORTANTE: Solo puede haber UNA sucursal principal a la vez
+ * Al establecer una nueva, automáticamente se quita el flag de la anterior
+ */
+export const establecerSucursalPrincipal = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { nombre } = req.params;
+    const nombreNormalizado = nombre.toLowerCase();
+
+    console.log(`🏠 Estableciendo ${nombreNormalizado} como casa principal...`);
+
+    // Verificar que la sucursal existe (tiene tabla de clientes)
+    const nombreTabla = `clientes_${nombreNormalizado}`;
+    const [tablas] = await pool.execute(
+      `SELECT TABLE_NAME 
+       FROM information_schema.TABLES 
+       WHERE TABLE_SCHEMA = DATABASE() 
+       AND TABLE_NAME = ?`,
+      [nombreTabla]
+    );
+
+    if ((tablas as any[]).length === 0) {
+      res.status(404).json({
+        success: false,
+        message: `La sucursal "${nombreNormalizado}" no existe en el sistema`
+      });
+      return;
+    }
+
+    // Obtener la sucursal principal actual (si existe)
+    const principalActual = await executeQuery<ConfiguracionSucursal[]>(
+      'SELECT sucursal FROM configuracion_sucursales WHERE es_principal = 1 LIMIT 1'
+    );
+
+    // Si ya es la principal, no hacer nada
+    if (principalActual.length > 0 && principalActual[0].sucursal === nombreNormalizado) {
+      res.json({
+        success: true,
+        data: {
+          sucursal: nombreNormalizado,
+          es_principal: true,
+          era_principal: true
+        },
+        message: `"${nombreNormalizado.toUpperCase()}" ya es la Casa Principal`
+      });
+      return;
+    }
+
+    // Quitar el flag de principal a todas las sucursales
+    await executeQuery(
+      'UPDATE configuracion_sucursales SET es_principal = 0'
+    );
+
+    // Insertar o actualizar la nueva sucursal principal
+    await executeQuery(
+      `INSERT INTO configuracion_sucursales (sucursal, es_principal, activa)
+       VALUES (?, 1, 1)
+       ON DUPLICATE KEY UPDATE es_principal = 1, activa = 1`,
+      [nombreNormalizado]
+    );
+
+    console.log(`✅ ${nombreNormalizado.toUpperCase()} establecida como casa principal`);
+
+    res.json({
+      success: true,
+      data: {
+        sucursal_anterior: principalActual.length > 0 ? principalActual[0].sucursal : null,
+        sucursal_nueva: nombreNormalizado,
+        es_principal: true
+      },
+      message: `🏠 "${nombreNormalizado.toUpperCase()}" ahora es la Casa Principal del sistema`
+    });
+  } catch (error) {
+    console.error('❌ Error al establecer sucursal principal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al establecer sucursal principal',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   }

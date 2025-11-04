@@ -15,10 +15,22 @@ import { tablaClientesExiste } from '../utils/database.js';
 const obtenerSucursalPrincipal = async (): Promise<string | null> => {
   const connection = await pool.getConnection();
   try {
+    // Obtener sucursal principal desde configuracion_sucursales
     const [rows] = await connection.query<RowDataPacket[]>(
-      'SELECT DISTINCT sucursal FROM productos_sucursal WHERE es_stock_principal = 1 LIMIT 1'
+      'SELECT sucursal FROM configuracion_sucursales WHERE es_principal = 1 LIMIT 1'
     );
-    return rows.length > 0 ? rows[0].sucursal : null;
+    
+    // Si hay sucursal principal, retornarla
+    if (rows.length > 0) {
+      return rows[0].sucursal;
+    }
+    
+    // Si NO hay sucursal principal, retornar la primera sucursal de la BD
+    const [firstRows] = await connection.query<RowDataPacket[]>(
+      'SELECT sucursal FROM configuracion_sucursales ORDER BY sucursal ASC LIMIT 1'
+    );
+    
+    return firstRows.length > 0 ? firstRows[0].sucursal : null;
   } finally {
     connection.release();
   }
@@ -794,7 +806,7 @@ export const obtenerCategorias = async (req: Request, res: Response): Promise<vo
 
     res.json({
       success: true,
-      data: categorias.map(c => c.valor),
+      data: categorias, // Devolver array con { id, valor }
       count: categorias.length
     });
   } catch (error) {
@@ -881,6 +893,182 @@ export const agregarCategoria = async (req: Request, res: Response): Promise<voi
     res.status(500).json({
       success: false,
       message: 'Error al agregar categoría',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Editar una categoría existente (marca, tipo o calidad)
+ * PUT /api/productos/categoria
+ */
+export const editarCategoria = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, tipo, valorNuevo } = req.body;
+
+    // Validaciones
+    if (!id || !tipo || !valorNuevo) {
+      res.status(400).json({
+        success: false,
+        message: 'ID, tipo y valor nuevo son requeridos'
+      });
+      return;
+    }
+
+    if (tipo !== 'marca' && tipo !== 'tipo' && tipo !== 'calidad') {
+      res.status(400).json({
+        success: false,
+        message: 'Tipo inválido. Debe ser "marca", "tipo" o "calidad"'
+      });
+      return;
+    }
+
+    if (typeof valorNuevo !== 'string' || valorNuevo.trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'El valor nuevo debe ser un texto válido'
+      });
+      return;
+    }
+
+    const valorLimpio = valorNuevo.trim();
+
+    // Actualizar en la base de datos
+    const query = `
+      UPDATE categorias_productos 
+      SET valor = ? 
+      WHERE id = ? AND tipo = ?
+    `;
+
+    const result = await executeQuery<ResultSetHeader>(query, [valorLimpio, id, tipo]);
+
+    if (result.affectedRows > 0) {
+      const nombreCategoria = tipo === 'marca' ? 'Marca' : tipo === 'tipo' ? 'Tipo' : 'Calidad';
+      res.json({
+        success: true,
+        message: `${nombreCategoria} actualizado exitosamente`,
+        data: {
+          id,
+          tipo,
+          valor: valorLimpio
+        }
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Categoría no encontrada'
+      });
+    }
+  } catch (error: any) {
+    console.error('Error al editar categoría:', error);
+    
+    // Manejar error de duplicado
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(409).json({
+        success: false,
+        message: 'Ya existe una categoría con este nombre'
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error al editar categoría',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Eliminar una categoría (marca, tipo o calidad)
+ * DELETE /api/productos/categoria/:id/:tipo
+ */
+export const eliminarCategoria = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, tipo } = req.params;
+
+    // Validaciones
+    if (!id || !tipo) {
+      res.status(400).json({
+        success: false,
+        message: 'ID y tipo son requeridos'
+      });
+      return;
+    }
+
+    if (tipo !== 'marca' && tipo !== 'tipo' && tipo !== 'calidad') {
+      res.status(400).json({
+        success: false,
+        message: 'Tipo inválido. Debe ser "marca", "tipo" o "calidad"'
+      });
+      return;
+    }
+
+    // Verificar si la categoría está en uso
+    const columna = tipo === 'marca' ? 'marca' : tipo === 'tipo' ? 'tipo' : 'calidad';
+    const queryVerificar = `
+      SELECT COUNT(*) as count, valor
+      FROM categorias_productos cp
+      LEFT JOIN productos p ON p.${columna} = cp.valor
+      WHERE cp.id = ? AND cp.tipo = ?
+      GROUP BY cp.valor
+    `;
+    
+    const [categoriaInfo] = await executeQuery<RowDataPacket[]>(queryVerificar, [id, tipo]);
+    
+    if (!categoriaInfo) {
+      res.status(404).json({
+        success: false,
+        message: 'Categoría no encontrada'
+      });
+      return;
+    }
+
+    const valorCategoria = categoriaInfo.valor;
+    
+    // Verificar si hay productos usando esta categoría
+    const queryProductos = `
+      SELECT COUNT(*) as count 
+      FROM productos 
+      WHERE ${columna} = ? AND activo = 1
+    `;
+    
+    const [productosUsando] = await executeQuery<RowDataPacket[]>(queryProductos, [valorCategoria]);
+    
+    if (productosUsando && productosUsando.count > 0) {
+      const nombreCategoria = tipo === 'marca' ? 'marca' : tipo === 'tipo' ? 'tipo' : 'calidad';
+      res.status(409).json({
+        success: false,
+        message: `No se puede eliminar esta ${nombreCategoria} porque ${productosUsando.count} producto(s) la están usando`
+      });
+      return;
+    }
+
+    // Eliminar de la base de datos
+    const queryEliminar = `
+      DELETE FROM categorias_productos 
+      WHERE id = ? AND tipo = ?
+    `;
+
+    const result = await executeQuery<ResultSetHeader>(queryEliminar, [id, tipo]);
+
+    if (result.affectedRows > 0) {
+      const nombreCategoria = tipo === 'marca' ? 'Marca' : tipo === 'tipo' ? 'Tipo' : 'Calidad';
+      res.json({
+        success: true,
+        message: `${nombreCategoria} eliminado exitosamente`
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Categoría no encontrada'
+      });
+    }
+  } catch (error) {
+    console.error('Error al eliminar categoría:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar categoría',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   }
@@ -1043,6 +1231,10 @@ export const confirmarTransferencia = async (req: Request, res: Response): Promi
     
     await connection.beginTransaction();
     
+    // Obtener sucursal principal para el historial
+    const sucursalOrigen = await obtenerSucursalPrincipal();
+    const usuarioEmail = req.usuario?.email || 'sistema';
+    
     for (const transfer of transferencias) {
       const { producto_id, sucursal, cantidad } = transfer;
       
@@ -1061,6 +1253,13 @@ export const confirmarTransferencia = async (req: Request, res: Response): Promi
         return;
       }
       
+      // Obtener nombre del producto para el historial
+      const [productoRows] = await connection.query<RowDataPacket[]>(
+        'SELECT nombre FROM productos WHERE id = ?',
+        [producto_id]
+      );
+      const productoNombre = productoRows.length > 0 ? productoRows[0].nombre : 'Desconocido';
+      
       // Pasar de stock_en_transito a stock
       await connection.query(
         `UPDATE productos_sucursal 
@@ -1068,6 +1267,14 @@ export const confirmarTransferencia = async (req: Request, res: Response): Promi
              stock_en_transito = stock_en_transito - ? 
          WHERE producto_id = ? AND sucursal = ?`,
         [cantidad, cantidad, producto_id, sucursal]
+      );
+      
+      // 📝 Guardar en historial de transferencias
+      await connection.query(
+        `INSERT INTO historial_transferencias 
+         (producto_id, producto_nombre, sucursal_origen, sucursal_destino, cantidad, usuario_email) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [producto_id, productoNombre, sucursalOrigen, sucursal, cantidad, usuarioEmail]
       );
     }
     
@@ -1199,6 +1406,221 @@ export const ajustarTransferencia = async (req: Request, res: Response): Promise
     });
   } finally {
     connection.release();
+  }
+};
+
+/**
+ * GET /api/productos/historial-transferencias
+ * Obtener historial de transferencias con filtros opcionales
+ * Query params: fecha_desde, fecha_hasta, sucursal_destino
+ */
+export const obtenerHistorialTransferencias = async (req: Request, res: Response): Promise<void> => {
+  console.log('📋 Endpoint historial-transferencias llamado');
+  console.log('Query params:', req.query);
+  console.log('Headers:', req.headers.authorization);
+  
+  let connection;
+  
+  try {
+    connection = await pool.getConnection();
+    
+    const { fecha_desde, fecha_hasta, sucursal_destino } = req.query;
+    
+    let query = `
+      SELECT 
+        id,
+        producto_id,
+        producto_nombre,
+        sucursal_origen,
+        sucursal_destino,
+        cantidad,
+        usuario_email,
+        fecha_envio
+      FROM historial_transferencias
+      WHERE 1=1
+    `;
+    
+    const params: any[] = [];
+    
+    // Filtro por fecha desde
+    if (fecha_desde) {
+      query += ` AND fecha_envio >= ?`;
+      params.push(fecha_desde);
+      console.log('📅 Filtro fecha_desde:', fecha_desde);
+    }
+    
+    // Filtro por fecha hasta
+    if (fecha_hasta) {
+      query += ` AND fecha_envio <= DATE_ADD(?, INTERVAL 1 DAY)`;
+      params.push(fecha_hasta);
+      console.log('📅 Filtro fecha_hasta:', fecha_hasta);
+    }
+    
+    // Filtro por sucursal destino
+    if (sucursal_destino && sucursal_destino !== 'todas') {
+      query += ` AND sucursal_destino = ?`;
+      params.push(sucursal_destino);
+      console.log('🏢 Filtro sucursal_destino:', sucursal_destino);
+    }
+    
+    query += ` ORDER BY fecha_envio DESC`;
+    
+    console.log('🔍 Query SQL:', query);
+    console.log('🔍 Params:', params);
+    
+    const [rows] = await connection.query<RowDataPacket[]>(query, params);
+    
+    console.log('✅ Registros encontrados:', rows.length);
+    
+    res.status(200).json({
+      success: true,
+      data: rows,
+      total: rows.length
+    });
+    
+  } catch (error) {
+    console.error('❌ Error al obtener historial de transferencias:', error);
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener historial de transferencias',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
+/**
+ * Obtener inventario completo (productos con stock por sucursal en formato plano)
+ * GET /api/productos/inventario
+ * Query params: sucursal, marca, tipo
+ */
+export const obtenerInventario = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, marca, tipo } = req.query;
+
+    let query = `
+      SELECT 
+        p.id as producto_id,
+        p.nombre as producto,
+        p.marca,
+        p.tipo as modelo,
+        ps.sucursal,
+        ps.stock,
+        ps.stock_en_transito as recibidos,
+        ps.precio,
+        ps.stock_minimo,
+        ps.updated_at
+      FROM productos p
+      INNER JOIN productos_sucursal ps ON p.id = ps.producto_id
+      WHERE p.activo = 1 AND ps.activo = 1
+    `;
+
+    const params: any[] = [];
+
+    // Filtro por sucursal
+    if (sucursal && sucursal !== 'all') {
+      query += ` AND ps.sucursal = ?`;
+      params.push(sucursal);
+    }
+
+    // Filtro por marca
+    if (marca && marca !== 'all') {
+      query += ` AND p.marca = ?`;
+      params.push(marca);
+    }
+
+    // Filtro por tipo (modelo)
+    if (tipo && tipo !== 'all') {
+      query += ` AND p.tipo = ?`;
+      params.push(tipo);
+    }
+
+    query += ` ORDER BY ps.sucursal ASC, p.marca ASC, p.nombre ASC`;
+
+    const [rows] = await pool.query<RowDataPacket[]>(query, params);
+
+    res.json({
+      success: true,
+      data: rows,
+      count: rows.length
+    });
+
+  } catch (error) {
+    console.error('Error al obtener inventario:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener inventario',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener marcas y modelos únicos de productos
+ * GET /api/productos/filtros
+ * Query params opcionales:
+ *  - sucursal: filtrar por sucursal específica
+ */
+export const obtenerFiltrosProductos = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal } = req.query;
+
+    // Query para obtener marcas únicas
+    let queryMarcas = `
+      SELECT DISTINCT p.marca
+      FROM productos p
+      INNER JOIN productos_sucursal ps ON p.id = ps.producto_id
+      WHERE p.activo = 1 AND ps.activo = 1 AND p.marca IS NOT NULL AND p.marca != ''
+    `;
+
+    // Query para obtener modelos (tipo) únicos
+    let queryModelos = `
+      SELECT DISTINCT p.tipo
+      FROM productos p
+      INNER JOIN productos_sucursal ps ON p.id = ps.producto_id
+      WHERE p.activo = 1 AND ps.activo = 1 AND p.tipo IS NOT NULL AND p.tipo != ''
+    `;
+
+    const params: any[] = [];
+
+    // Si se especifica sucursal, filtrar por ella
+    if (sucursal && sucursal !== 'all') {
+      queryMarcas += ` AND ps.sucursal = ?`;
+      queryModelos += ` AND ps.sucursal = ?`;
+      params.push(sucursal);
+    }
+
+    queryMarcas += ` ORDER BY p.marca ASC`;
+    queryModelos += ` ORDER BY p.tipo ASC`;
+
+    // Ejecutar ambas queries
+    const [marcas] = await pool.query<RowDataPacket[]>(queryMarcas, params);
+    const [modelos] = await pool.query<RowDataPacket[]>(queryModelos, params);
+
+    // Extraer solo los valores
+    const marcasUnicas = marcas.map(row => row.marca).filter(Boolean);
+    const modelosUnicos = modelos.map(row => row.tipo).filter(Boolean);
+
+    res.json({
+      success: true,
+      data: {
+        marcas: marcasUnicas,
+        modelos: modelosUnicos
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener filtros de productos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener filtros de productos',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
   }
 };
 

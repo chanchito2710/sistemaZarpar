@@ -536,3 +536,8 @@ INSERT INTO transferencias_detalle (
 **Autor**: Sistema Zarpar - Documentación
 
 
+
+
+
+
+

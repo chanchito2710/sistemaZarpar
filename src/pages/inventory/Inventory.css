@@ -1,0 +1,86 @@
+/* Estilo personalizado para Select de Sucursal */
+.custom-select-sucursal .ant-select-selector {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%) !important;
+  border: 2px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  height: 48px !important;
+  padding: 4px 12px !important;
+}
+
+.custom-select-sucursal .ant-select-selector:hover {
+  border-color: #10b981 !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.custom-select-sucursal.ant-select-focused .ant-select-selector {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+.custom-select-sucursal .ant-select-selection-item {
+  display: flex !important;
+  align-items: center !important;
+  font-weight: 500 !important;
+  color: #1f2937 !important;
+}
+
+.custom-select-sucursal .ant-select-arrow {
+  right: 12px !important;
+}
+
+/* Hover effect para las opciones del dropdown */
+.ant-select-dropdown .ant-select-item-option:hover {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
+}
+
+.ant-select-dropdown .ant-select-item-option-selected {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%) !important;
+  font-weight: 600 !important;
+}
+
+/* Animación suave para el dropdown */
+.ant-select-dropdown {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animación para expandir el buscador */
+@keyframes expandSearch {
+  from {
+    opacity: 0;
+    width: 48px;
+    transform: scaleX(0.1);
+  }
+  to {
+    opacity: 1;
+    width: 100%;
+    transform: scaleX(1);
+  }
+}
+
+/* Estilo para el botón de búsqueda */
+.search-button-icon {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-button-icon:hover {
+  transform: scale(1.1) rotate(15deg);
+}
+
+.search-button-icon:active {
+  transform: scale(0.95);
+}
+

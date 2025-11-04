@@ -8,7 +8,9 @@ import {
   obtenerSucursales,
   crearSucursal,
   eliminarSucursal,
-  obtenerEstadisticasSucursal
+  obtenerEstadisticasSucursal,
+  obtenerSucursalPrincipal,
+  establecerSucursalPrincipal
 } from '../controllers/sucursalesController';
 import { verificarAutenticacion, verificarAdmin } from '../middleware/auth';
 
@@ -22,11 +24,25 @@ const router = Router();
 router.get('/', obtenerSucursales);
 
 /**
+ * @route   GET /api/sucursales/principal
+ * @desc    Obtener la sucursal principal (Casa Central)
+ * @access  Public
+ */
+router.get('/principal', obtenerSucursalPrincipal);
+
+/**
  * @route   GET /api/sucursales/:nombre/stats
  * @desc    Obtener estadísticas de una sucursal específica
  * @access  Private (Autenticado)
  */
 router.get('/:nombre/stats', verificarAutenticacion, obtenerEstadisticasSucursal);
+
+/**
+ * @route   PUT /api/sucursales/:nombre/principal
+ * @desc    Establecer una sucursal como principal (Casa Central)
+ * @access  Private (Solo Administradores)
+ */
+router.put('/:nombre/principal', verificarAutenticacion, verificarAdmin, establecerSucursalPrincipal);
 
 /**
  * @route   POST /api/sucursales

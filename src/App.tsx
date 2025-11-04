@@ -14,6 +14,7 @@ import Inventory from './pages/inventory/Inventory';
 import InventoryLog from './pages/inventory/InventoryLog';
 import Returns from './pages/sales/Returns';
 import Sales from './pages/sales/Sales';
+import GlobalSales from './pages/GlobalSales';
 import MoneyTransfer from './pages/finance/MoneyTransfer';
 import Expenses from './pages/finance/Expenses';
 import Payroll from './pages/finance/Payroll';
@@ -21,8 +22,8 @@ import Banks from './pages/finance/Banks';
 import Cash from './pages/finance/Cash';
 import Transfer from './pages/inventory/Transfer';
 import ReceiveTransfers from './pages/inventory/ReceiveTransfers';
-import CustomerAccounts from './pages/CustomerAccounts';
 import Customers from './pages/customers/Customers';
+import CustomerAccounts from './pages/customers/Accounts';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import DatabaseManager from './pages/admin/DatabaseManager';
@@ -50,6 +51,7 @@ function App() {
                 <Route path="pos/cart" element={<Cart />} />
                 <Route path="sales" element={<Sales />} />
                 <Route path="sales/returns" element={<Returns />} />
+                <Route path="global-sales" element={<GlobalSales />} />
                 
                 {/* Módulo de Inventario */}
                 <Route path="inventory" element={<Inventory />} />

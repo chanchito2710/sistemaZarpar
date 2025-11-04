@@ -39,6 +39,7 @@ body {
 #root {
   min-height: 100vh;
   width: 100%;
+  overflow-x: hidden;
 }
 
 /* Estilos para scrollbar personalizado */
@@ -152,6 +153,7 @@ body {
 /* Personalización adicional de componentes Ant Design */
 .ant-layout {
   background: var(--background-color) !important;
+  overflow-x: hidden !important;
 }
 
 .ant-menu-item-selected {

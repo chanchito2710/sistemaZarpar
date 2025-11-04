@@ -362,3 +362,8 @@ curl http://localhost:3456/api/sucursales
 **¡Listo! Ahora prueba actualizar el stock para "Soriano" o "Minas" y debería funcionar perfectamente.** 🎉
 
 
+
+
+
+
+

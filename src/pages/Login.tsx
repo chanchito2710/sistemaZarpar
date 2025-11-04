@@ -141,12 +141,12 @@ const Login: React.FC = () => {
             type="text"
             onClick={() => form.setFieldsValue({
               email: 'admin@zarparuy.com',
-              password: 'zarpar123'
+              password: 'admin123'
             })}
             disabled={loading}
           >
             <Text type="secondary" style={{ fontSize: 12 }}>
-              👑 Admin: admin@zarparuy.com / zarpar123
+              👑 Admin: admin@zarparuy.com / admin123
             </Text>
           </Button>
           <Button 
@@ -155,12 +155,12 @@ const Login: React.FC = () => {
             type="text"
             onClick={() => form.setFieldsValue({
               email: 'pando@zarparuy.com',
-              password: 'zarpar123'
+              password: 'pando123'
             })}
             disabled={loading}
           >
             <Text type="secondary" style={{ fontSize: 12 }}>
-              💼 Vendedor Pando: pando@zarparuy.com / zarpar123
+              💼 Vendedor Pando: pando@zarparuy.com / pando123
             </Text>
           </Button>
         </Space>

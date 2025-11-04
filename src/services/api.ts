@@ -708,9 +708,9 @@ export const productosService = {
    * Obtener categorías (marcas, tipos o calidades) para los selectores
    * @param tipo - 'marca', 'tipo' o 'calidad'
    */
-  obtenerCategorias: async (tipo: 'marca' | 'tipo' | 'calidad'): Promise<string[]> => {
+  obtenerCategorias: async (tipo: 'marca' | 'tipo' | 'calidad'): Promise<Array<{ id: number; valor: string }>> => {
     try {
-      const response: AxiosResponse<ApiResponse<string[]>> = await apiClient.get(
+      const response: AxiosResponse<ApiResponse<Array<{ id: number; valor: string }>>> = await apiClient.get(
         `/productos/categorias/${tipo}`
       );
       return response.data.data || [];
@@ -730,6 +730,35 @@ export const productosService = {
       await apiClient.post('/productos/categorias', { tipo, valor });
     } catch (error) {
       console.error(`Error al agregar ${tipo}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Editar una categoría existente (marca, tipo o calidad)
+   * @param id - ID de la categoría
+   * @param tipo - 'marca', 'tipo' o 'calidad'
+   * @param valorNuevo - Nuevo valor de la categoría
+   */
+  editarCategoria: async (id: number, tipo: 'marca' | 'tipo' | 'calidad', valorNuevo: string): Promise<void> => {
+    try {
+      await apiClient.put('/productos/categorias', { id, tipo, valorNuevo });
+    } catch (error) {
+      console.error(`Error al editar ${tipo}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Eliminar una categoría (marca, tipo o calidad)
+   * @param id - ID de la categoría
+   * @param tipo - 'marca', 'tipo' o 'calidad'
+   */
+  eliminarCategoria: async (id: number, tipo: 'marca' | 'tipo' | 'calidad'): Promise<void> => {
+    try {
+      await apiClient.delete(`/productos/categorias/${id}/${tipo}`);
+    } catch (error) {
+      console.error(`Error al eliminar ${tipo}:`, error);
       throw error;
     }
   },
@@ -810,6 +839,26 @@ export const productosService = {
       throw error;
     }
   },
+
+  /**
+   * Obtener inventario completo (productos con stock por sucursal en formato plano)
+   * @param filtros - Filtros opcionales: sucursal, marca, tipo
+   */
+  obtenerInventario: async (filtros?: { sucursal?: string; marca?: string; tipo?: string }): Promise<any[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros?.sucursal) params.append('sucursal', filtros.sucursal);
+      if (filtros?.marca) params.append('marca', filtros.marca);
+      if (filtros?.tipo) params.append('tipo', filtros.tipo);
+      
+      const url = `/productos/inventario${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener inventario:', error);
+      throw error;
+    }
+  },
 };
 
 /**
@@ -850,6 +899,7 @@ export interface Venta {
   fecha_vencimiento?: string;
   observaciones?: string;
   total_productos?: number; // Agregado por JOIN
+  productos?: VentaDetalle[]; // Detalle de productos vendidos
 }
 
 export interface VentaDetalle {
@@ -1039,6 +1089,105 @@ export const ventasService = {
       throw error;
     }
   },
+
+  /**
+   * Obtener historial completo de ventas con filtros opcionales
+   * @param filtros - Filtros opcionales: sucursal, fecha_desde, fecha_hasta, metodo_pago, estado_pago
+   */
+  obtenerHistorial: async (
+    filtros?: {
+      sucursal?: string;
+      fecha_desde?: string;
+      fecha_hasta?: string;
+      metodo_pago?: string;
+      estado_pago?: string;
+    }
+  ): Promise<Venta[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros) {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const url = `/ventas/historial${params.toString() ? `?${params.toString()}` : ''}`;
+      console.log('🔗 URL del historial:', url);
+      
+      const response: AxiosResponse<ApiResponse<Venta[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener historial de ventas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener las últimas ventas (para Dashboard)
+   */
+  obtenerUltimas: async (limit: number = 4): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = 
+        await apiClient.get(`/ventas/ultimas/${limit}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener últimas ventas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener ventas del día actual
+   */
+  obtenerVentasDelDia: async (): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = 
+        await apiClient.get('/ventas/ventas-del-dia');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al obtener ventas del día:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Guardar resumen diario (llamado por cron o manualmente)
+   */
+  guardarResumenDiario: async (fecha?: string): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = 
+        await apiClient.post('/ventas/guardar-resumen-diario', { fecha });
+      return response.data;
+    } catch (error) {
+      console.error('Error al guardar resumen diario:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener historial de ventas globales
+   */
+  obtenerVentasGlobales: async (filtros?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    sucursal?: string;
+  }): Promise<any[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros?.fecha_desde) params.append('fecha_desde', filtros.fecha_desde);
+      if (filtros?.fecha_hasta) params.append('fecha_hasta', filtros.fecha_hasta);
+      if (filtros?.sucursal) params.append('sucursal', filtros.sucursal);
+
+      const url = `/ventas/ventas-globales${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener ventas globales:', error);
+      throw error;
+    }
+  },
 };
 
 /**
@@ -1086,6 +1235,38 @@ export const cuentaCorrienteService = {
       return response.data.data;
     } catch (error) {
       console.error('Error al registrar pago:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener historial de pagos de cuenta corriente
+   */
+  obtenerHistorialPagos: async (filtros: {
+    sucursal?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Promise<{
+    pagos: any[];
+    estadisticas: {
+      total_pagos: number;
+      total_cobrado: number;
+      promedio_pago: number;
+      total_efectivo: number;
+      total_transferencia: number;
+    };
+  }> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros.sucursal) params.append('sucursal', filtros.sucursal);
+      if (filtros.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
+      if (filtros.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
+
+      const response: AxiosResponse<ApiResponse<any>> = 
+        await apiClient.get(`/ventas/historial-pagos-cuenta-corriente?${params.toString()}`);
+      return response.data.data!;
+    } catch (error) {
+      console.error('Error al obtener historial de pagos:', error);
       throw error;
     }
   },

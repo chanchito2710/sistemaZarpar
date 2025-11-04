@@ -223,3 +223,8 @@ WHERE ROUTINE_SCHEMA = 'zarparDataBase'
 SELECT '✅ Migración completada exitosamente' as mensaje;
 
 
+
+
+
+
+

@@ -346,3 +346,8 @@ Sistema refleja realidad física ✅
 **Autor**: Sistema Zarpar - Asistente IA
 
 
+
+
+
+
+

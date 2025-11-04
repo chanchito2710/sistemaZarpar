@@ -486,3 +486,8 @@ GET /api/productos/con-sucursales
 **Tests**: Manual (funcional completo)
 
 
+
+
+
+
+

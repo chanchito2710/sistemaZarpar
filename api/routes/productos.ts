@@ -16,10 +16,15 @@ import {
   buscarProductos,
   obtenerCategorias,
   agregarCategoria,
+  editarCategoria,
+  eliminarCategoria,
   obtenerSucursalPrincipalEndpoint,
   prepararTransferencia,
   confirmarTransferencia,
-  ajustarTransferencia
+  ajustarTransferencia,
+  obtenerHistorialTransferencias,
+  obtenerInventario,
+  obtenerFiltrosProductos
 } from '../controllers/productosController.js';
 import { verificarAutenticacion } from '../middleware/auth.js';
 
@@ -51,6 +56,100 @@ router.get(
 );
 
 /**
+ * ===================================
+ * RUTAS ESPECÍFICAS (ANTES DE /:id)
+ * ===================================
+ */
+
+/**
+ * @route   GET /api/productos/sucursal-principal
+ * @desc    Obtener la sucursal principal (identificada por es_principal = 1)
+ * @access  Private (requiere autenticación)
+ * @returns { sucursal: string } - Nombre de la sucursal principal
+ */
+router.get(
+  '/sucursal-principal',
+  verificarAutenticacion,
+  obtenerSucursalPrincipalEndpoint
+);
+
+/**
+ * @route   GET /api/productos/categorias/:tipo
+ * @desc    Obtener categorías (marcas o tipos) para selectores
+ * @access  Private (requiere autenticación)
+ * @param   tipo - 'marca' o 'tipo'
+ */
+router.get(
+  '/categorias/:tipo',
+  verificarAutenticacion,
+  obtenerCategorias
+);
+
+/**
+ * @route   POST /api/productos/categorias
+ * @desc    Agregar nueva categoría (marca, tipo o calidad)
+ * @access  Private (requiere autenticación)
+ * @body    { tipo: 'marca' | 'tipo' | 'calidad', valor: string }
+ */
+router.post(
+  '/categorias',
+  verificarAutenticacion,
+  agregarCategoria
+);
+
+/**
+ * @route   PUT /api/productos/categorias
+ * @desc    Editar una categoría existente (marca, tipo o calidad)
+ * @access  Private (requiere autenticación)
+ * @body    { id: number, tipo: 'marca' | 'tipo' | 'calidad', valorNuevo: string }
+ */
+router.put(
+  '/categorias',
+  verificarAutenticacion,
+  editarCategoria
+);
+
+/**
+ * @route   DELETE /api/productos/categorias/:id/:tipo
+ * @desc    Eliminar una categoría (marca, tipo o calidad)
+ * @access  Private (requiere autenticación)
+ * @param   id - ID de la categoría a eliminar
+ * @param   tipo - 'marca' | 'tipo' | 'calidad'
+ */
+router.delete(
+  '/categorias/:id/:tipo',
+  verificarAutenticacion,
+  eliminarCategoria
+);
+
+/**
+ * @route   GET /api/productos/filtros
+ * @desc    Obtener marcas y modelos únicos para los filtros
+ * @access  Private (requiere autenticación)
+ * @query   sucursal (opcional) - Filtrar por sucursal específica
+ * @returns { marcas: string[], modelos: string[] }
+ */
+router.get(
+  '/filtros',
+  verificarAutenticacion,
+  obtenerFiltrosProductos
+);
+
+/**
+ * @route   GET /api/productos/inventario
+ * @desc    Obtener inventario completo (productos con stock por sucursal en formato plano)
+ * @access  Private (requiere autenticación)
+ * @query   sucursal (opcional) - Filtrar por sucursal
+ * @query   marca (opcional) - Filtrar por marca
+ * @query   tipo (opcional) - Filtrar por tipo/modelo
+ */
+router.get(
+  '/inventario',
+  verificarAutenticacion,
+  obtenerInventario
+);
+
+/**
  * @route   GET /api/productos/sucursal/:sucursal
  * @desc    Obtener productos de una sucursal con stock y precio
  * @access  Private (requiere autenticación)
@@ -60,6 +159,37 @@ router.get(
   verificarAutenticacion,
   obtenerProductosPorSucursal
 );
+
+/**
+ * ===================================
+ * TRANSFERENCIAS - HISTORIAL
+ * ===================================
+ */
+
+/**
+ * @route   GET /api/productos/historial-transferencias
+ * @desc    Obtener historial de transferencias con filtros opcionales
+ * @access  Public (TEMPORALMENTE SIN AUTENTICACIÓN PARA DEBUG)
+ * @query   fecha_desde, fecha_hasta, sucursal_destino (opcional)
+ * @returns Array de transferencias históricas
+ */
+router.get(
+  '/historial-transferencias',
+  async (req, res, next) => {
+    console.log('🔥 MIDDLEWARE: Request recibida para historial-transferencias');
+    console.log('Headers:', req.headers);
+    console.log('Query:', req.query);
+    next();
+  },
+  // verificarAutenticacion, // TEMPORALMENTE COMENTADO PARA DEBUG
+  obtenerHistorialTransferencias
+);
+
+/**
+ * ===================================
+ * RUTAS CON PARÁMETROS DINÁMICOS
+ * ===================================
+ */
 
 /**
  * @route   GET /api/productos/:id
@@ -117,46 +247,10 @@ router.put(
 );
 
 /**
- * @route   GET /api/productos/categorias/:tipo
- * @desc    Obtener categorías (marcas o tipos) para selectores
- * @access  Private (requiere autenticación)
- * @param   tipo - 'marca' o 'tipo'
- */
-router.get(
-  '/categorias/:tipo',
-  verificarAutenticacion,
-  obtenerCategorias
-);
-
-/**
- * @route   POST /api/productos/categorias
- * @desc    Agregar nueva categoría (marca o tipo)
- * @access  Private (requiere autenticación)
- * @body    { tipo: 'marca' | 'tipo', valor: string }
- */
-router.post(
-  '/categorias',
-  verificarAutenticacion,
-  agregarCategoria
-);
-
-/**
  * ===================================
  * RUTAS PARA TRANSFERENCIAS DINÁMICAS
  * ===================================
  */
-
-/**
- * @route   GET /api/productos/sucursal-principal
- * @desc    Obtener la sucursal principal (identificada por es_stock_principal = 1)
- * @access  Private (requiere autenticación)
- * @returns { sucursal: string } - Nombre de la sucursal principal
- */
-router.get(
-  '/sucursal-principal',
-  verificarAutenticacion,
-  obtenerSucursalPrincipalEndpoint
-);
 
 /**
  * @route   POST /api/productos/preparar-transferencia

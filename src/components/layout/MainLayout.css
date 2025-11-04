@@ -1,0 +1,27 @@
+/* Estilos para el botón Home */
+.ant-menu-item:hover .home-icon-button {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.6);
+}
+
+.ant-menu-item-selected .home-icon-button {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.8);
+  transform: scale(1.05);
+}
+
+.ant-menu-item {
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-menu-item:hover {
+  background: rgba(102, 126, 234, 0.08) !important;
+}
+
+.ant-menu-item-selected {
+  background: rgba(102, 126, 234, 0.12) !important;
+}
+
+

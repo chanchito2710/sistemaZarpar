@@ -74,197 +74,35 @@ const GradientIcon: React.FC<{
 
 export const menuItems: MenuItem[] = [
   getItem(
-    'Dashboard',
+    'Home',
     'dashboard',
-    <GradientIcon 
-      icon={<DashboardOutlined />} 
-      gradient={moduleColors.settings.gradient}
-      color={moduleColors.settings.color}
-    />
+    <div
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'white',
+        fontSize: 20,
+        boxShadow: '0 4px 16px rgba(102, 126, 234, 0.4)',
+        transition: 'all 0.3s ease',
+      }}
+      className="home-icon-button"
+    >
+      <HomeOutlined />
+    </div>,
+    undefined,
+    undefined,
+    {
+      fontSize: '16px',
+      fontWeight: 600,
+      color: '#1a1a1a',
+      padding: '16px 24px',
+    }
   ),
-  
-  // Sección de Ventas
-  getItem('VENTAS', 'sales-group', null, [
-    getItem(
-      'Punto de Venta',
-      'pos',
-      <GradientIcon 
-        icon={<ShopOutlined />} 
-        gradient={moduleColors.pos.gradient}
-        color={moduleColors.pos.color}
-      />
-    ),
-    getItem(
-      'Historial de Ventas',
-      'sales',
-      <GradientIcon 
-        icon={<LineChartOutlined />} 
-        gradient={moduleColors.sales.gradient}
-        color={moduleColors.sales.color}
-      />
-    ),
-    getItem(
-      'Devoluciones',
-      'returns',
-      <GradientIcon 
-        icon={<RollbackOutlined />} 
-        gradient={moduleColors.returns.gradient}
-        color={moduleColors.returns.color}
-      />
-    ),
-  ], 'group'),
-
-  // Sección de Inventario
-  getItem('INVENTARIO', 'inventory-group', null, [
-    getItem(
-      'Stock',
-      'inventory',
-      <GradientIcon 
-        icon={<InboxOutlined />} 
-        gradient={moduleColors.inventory.gradient}
-        color={moduleColors.inventory.color}
-      />
-    ),
-    getItem(
-      'Bitácora de Inventario',
-      'inventory/log',
-      <GradientIcon 
-        icon={<HistoryOutlined />} 
-        gradient={moduleColors.inventory.gradient}
-        color={moduleColors.inventory.color}
-      />
-    ),
-    getItem(
-      'Transfer Mercadería',
-      'inventory/transfer',
-      <GradientIcon 
-        icon={<SwapOutlined />} 
-        gradient={moduleColors.transfer.gradient}
-        color={moduleColors.transfer.color}
-      />
-    ),
-  ], 'group'),
-
-  // Sección de Productos
-  getItem('PRODUCTOS', 'products-group', null, [
-    getItem(
-      'Catálogo de Productos',
-      'products',
-      <GradientIcon 
-        icon={<GiftOutlined />} 
-        gradient={moduleColors.products.gradient}
-        color={moduleColors.products.color}
-      />
-    ),
-    getItem(
-      'Lista de Precios',
-      'products/prices',
-      <GradientIcon 
-        icon={<UnorderedListOutlined />} 
-        gradient={moduleColors.products.gradient}
-        color={moduleColors.products.color}
-      />
-    ),
-
-  ], 'group'),
-
-  // Sección de Clientes
-  getItem('CLIENTES', 'customers-group', null, [
-    getItem(
-      'Base de Clientes',
-      'customers',
-      <GradientIcon 
-        icon={<UserOutlined />} 
-        gradient={moduleColors.customers.gradient}
-        color={moduleColors.customers.color}
-      />
-    ),
-    getItem(
-      'Cuentas Corrientes',
-      'customers/accounts',
-      <GradientIcon 
-        icon={<CreditCardOutlined />} 
-        gradient={moduleColors.customers.gradient}
-        color={moduleColors.customers.color}
-      />
-    ),
-  ], 'group'),
-
-  // Sección de Finanzas
-  getItem('FINANZAS', 'finance-group', null, [
-    getItem(
-      'Caja',
-      'finance/cash',
-      <GradientIcon 
-        icon={<CalculatorOutlined />} 
-        gradient={moduleColors.money.gradient}
-        color={moduleColors.money.color}
-      />
-    ),
-    getItem(
-      'Bancos',
-      'finance/banks',
-      <GradientIcon 
-        icon={<BankOutlined />} 
-        gradient={moduleColors.money.gradient}
-        color={moduleColors.money.color}
-      />
-    ),
-    getItem(
-      'Gastos',
-      'finance/expenses',
-      <GradientIcon 
-        icon={<DollarOutlined />} 
-        gradient={moduleColors.expenses.gradient}
-        color={moduleColors.expenses.color}
-      />
-    ),
-    getItem(
-      'Sueldos',
-      'finance/payroll',
-      <GradientIcon 
-        icon={<TeamOutlined />} 
-        gradient={moduleColors.payroll.gradient}
-        color={moduleColors.payroll.color}
-      />
-    ),
-    getItem(
-      'Envío de Dinero',
-      'finance/money-transfer',
-      <GradientIcon 
-        icon={<SendOutlined />} 
-        gradient={moduleColors.money.gradient}
-        color={moduleColors.money.color}
-      />
-    ),
-  ], 'group'),
-
-  // Sección de Personal
-  getItem('PERSONAL', 'staff-group', null, [
-    getItem(
-      'Gestionar',
-      'staff/sellers',
-      <GradientIcon 
-        icon={<BuildOutlined />} 
-        gradient={moduleColors.customers.gradient}
-        color={moduleColors.customers.color}
-      />
-    ),
-  ], 'group'),
-
-  // Sección de Administración
-  getItem('ADMINISTRACIÓN', 'admin-group', null, [
-    getItem(
-      'Base de Datos',
-      'admin/database',
-      <GradientIcon 
-        icon={<DashboardOutlined />} 
-        gradient={moduleColors.settings.gradient}
-        color={moduleColors.settings.color}
-      />
-    ),
-  ], 'group'),
-
 ];
 
 // Mapeo de rutas para navegación
@@ -429,14 +267,6 @@ export const moduleInfo = {
     color: moduleColors.products.color,
     gradient: moduleColors.products.gradient,
     icon: <UnorderedListOutlined />,
-  },
-  branches: {
-    title: 'Sucursales',
-    description: 'Gestión de sucursales',
-    path: '/branches',
-    color: moduleColors.customers.color,
-    gradient: moduleColors.customers.gradient,
-    icon: <HomeOutlined />,
   },
   database: {
     title: 'Base de Datos',

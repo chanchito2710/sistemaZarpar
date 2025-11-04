@@ -414,11 +414,11 @@ export const obtenerCuentaCorriente = async (req: Request, res: Response): Promi
   try {
     const { sucursal, cliente_id } = req.params;
 
-    // Obtener todos los movimientos
+    // Obtener todos los movimientos (ordenados de más viejo a más nuevo)
     const queryMovimientos = `
       SELECT * FROM cuenta_corriente_movimientos
       WHERE sucursal = ? AND cliente_id = ?
-      ORDER BY fecha_movimiento DESC
+      ORDER BY fecha_movimiento ASC
     `;
 
     const movimientos = await executeQuery<RowDataPacket[]>(queryMovimientos, [sucursal, cliente_id]);
@@ -736,6 +736,506 @@ export const obtenerClientesCuentaCorriente = async (req: Request, res: Response
     res.status(500).json({
       success: false,
       message: 'Error al obtener los clientes',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener historial completo de ventas (TODAS las sucursales o filtradas)
+ * GET /api/ventas/historial
+ * Query params: 
+ *   - sucursal (opcional): filtrar por sucursal específica
+ *   - fecha_desde (opcional): fecha inicio (YYYY-MM-DD)
+ *   - fecha_hasta (opcional): fecha fin (YYYY-MM-DD)
+ *   - metodo_pago (opcional): efectivo | transferencia | cuenta_corriente
+ *   - estado_pago (opcional): pagado | pendiente | parcial
+ */
+export const obtenerHistorialVentas = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📋 Endpoint /api/ventas/historial llamado');
+    console.log('Query params:', req.query);
+
+    const { sucursal, fecha_desde, fecha_hasta, metodo_pago, estado_pago } = req.query;
+
+    // Query base: obtener ventas con cantidad de productos
+    let query = `
+      SELECT 
+        v.id,
+        v.numero_venta,
+        v.sucursal,
+        v.cliente_id,
+        v.cliente_nombre,
+        v.vendedor_id,
+        v.vendedor_nombre,
+        v.subtotal,
+        v.descuento,
+        v.total,
+        v.metodo_pago,
+        v.estado_pago,
+        v.saldo_pendiente,
+        v.fecha_venta,
+        v.observaciones,
+        COUNT(vd.id) as total_productos
+      FROM ventas v
+      LEFT JOIN ventas_detalle vd ON v.id = vd.venta_id
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+
+    // Filtro por sucursal
+    if (sucursal && sucursal !== 'todas') {
+      query += ` AND v.sucursal = ?`;
+      params.push(sucursal);
+      console.log('🏢 Filtro sucursal:', sucursal);
+    }
+
+    // Filtro por fecha desde
+    if (fecha_desde) {
+      query += ` AND DATE(v.fecha_venta) >= ?`;
+      params.push(fecha_desde);
+      console.log('📅 Filtro fecha_desde:', fecha_desde);
+    }
+
+    // Filtro por fecha hasta
+    if (fecha_hasta) {
+      query += ` AND DATE(v.fecha_venta) <= ?`;
+      params.push(fecha_hasta);
+      console.log('📅 Filtro fecha_hasta:', fecha_hasta);
+    }
+
+    // Filtro por método de pago
+    if (metodo_pago && metodo_pago !== 'todos') {
+      query += ` AND v.metodo_pago = ?`;
+      params.push(metodo_pago);
+      console.log('💳 Filtro metodo_pago:', metodo_pago);
+    }
+
+    // Filtro por estado de pago
+    if (estado_pago && estado_pago !== 'todos') {
+      query += ` AND v.estado_pago = ?`;
+      params.push(estado_pago);
+      console.log('✅ Filtro estado_pago:', estado_pago);
+    }
+
+    query += ` GROUP BY v.id ORDER BY v.fecha_venta DESC`;
+
+    console.log('🔍 Query SQL:', query);
+    console.log('🔍 Params:', params);
+
+    const ventas = await executeQuery<RowDataPacket[]>(query, params);
+
+    console.log('✅ Ventas encontradas:', ventas.length);
+
+    res.status(200).json({
+      success: true,
+      data: ventas,
+      count: ventas.length
+    });
+
+  } catch (error) {
+    console.error('❌ Error al obtener historial de ventas:', error);
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
+
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener historial de ventas',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener historial de pagos de cuenta corriente
+ * Filtra por sucursal y rango de fechas
+ */
+export const obtenerHistorialPagosCuentaCorriente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, fechaDesde, fechaHasta } = req.query;
+
+    console.log('📋 Obteniendo historial de pagos cuenta corriente:', {
+      sucursal,
+      fechaDesde,
+      fechaHasta
+    });
+
+    // Construir query con filtros dinámicos
+    let query = `
+      SELECT 
+        p.*,
+        COALESCE(
+          (SELECT saldo_actual 
+           FROM resumen_cuenta_corriente r 
+           WHERE r.sucursal = p.sucursal 
+           AND r.cliente_id = p.cliente_id 
+           LIMIT 1),
+          0
+        ) as saldo_actual_cliente
+      FROM pagos_cuenta_corriente p
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+
+    // Filtro por sucursal
+    if (sucursal && sucursal !== 'todas') {
+      query += ` AND p.sucursal = ?`;
+      params.push(sucursal);
+    }
+
+    // Filtro por fecha desde
+    if (fechaDesde) {
+      query += ` AND DATE(p.fecha_pago) >= ?`;
+      params.push(fechaDesde);
+    }
+
+    // Filtro por fecha hasta
+    if (fechaHasta) {
+      query += ` AND DATE(p.fecha_pago) <= ?`;
+      params.push(fechaHasta);
+    }
+
+    // Ordenar por fecha más reciente primero
+    query += ` ORDER BY p.fecha_pago DESC`;
+
+    const pagos = await executeQuery<RowDataPacket[]>(query, params);
+
+    // Obtener estadísticas
+    let statsQuery = `
+      SELECT 
+        COUNT(*) as total_pagos,
+        SUM(monto) as total_cobrado,
+        AVG(monto) as promedio_pago,
+        SUM(CASE WHEN metodo_pago = 'efectivo' THEN monto ELSE 0 END) as total_efectivo,
+        SUM(CASE WHEN metodo_pago = 'transferencia' THEN monto ELSE 0 END) as total_transferencia
+      FROM pagos_cuenta_corriente
+      WHERE 1=1
+    `;
+
+    const statsParams: any[] = [];
+
+    if (sucursal && sucursal !== 'todas') {
+      statsQuery += ` AND sucursal = ?`;
+      statsParams.push(sucursal);
+    }
+
+    if (fechaDesde) {
+      statsQuery += ` AND DATE(fecha_pago) >= ?`;
+      statsParams.push(fechaDesde);
+    }
+
+    if (fechaHasta) {
+      statsQuery += ` AND DATE(fecha_pago) <= ?`;
+      statsParams.push(fechaHasta);
+    }
+
+    const stats = await executeQuery<RowDataPacket[]>(statsQuery, statsParams);
+
+    console.log(`✅ Encontrados ${pagos.length} pagos`);
+
+    res.json({
+      success: true,
+      data: {
+        pagos,
+        estadisticas: stats[0] || {
+          total_pagos: 0,
+          total_cobrado: 0,
+          promedio_pago: 0,
+          total_efectivo: 0,
+          total_transferencia: 0
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error al obtener historial de pagos cuenta corriente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener historial de pagos cuenta corriente',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener últimas ventas para el Dashboard
+ * GET /api/ventas/ultimas/:limit?
+ */
+export const obtenerUltimasVentas = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const limitParam = req.params.limit;
+    const limit = limitParam ? parseInt(limitParam) : 4;
+
+    // Validar que limit sea un número válido
+    if (isNaN(limit) || limit < 1 || limit > 100) {
+      res.status(400).json({
+        success: false,
+        message: 'Límite inválido. Debe ser un número entre 1 y 100'
+      });
+      return;
+    }
+
+    // Query simple para obtener las últimas ventas
+    const query = `
+      SELECT 
+        v.id,
+        v.numero_venta,
+        v.sucursal,
+        v.cliente_nombre,
+        v.total,
+        v.metodo_pago,
+        v.fecha_venta
+      FROM ventas v
+      ORDER BY v.fecha_venta DESC
+      LIMIT ${limit}
+    `;
+
+    const ventas = await executeQuery<RowDataPacket[]>(query);
+
+    // Obtener primer producto para cada venta
+    for (const venta of ventas) {
+      const queryProducto = `
+        SELECT producto_nombre
+        FROM ventas_detalle
+        WHERE venta_id = ?
+        LIMIT 1
+      `;
+      const productos = await executeQuery<RowDataPacket[]>(queryProducto, [venta.id]);
+      venta.primer_producto = productos.length > 0 ? productos[0].producto_nombre : null;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: ventas,
+      count: ventas.length
+    });
+
+  } catch (error) {
+    console.error('Error al obtener últimas ventas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las últimas ventas',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener ventas del día actual (todas las sucursales)
+ * GET /api/ventas/ventas-del-dia
+ */
+export const obtenerVentasDelDia = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Query para obtener ventas del día actual
+    const query = `
+      SELECT 
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as total_ingresos,
+        COALESCE(SUM(descuento), 0) as total_descuentos
+      FROM ventas
+      WHERE DATE(fecha_venta) = CURDATE()
+    `;
+
+    const resultado = await executeQuery<RowDataPacket[]>(query);
+    const resumen = resultado[0];
+
+    // Query para obtener ventas por sucursal del día
+    const queryPorSucursal = `
+      SELECT 
+        sucursal,
+        COUNT(*) as cantidad,
+        COALESCE(SUM(total), 0) as total
+      FROM ventas
+      WHERE DATE(fecha_venta) = CURDATE()
+      GROUP BY sucursal
+    `;
+
+    const porSucursal = await executeQuery<RowDataPacket[]>(queryPorSucursal);
+
+    // Query para obtener ventas por método de pago del día
+    const queryPorMetodo = `
+      SELECT 
+        metodo_pago,
+        COUNT(*) as cantidad,
+        COALESCE(SUM(total), 0) as total
+      FROM ventas
+      WHERE DATE(fecha_venta) = CURDATE()
+      GROUP BY metodo_pago
+    `;
+
+    const porMetodoPago = await executeQuery<RowDataPacket[]>(queryPorMetodo);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total_ventas: parseInt(resumen.total_ventas),
+        total_ingresos: parseFloat(resumen.total_ingresos),
+        total_descuentos: parseFloat(resumen.total_descuentos),
+        por_sucursal: porSucursal,
+        por_metodo_pago: porMetodoPago
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener ventas del día:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las ventas del día',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Guardar resumen diario de ventas
+ * POST /api/ventas/guardar-resumen-diario
+ */
+export const guardarResumenDiario = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fecha } = req.body;
+    const fechaResumen = fecha || new Date().toISOString().split('T')[0];
+
+    // Obtener ventas del día especificado
+    const query = `
+      SELECT 
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as total_ingresos
+      FROM ventas
+      WHERE DATE(fecha_venta) = ?
+    `;
+
+    const resultado = await executeQuery<RowDataPacket[]>(query, [fechaResumen]);
+    const resumen = resultado[0];
+
+    // Obtener por sucursal
+    const queryPorSucursal = `
+      SELECT 
+        sucursal,
+        COUNT(*) as cantidad,
+        COALESCE(SUM(total), 0) as total
+      FROM ventas
+      WHERE DATE(fecha_venta) = ?
+      GROUP BY sucursal
+    `;
+
+    const porSucursal = await executeQuery<RowDataPacket[]>(queryPorSucursal, [fechaResumen]);
+
+    // Obtener por método de pago
+    const queryPorMetodo = `
+      SELECT 
+        metodo_pago,
+        COUNT(*) as cantidad,
+        COALESCE(SUM(total), 0) as total
+      FROM ventas
+      WHERE DATE(fecha_venta) = ?
+      GROUP BY metodo_pago
+    `;
+
+    const porMetodoPago = await executeQuery<RowDataPacket[]>(queryPorMetodo, [fechaResumen]);
+
+    // Insertar o actualizar resumen
+    const queryInsert = `
+      INSERT INTO ventas_diarias_resumen 
+        (fecha, total_ventas, total_ingresos, por_sucursal, por_metodo_pago)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        total_ventas = VALUES(total_ventas),
+        total_ingresos = VALUES(total_ingresos),
+        por_sucursal = VALUES(por_sucursal),
+        por_metodo_pago = VALUES(por_metodo_pago)
+    `;
+
+    await executeQuery(queryInsert, [
+      fechaResumen,
+      resumen.total_ventas,
+      resumen.total_ingresos,
+      JSON.stringify(porSucursal),
+      JSON.stringify(porMetodoPago)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Resumen diario guardado exitosamente',
+      data: {
+        fecha: fechaResumen,
+        total_ventas: parseInt(resumen.total_ventas),
+        total_ingresos: parseFloat(resumen.total_ingresos)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al guardar resumen diario:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al guardar el resumen diario',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener historial de ventas diarias (Ventas Globales)
+ * GET /api/ventas/ventas-globales
+ */
+export const obtenerVentasGlobales = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fecha_desde, fecha_hasta, sucursal } = req.query;
+
+    let query = `
+      SELECT 
+        fecha,
+        total_ventas,
+        total_ingresos,
+        por_sucursal,
+        por_metodo_pago,
+        created_at
+      FROM ventas_diarias_resumen
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+
+    // Filtro por fecha desde
+    if (fecha_desde) {
+      query += ` AND fecha >= ?`;
+      params.push(fecha_desde);
+    }
+
+    // Filtro por fecha hasta
+    if (fecha_hasta) {
+      query += ` AND fecha <= ?`;
+      params.push(fecha_hasta);
+    }
+
+    // Filtro por sucursal (buscar en JSON)
+    if (sucursal && sucursal !== 'todas') {
+      query += ` AND JSON_SEARCH(por_sucursal, 'one', ?, NULL, '$[*].sucursal') IS NOT NULL`;
+      params.push(sucursal);
+    }
+
+    query += ` ORDER BY fecha DESC`;
+
+    const resumenes = await executeQuery<RowDataPacket[]>(query, params);
+
+    // Parsear JSON en los resultados
+    const resumenesParseados = resumenes.map(r => ({
+      ...r,
+      por_sucursal: JSON.parse(r.por_sucursal || '[]'),
+      por_metodo_pago: JSON.parse(r.por_metodo_pago || '[]')
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: resumenesParseados,
+      count: resumenesParseados.length
+    });
+
+  } catch (error) {
+    console.error('Error al obtener ventas globales:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener el historial de ventas globales',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   }

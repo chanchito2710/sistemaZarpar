@@ -1,0 +1,244 @@
+
+> sistema-zarpar@0.0.0 dev
+> concurrently "npm run client:dev" "npm run server:dev"
+
+[0] 
+[0] > sistema-zarpar@0.0.0 client:dev
+[0] > vite
+[0] 
+[1] 
+[1] > sistema-zarpar@0.0.0 server:dev
+[1] > nodemon
+[1] 
+[1] [33m[nodemon] 3.1.10[39m
+[1] [33m[nodemon] to restart at any time, enter `rs`[39m
+[1] [33m[nodemon] watching path(s): api\**\*[39m
+[1] [33m[nodemon] watching extensions: ts,mts,js,json[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ­ƒôí auto-backup env with Radar: https://dotenvx.com/radar
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ­ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[0] 
+[0]   VITE v6.3.6  ready in 1960 ms
+[0] 
+[0]   Ô×£  Local:   http://localhost:5678/
+[0]   Ô×£  Network: use --host to expose
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ÔÜÖ´©Å  specify custom .env file path with { path: '/custom/path/.env' }
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ­ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] ÔØî ERROR EN EL SERVIDOR: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+[1]     at JSON.parse (<anonymous>)
+[1]     at parse (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\types\json.js:92:19)
+[1]     at C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\read.js:128:18
+[1]     at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+[1]     at invokeCallback (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:238:16)
+[1]     at done (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:227:7)
+[1]     at IncomingMessage.onEnd (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:287:7)
+[1]     at IncomingMessage.emit (node:events:518:28)
+[1]     at endReadableNT (node:internal/streams/readable:1698:12)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+[1]   expose: true,
+[1]   statusCode: 400,
+[1]   status: 400,
+[1]   body: '{\\"email\\":\\"admin@zarparuy.com\\",\\"password\\":\\"zarpar123\\"}',
+[1]   type: 'entity.parse.failed'
+[1] }
+[1] Stack: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+[1]     at JSON.parse (<anonymous>)
+[1]     at parse (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\types\json.js:92:19)
+[1]     at C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\read.js:128:18
+[1]     at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+[1]     at invokeCallback (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:238:16)
+[1]     at done (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:227:7)
+[1]     at IncomingMessage.onEnd (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:287:7)
+[1]     at IncomingMessage.emit (node:events:518:28)
+[1]     at endReadableNT (node:internal/streams/readable:1698:12)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒöæ Admin tiene acceso a 9 tablas de clientes
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒöæ Admin tiene acceso a 9 tablas de clientes
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ­ƒôí observe env with Radar: https://dotenvx.com/radar
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ÔÜÖ´©Å  write to custom object with { processEnv: myObject }
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒÅá Estableciendo maldonado como casa principal...
+[1] Ô£à MALDONADO establecida como casa principal
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ­ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ÔÜÖ´©Å  enable debug logging with { debug: true }
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[0] 10:41:44 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[0] 10:52:58 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ÔÜÖ´©Å  load multiple .env files with { path: ['.env.local', '.env'] }
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ÔÜÖ´©Å  load multiple .env files with { path: ['.env.local', '.env'] }
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] ­ƒÅá Estableciendo melo como casa principal...
+[1] Ô£à MELO establecida como casa principal
+[1] ­ƒÅá Estableciendo maldonado como casa principal...
+[1] Ô£à MALDONADO establecida como casa principal
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒöæ Admin tiene acceso a 9 tablas de clientes
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[0] 11:10:24 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[0] 11:10:25 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[0] 11:10:36 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[1] ÔØî ERROR EN EL SERVIDOR: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+[1]     at JSON.parse (<anonymous>)
+[1]     at parse (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\types\json.js:92:19)
+[1]     at C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\read.js:128:18
+[1]     at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+[1]     at invokeCallback (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:238:16)
+[1]     at done (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:227:7)
+[1]     at IncomingMessage.onEnd (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:287:7)
+[1]     at IncomingMessage.emit (node:events:518:28)
+[1]     at endReadableNT (node:internal/streams/readable:1698:12)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+[1]   expose: true,
+[1]   statusCode: 400,
+[1]   status: 400,
+[1]   body: '{\\"email\\":\\"admin@zarparuy.com\\",\\"password\\":\\"admin123\\"}',
+[1]   type: 'entity.parse.failed'
+[1] }
+[1] Stack: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+[1]     at JSON.parse (<anonymous>)
+[1]     at parse (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\types\json.js:92:19)
+[1]     at C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\body-parser\lib\read.js:128:18
+[1]     at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+[1]     at invokeCallback (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:238:16)
+[1]     at done (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:227:7)
+[1]     at IncomingMessage.onEnd (C:\Users\Fullstack\Desktop\Mis Proyectos\En-proceso\sistema\node_modules\raw-body\index.js:287:7)
+[1]     at IncomingMessage.emit (node:events:518:28)
+[1]     at endReadableNT (node:internal/streams/readable:1698:12)
+[1]     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+[0] 11:16:20 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[0] 11:16:35 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ÔÜÖ´©Å  write to custom object with { processEnv: myObject }
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ÔÜÖ´©Å  write to custom object with { processEnv: myObject }
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ­ƒøá´©Å  run anywhere with `dotenvx run -- yourcommand`
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ­ƒøá´©Å  run anywhere with `dotenvx run -- yourcommand`
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôØ Usuario admin@zarparuy.com cerr├│ sesi├│n
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒöæ Admin tiene acceso a 9 tablas de clientes
+[1] ­ƒôØ Usuario admin@zarparuy.com cerr├│ sesi├│n
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒöæ Admin tiene acceso a 9 tablas de clientes
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ­ƒôí auto-backup env with Radar: https://dotenvx.com/radar
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ÔÜÖ´©Å  load multiple .env files with { path: ['.env.local', '.env'] }
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ÔÜÖ´©Å  specify custom .env file path with { path: '/custom/path/.env' }
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ÔÜÖ´©Å  load multiple .env files with { path: ['.env.local', '.env'] }
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôØ Usuario admin@zarparuy.com cerr├│ sesi├│n
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒöæ Admin tiene acceso a 9 tablas de clientes
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôØ Usuario admin@zarparuy.com cerr├│ sesi├│n
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒöæ Admin tiene acceso a 9 tablas de clientes
+[1] ÔØî Token JWT inv├ílido: invalid signature
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ÔÜÖ´©Å  enable debug logging with { debug: true }
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ÔÜÖ´©Å  load multiple .env files with { path: ['.env.local', '.env'] }
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ­ƒôí observe env with Radar: https://dotenvx.com/radar
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ­ƒôí auto-backup env with Radar: https://dotenvx.com/radar
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[1] ­ƒôï Tablas de clientes encontradas: 9
+[0] 11:38:26 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ÔÜÖ´©Å  enable debug logging with { debug: true }
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ­ƒôí observe env with Radar: https://dotenvx.com/radar
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)
+[0] 11:38:47 a.┬ám. [vite] (client) hmr update /src/pages/inventory/Transfer.tsx, /src/index.css
+[1] [32m[nodemon] restarting due to changes...[39m
+[1] [32m[nodemon] starting `tsx api/server.ts`[39m
+[1] [dotenv@17.2.2] injecting env (5) from .env -- tip: ­ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+[1] [dotenv@17.2.2] injecting env (0) from .env -- tip: ­ƒôí auto-backup env with Radar: https://dotenvx.com/radar
+[1] ­ƒÜÇ Servidor iniciado en http://localhost:3456
+[1] ­ƒôè API disponible en http://localhost:3456/api
+[1] Ô£à Conexi├│n exitosa a MySQL - Base de datos: zarparDataBase
+[1] ­ƒôª Contenedor Docker: zarpar-mysql (Puerto 3307)

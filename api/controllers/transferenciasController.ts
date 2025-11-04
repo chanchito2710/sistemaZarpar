@@ -207,7 +207,7 @@ export const crearTransferencia = async (req: Request, res: Response): Promise<v
       
       const stock_destino_antes = stockDestino[0]?.stock || 0;
       
-      // RESTAR stock de Maldonado
+      // RESTAR stock de Casa Principal (Maldonado/Melo)
       await connection.execute(
         `UPDATE productos_sucursal 
          SET stock = stock - ?, updated_at = NOW()
@@ -215,7 +215,7 @@ export const crearTransferencia = async (req: Request, res: Response): Promise<v
         [cantidad, producto_id, sucursal_origen_norm]
       );
       
-      // SUMAR a stock_en_transito en destino
+      // SUMAR a stock_en_transito en destino (para mostrar "🚚 En camino")
       // Verificar si existe registro de productos_sucursal para la sucursal destino
       if (stockDestino.length === 0) {
         // Crear registro si no existe
@@ -785,5 +785,7 @@ export const obtenerResumen = async (req: Request, res: Response): Promise<void>
     });
   }
 };
+
+
 
 

@@ -42,7 +42,9 @@ import {
   CrownOutlined,
   ReloadOutlined,
   CheckCircleOutlined,
-  WarningOutlined
+  WarningOutlined,
+  HomeFilled,
+  HomeOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import axios from 'axios';
@@ -75,6 +77,7 @@ interface Vendedor {
 interface Sucursal {
   sucursal: string;
   total_vendedores: number;
+  es_principal?: boolean;
 }
 
 /**
@@ -456,6 +459,64 @@ const StaffSellers: React.FC = () => {
       console.error('❌ Error al eliminar sucursal:', error);
       const errorMsg = error.response?.data?.message || 'Error al eliminar sucursal';
       messageApi.error(errorMsg, 6);
+    }
+  };
+
+  /**
+   * Establecer sucursal como principal (Casa Central)
+   */
+  const handleEstablecerCasaPrincipal = async (nombreSucursal: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        messageApi.error('No hay sesión activa');
+        return;
+      }
+
+      console.log(`🏠 Estableciendo ${nombreSucursal} como casa principal...`);
+
+      const response = await axios.put(
+        `${API_URL}/sucursales/${nombreSucursal}/principal`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        const data = response.data.data;
+        
+        if (data.era_principal) {
+          messageApi.info({
+            content: `ℹ️ "${nombreSucursal.toUpperCase()}" ya es la Casa Principal`,
+            duration: 3
+          });
+        } else {
+          messageApi.success({
+            content: (
+              <div>
+                <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
+                  🏠 Casa Principal Actualizada
+                </div>
+                <div style={{ fontSize: '12px' }}>
+                  {data.sucursal_anterior && (
+                    <>📍 Anterior: {data.sucursal_anterior.toUpperCase()}<br /></>
+                  )}
+                  🏠 Nueva: {data.sucursal_nueva.toUpperCase()}
+                </div>
+              </div>
+            ),
+            duration: 5
+          });
+        }
+
+        // Recargar sucursales para actualizar el estilo visual
+        await cargarSucursales();
+      }
+    } catch (error: any) {
+      console.error('❌ Error al establecer casa principal:', error);
+      const errorMsg = error.response?.data?.message || 'Error al establecer casa principal';
+      messageApi.error(errorMsg, 5);
     }
   };
 
@@ -867,101 +928,181 @@ const StaffSellers: React.FC = () => {
                   </Row>
                 </Card>
 
-                <Row gutter={[16, 16]}>
-                  {sucursalesLoading ? (
-                    <Col span={24}>
+                {/* TABLA DE SUCURSALES - COMPLETAMENTE REDISEÑADA */}
                       <Card>
-                        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                          <Spin size="large" />
-                          <p style={{ marginTop: 16, color: '#666' }}>Cargando sucursales...</p>
-                        </div>
-                      </Card>
-                    </Col>
-                  ) : (
-                    sucursales.map((sucursal) => (
-                      <Col xs={24} sm={12} lg={8} key={sucursal.sucursal}>
-                        <Card
-                          hoverable
-                          actions={[
-                            <Text type="secondary" key="vendedores">
-                              <TeamOutlined /> {sucursal.total_vendedores} vendedor{sucursal.total_vendedores !== 1 ? 'es' : ''}
-                            </Text>,
-                            <Text type="secondary" key="tabla">
-                              📊 clientes_{sucursal.sucursal}
-                            </Text>,
+                  <Spin spinning={sucursalesLoading}>
+                    <Table
+                      dataSource={sucursales}
+                      rowKey="sucursal"
+                      pagination={{
+                        pageSize: 10,
+                        showSizeChanger: true,
+                        showTotal: (total) => `Total: ${total} sucursales`,
+                      }}
+                      rowClassName={(record) => 
+                        record.es_principal ? 'sucursal-principal-row' : ''
+                      }
+                      scroll={{ x: 1000 }}
+                    >
+                      {/* Columna: Sucursal */}
+                      <Table.Column
+                        title="Sucursal"
+                        dataIndex="sucursal"
+                        key="sucursal"
+                        width={200}
+                        render={(sucursal: string, record: Sucursal) => (
+                          <Space>
+                            {record.es_principal ? (
+                              <HomeFilled style={{ fontSize: 20, color: '#f39c12' }} />
+                            ) : (
+                              <ShopOutlined style={{ fontSize: 20, color: '#1890ff' }} />
+                            )}
+                            <Text strong style={{ fontSize: 16 }}>
+                              {formatearNombreSucursal(sucursal)}
+                            </Text>
+                            {record.es_principal && (
+                              <Tag 
+                                icon={<HomeFilled />} 
+                                color="orange" 
+                                style={{ 
+                                  fontWeight: 'bold',
+                                  marginLeft: 8
+                                }}
+                              >
+                                CASA PRINCIPAL
+                              </Tag>
+                            )}
+                          </Space>
+                        )}
+                      />
+
+                      {/* Columna: Tabla de Clientes */}
+                      <Table.Column
+                        title="Tabla de Clientes"
+                        dataIndex="sucursal"
+                        key="tabla"
+                        width={180}
+                        render={(sucursal: string) => (
+                          <Text code>clientes_{sucursal}</Text>
+                        )}
+                      />
+
+                      {/* Columna: Vendedores */}
+                      <Table.Column
+                        title="Vendedores"
+                        dataIndex="total_vendedores"
+                        key="vendedores"
+                        width={120}
+                        align="center"
+                        render={(total: number) => (
+                          <Space>
+                            <TeamOutlined style={{ color: '#1890ff' }} />
+                            <Text>{total}</Text>
+                          </Space>
+                        )}
+                      />
+
+                      {/* Columna: Estado */}
+                      <Table.Column
+                        title="Estado"
+                        key="estado"
+                        width={100}
+                        align="center"
+                        render={() => (
+                          <Tag icon={<CheckCircleOutlined />} color="success">
+                            Activa
+                          </Tag>
+                        )}
+                      />
+
+                      {/* Columna: Acciones */}
+                      <Table.Column
+                        title="Acciones"
+                        key="acciones"
+                        width={300}
+                        render={(_, record: Sucursal) => (
+                          <Space size="middle">
+                            {/* Botón Casa Principal */}
+                            {record.es_principal ? (
+                              <Tag 
+                                icon={<HomeFilled />} 
+                                color="gold"
+                                style={{ 
+                                  padding: '4px 12px',
+                                  fontSize: 13,
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                Es Casa Principal
+                              </Tag>
+                            ) : (
+                              <Button
+                                type="default"
+                                icon={<HomeOutlined />}
+                                onClick={() => handleEstablecerCasaPrincipal(record.sucursal)}
+                                style={{ 
+                                  borderColor: '#f39c12',
+                                  color: '#f39c12'
+                                }}
+                              >
+                                Hacer Principal
+                              </Button>
+                            )}
+
+                            {/* Botón Eliminar */}
                             <Popconfirm
-                              key="eliminar"
-                              title={
-                                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#ff4d4f' }}>
-                                  🚨 ¡ELIMINAR SUCURSAL PERMANENTEMENTE!
-                                </span>
-                              }
+                              title="⚠️ Eliminar Sucursal"
                               description={
-                                <div style={{ maxWidth: '380px' }}>
-                                  <p style={{ margin: '8px 0', fontWeight: 'bold', fontSize: '14px' }}>
-                                    ¿Estás seguro de eliminar <strong style={{ color: '#ff4d4f' }}>"{formatearNombreSucursal(sucursal.sucursal)}"</strong>?
-                                  </p>
+                                <div style={{ maxWidth: 300 }}>
+                                  <p>¿Eliminar <strong>{formatearNombreSucursal(record.sucursal)}</strong>?</p>
+                                  {record.total_vendedores > 0 && (
                                   <Alert
-                                    message="⚠️ ADVERTENCIA CRÍTICA: Esta acción es IRREVERSIBLE"
-                                    description={
-                                      <div style={{ fontSize: '12px', marginTop: 8 }}>
-                                        <p style={{ margin: '4px 0', fontWeight: 'bold' }}>Se eliminará PERMANENTEMENTE:</p>
-                                        <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
-                                          <li>📊 Tabla de clientes completa</li>
-                                          <li>👥 Todos los clientes de la sucursal</li>
-                                          <li>📦 Productos asignados a la sucursal</li>
-                                          <li>🗑️ La sucursal del sistema</li>
-                                        </ul>
-                                        <p style={{ margin: '4px 0', color: '#ff4d4f', fontWeight: 'bold' }}>
-                                          ⚠️ Los datos NO se podrán recuperar
-                                        </p>
-                                        {sucursal.total_vendedores > 0 && (
-                                          <p style={{ margin: '8px 0', color: '#fa8c16', fontWeight: 'bold' }}>
-                                            ⚠️ Esta sucursal tiene {sucursal.total_vendedores} vendedor(es). Debes eliminarlos o reasignarlos primero.
-                                          </p>
-                                        )}
-                                      </div>
-                                    }
-                                    type="error"
+                                      message="No se puede eliminar"
+                                      description={`Tiene ${record.total_vendedores} vendedor(es) activo(s)`}
+                                      type="warning"
                                     showIcon
                                     style={{ marginTop: 8 }}
                                   />
+                                  )}
                                 </div>
                               }
-                              onConfirm={() => handleEliminarSucursal(sucursal.sucursal)}
-                              okText={sucursal.total_vendedores > 0 ? "❌ NO SE PUEDE ELIMINAR" : "🗑️ SÍ, ELIMINAR TODO"}
-                              cancelText="❌ Cancelar"
+                              onConfirm={() => handleEliminarSucursal(record.sucursal)}
+                              okText="Eliminar"
+                              cancelText="Cancelar"
                               okButtonProps={{
                                 danger: true,
-                                size: 'large',
-                                style: { fontWeight: 'bold' },
-                                disabled: sucursal.total_vendedores > 0
-                              }}
-                              cancelButtonProps={{
-                                size: 'large'
+                                disabled: record.total_vendedores > 0
                               }}
                             >
-                              <Button type="link" danger icon={<DeleteOutlined />} size="small">
+                              <Button 
+                                danger 
+                                icon={<DeleteOutlined />}
+                                disabled={record.total_vendedores > 0}
+                              >
                                 Eliminar
                               </Button>
                             </Popconfirm>
-                          ]}
-                        >
-                          <Card.Meta
-                            avatar={<ShopOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
-                            title={<Title level={4}>{formatearNombreSucursal(sucursal.sucursal)}</Title>}
-                            description={
-                              <Space direction="vertical">
-                                <Tag color="success">Activa</Tag>
-                                <Text type="secondary">Tabla de clientes creada</Text>
                               </Space>
-                            }
+                        )}
                           />
+                    </Table>
+                  </Spin>
                         </Card>
-                      </Col>
-                    ))
-                  )}
-                </Row>
+
+                {/* Estilos inline para la fila de casa principal */}
+                <style>
+                  {`
+                    .sucursal-principal-row {
+                      background: linear-gradient(135deg, #fff9e6 0%, #fffaf0 100%) !important;
+                    }
+                    .sucursal-principal-row:hover {
+                      background: linear-gradient(135deg, #fff4d6 0%, #fff9e6 100%) !important;
+                    }
+                    .sucursal-principal-row td {
+                      border-color: #ffd666 !important;
+                    }
+                  `}
+                </style>
               </>
             ),
           },

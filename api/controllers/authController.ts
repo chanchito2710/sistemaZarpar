@@ -43,10 +43,12 @@ const JWT_EXPIRES_IN = '24h'; // Token válido por 24 horas
  */
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('🔐 Intento de login:', req.body.email);
     const { email, password } = req.body;
 
     // Validar que se envíen email y password
     if (!email || !password) {
+      console.log('❌ Email o password faltante');
       res.status(400).json({
         error: 'Email y contraseña son requeridos'
       });
@@ -54,13 +56,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Buscar usuario por email en la base de datos
+    console.log('🔍 Buscando usuario en BD...');
     const [usuarios] = await pool.execute<VendedorDB[]>(
       'SELECT * FROM `vendedores` WHERE `email` = ? AND `activo` = TRUE',
       [email]
     );
+    console.log(`📊 Usuarios encontrados: ${usuarios.length}`);
 
     // Verificar si el usuario existe
     if (usuarios.length === 0) {
+      console.log('❌ Usuario no encontrado');
       res.status(401).json({
         error: 'Credenciales inválidas'
       });
@@ -68,9 +73,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const usuario = usuarios[0];
+    console.log('✅ Usuario encontrado:', usuario.email);
 
     // Verificar que el usuario tenga contraseña configurada
     if (!usuario.password) {
+      console.log('❌ Usuario sin contraseña configurada');
       res.status(500).json({
         error: 'Usuario sin contraseña configurada. Contacte al administrador.'
       });
@@ -78,9 +85,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Verificar la contraseña
+    console.log('🔒 Verificando contraseña...');
     const passwordValida = await bcrypt.compare(password, usuario.password);
+    console.log(`🔓 Contraseña válida: ${passwordValida}`);
 
     if (!passwordValida) {
+      console.log('❌ Contraseña incorrecta');
       res.status(401).json({
         error: 'Credenciales inválidas'
       });
@@ -89,6 +99,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Determinar si es administrador
     const esAdmin = usuario.email === 'admin@zarparuy.com';
+    console.log(`👑 Es admin: ${esAdmin}`);
 
     // Preparar payload del token
     const payload: JWTPayload = {
@@ -101,11 +112,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     };
 
     // Generar token JWT
+    console.log('🎫 Generando token JWT...');
     const token = jwt.sign(payload, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN
     });
+    console.log('✅ Token generado');
 
     // Actualizar último acceso
+    console.log('📝 Actualizando último acceso...');
     await pool.execute(
       'UPDATE `vendedores` SET `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?',
       [usuario.id]
@@ -114,17 +128,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Determinar tablas de clientes accesibles
     let tablasClientes: string[] = [];
     
+    console.log('📋 Obteniendo tablas de clientes...');
     if (esAdmin) {
       // Admin tiene acceso a TODAS las tablas de clientes (dinámico desde BD)
       tablasClientes = await obtenerTodasLasTablas();
-      console.log(`🔑 Admin tiene acceso a ${tablasClientes.length} tablas de clientes`);
+      console.log(`🔑 Admin tiene acceso a ${tablasClientes.length} tablas de clientes:`, tablasClientes);
     } else {
       // Vendedor normal solo su tabla de clientes
       const sucursalLower = usuario.sucursal.toLowerCase();
       tablasClientes = [`clientes_${sucursalLower}`];
+      console.log(`🔑 Vendedor tiene acceso a:`, tablasClientes);
     }
 
     // Responder con token y datos del usuario
+    console.log('✅ Login exitoso, enviando respuesta');
     res.json({
       mensaje: 'Login exitoso',
       token,
@@ -144,6 +161,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         }
       }
     });
+    console.log('🎉 Respuesta enviada correctamente');
 
   } catch (error) {
     console.error('❌ Error en login:', error);

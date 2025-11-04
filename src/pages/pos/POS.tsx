@@ -309,9 +309,10 @@ const POS: React.FC = () => {
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      overflowX: 'hidden'
     }}>
-      <div style={{ maxWidth: '800px', width: '100%' }}>
+      <div style={{ maxWidth: '800px', width: '100%', overflowX: 'hidden' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <Title level={1} style={{ color: 'white', marginBottom: '8px', fontSize: '2.5rem' }}>
@@ -331,7 +332,7 @@ const POS: React.FC = () => {
           }}
         >
           <Form form={form} layout="vertical" size="large">
-            <Row gutter={[24, 24]}>
+            <Row gutter={[16, 16]}>
               {/* Sucursal */}
               <Col xs={24} md={8}>
                 <Card 

@@ -283,3 +283,8 @@ El bug estaba causado por filtros que persistían entre sesiones del modal. La s
 **Ahora el sistema es 100% dinámico y consistente.** ✅
 
 
+
+
+
+
+

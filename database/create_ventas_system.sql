@@ -184,3 +184,8 @@ GROUP BY sucursal, cliente_id, cliente_nombre;
 
 
 
+
+
+
+
+

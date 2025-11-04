@@ -77,6 +77,7 @@ export const verificarAutenticacion = async (
 
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
+      console.error('❌ Token JWT inválido:', error.message);
       res.status(401).json({
         error: 'Token inválido'
       });
@@ -84,6 +85,7 @@ export const verificarAutenticacion = async (
     }
     
     if (error instanceof jwt.TokenExpiredError) {
+      console.error('❌ Token JWT expirado');
       res.status(401).json({
         error: 'Token expirado. Por favor, inicia sesión nuevamente.'
       });

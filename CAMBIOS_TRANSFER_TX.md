@@ -406,3 +406,8 @@ Body: {
 **Próximo paso**: Crear ReceiveTransfers.tsx para confirmación de recepción
 
 
+
+
+
+
+

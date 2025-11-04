@@ -230,13 +230,14 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
             closable={false}
             centered
             width="90%"
-            style={{ maxWidth: '550px', maxHeight: '95vh' }}
-            bodyStyle={{
-              padding: 0,
-              overflow: 'hidden',
-              overflowX: 'hidden',
-              borderRadius: '16px',
-              maxHeight: '95vh',
+            style={{ maxWidth: '750px', maxHeight: '85vh' }}
+            styles={{
+              body: {
+                padding: 0,
+                overflow: 'auto',
+                borderRadius: '16px',
+                maxHeight: '85vh',
+              }
             }}
       maskStyle={{
         backdropFilter: 'blur(8px)',
@@ -247,7 +248,7 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
       <div
         style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '30px 20px',
+          padding: '20px 20px',
           textAlign: 'center',
           position: 'relative',
         }}
@@ -262,9 +263,9 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
           level={2}
           style={{
             color: 'white',
-            marginTop: '15px',
+            marginTop: '10px',
             marginBottom: '5px',
-            fontSize: '24px',
+            fontSize: '22px',
             fontWeight: 700,
           }}
         >
@@ -272,21 +273,21 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
         </Title>
 
         {/* Checkmark pequeño adicional */}
-        <div style={{ marginTop: '10px' }}>
-          <CheckCircleOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
+        <div style={{ marginTop: '8px' }}>
+          <CheckCircleOutlined style={{ fontSize: '20px', color: '#52c41a' }} />
         </div>
       </div>
 
       {/* Contenido del modal */}
-      <div style={{ padding: '20px 20px 15px 20px' }}>
+      <div style={{ padding: '15px 20px 15px 20px' }}>
         {/* Número de venta destacado */}
         <div
           style={{
             textAlign: 'center',
-            marginBottom: '16px',
+            marginBottom: '12px',
           }}
         >
-          <Text type="secondary" style={{ fontSize: '13px', display: 'block', marginBottom: '8px' }}>
+          <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '6px' }}>
             Número de venta
           </Text>
           <div
@@ -294,9 +295,9 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
               display: 'inline-block',
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
-              padding: '12px 24px',
+              padding: '10px 20px',
               borderRadius: '30px',
-              fontSize: '18px',
+              fontSize: '16px',
               fontWeight: 'bold',
               boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
             }}
@@ -305,7 +306,7 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
           </div>
         </div>
 
-        <Divider style={{ margin: '12px 0' }} />
+        <Divider style={{ margin: '10px 0' }} />
 
         {/* Información de la venta */}
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -337,15 +338,17 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
           </Row>
         </Space>
 
-        <Divider style={{ margin: '12px 0' }} />
+        <Divider style={{ margin: '10px 0' }} />
 
         {/* Productos vendidos */}
-        <div style={{ marginBottom: '12px' }}>
-          <Text strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>
+        <div style={{ marginBottom: '10px' }}>
+          <Text strong style={{ fontSize: '13px', display: 'block', marginBottom: '6px' }}>
             Productos Vendidos
           </Text>
           <div
             style={{
+              maxHeight: '180px',
+              overflowY: 'auto',
               overflowX: 'hidden',
             }}
           >
@@ -356,30 +359,30 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
                     key={index}
                     style={{
                       background: '#f5f5f5',
-                      padding: '8px 10px',
+                      padding: '6px 8px',
                       borderRadius: '6px',
                       border: '1px solid #e0e0e0',
                     }}
                   >
                     <Row justify="space-between" align="top">
                       <Col span={16}>
-                        <Text strong style={{ fontSize: '13px', display: 'block' }}>
+                        <Text strong style={{ fontSize: '12px', display: 'block' }}>
                           {item.nombre}
                         </Text>
                         {item.marca && (
-                          <Text type="secondary" style={{ fontSize: '11px', display: 'block' }}>
+                          <Text type="secondary" style={{ fontSize: '10px', display: 'block' }}>
                             {item.marca}
                           </Text>
                         )}
-                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                        <Text type="secondary" style={{ fontSize: '10px' }}>
                           Cantidad: {item.cantidad}
                         </Text>
                       </Col>
                       <Col span={8} style={{ textAlign: 'right' }}>
-                        <Text style={{ fontSize: '12px', display: 'block', color: '#888' }}>
+                        <Text style={{ fontSize: '11px', display: 'block', color: '#888' }}>
                           ${Number(item.precio || 0).toFixed(2)} c/u
                         </Text>
-                        <Text strong style={{ fontSize: '14px', color: '#52c41a' }}>
+                        <Text strong style={{ fontSize: '13px', color: '#52c41a' }}>
                           ${Number(item.subtotal || 0).toFixed(2)}
                         </Text>
                       </Col>
@@ -388,14 +391,14 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
                 ))}
               </Space>
             ) : (
-              <Text type="secondary" style={{ fontSize: '13px' }}>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
                 No hay productos en esta venta
               </Text>
             )}
           </div>
         </div>
 
-        <Divider style={{ margin: '12px 0' }} />
+        <Divider style={{ margin: '10px 0' }} />
 
         {/* Resumen de montos */}
         <Space direction="vertical" size="small" style={{ width: '100%' }}>
@@ -419,11 +422,11 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
             </Row>
           )}
 
-          <Divider style={{ margin: '12px 0' }} />
+          <Divider style={{ margin: '10px 0' }} />
 
           <Row justify="space-between">
             <Col>
-              <Text strong style={{ fontSize: '18px' }}>
+              <Text strong style={{ fontSize: '16px' }}>
                 Total
               </Text>
             </Col>
@@ -431,7 +434,7 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
               <Text
                 strong
                 style={{
-                  fontSize: '24px',
+                  fontSize: '20px',
                   color: '#52c41a',
                 }}
               >
@@ -442,8 +445,8 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
         </Space>
 
         {/* Botones de acción */}
-        <div style={{ marginTop: '16px' }}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <div style={{ marginTop: '12px' }}>
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <Button
               type="primary"
               size="large"
@@ -451,8 +454,8 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
               icon={<PrinterOutlined />}
               onClick={imprimirComprobante}
               style={{
-                height: '42px',
-                fontSize: '15px',
+                height: '40px',
+                fontSize: '14px',
                 borderRadius: '10px',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 border: 'none',
@@ -469,13 +472,13 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
               icon={<CloseOutlined />}
               onClick={handleFinalizar}
               style={{
-                height: '42px',
-                fontSize: '15px',
+                height: '40px',
+                fontSize: '14px',
                 borderRadius: '10px',
                 fontWeight: 600,
               }}
             >
-              Finalizar
+              Cerrar
             </Button>
           </Space>
         </div>

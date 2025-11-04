@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   Typography,
@@ -31,6 +31,8 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BRANCHES } from '../../data/branches';
+import { productosService } from '../../services/api';
+import './Inventory.css';
 
 // Extender el tipo jsPDF para incluir autoTable
 declare module 'jspdf' {
@@ -57,41 +59,106 @@ const Inventory: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedSucursal, setSelectedSucursal] = useState<string>('pando'); // Por defecto Pando
+  const [sucursales, setSucursales] = useState<string[]>([]);
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [transferQuantity, setTransferQuantity] = useState(0);
   const [sortedInfo, setSortedInfo] = useState<any>({});
+  const [loading, setLoading] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
 
-  // Datos de ejemplo realistas
-  const [inventoryData, setInventoryData] = useState<InventoryItem[]>([
-    // Maldonado
-    { key: '1', sucursal: 'Maldonado', marca: 'iPhone', modelo: '14', producto: 'Pantalla iPhone 14', stock: 15, recibidos: 5, categoria: 'Pantallas' },
-    { key: '2', sucursal: 'Maldonado', marca: 'iPhone', modelo: '13', producto: 'Pantalla iPhone 13', stock: 8, recibidos: 3, categoria: 'Pantallas' },
-    { key: '3', sucursal: 'Maldonado', marca: 'Samsung', modelo: 'A54', producto: 'Pantalla Samsung A54', stock: 12, recibidos: 0, categoria: 'Pantallas' },
-    { key: '4', sucursal: 'Maldonado', marca: 'iPhone', modelo: '14', producto: 'Batería iPhone 14', stock: 20, recibidos: 8, categoria: 'Baterías' },
-    { key: '5', sucursal: 'Maldonado', marca: 'Xiaomi', modelo: 'Redmi Note 12', producto: 'Carcasa Xiaomi Redmi Note 12', stock: 25, recibidos: 0, categoria: 'Carcasas' },
-    
-    // Montevideo
-    { key: '6', sucursal: 'Montevideo', marca: 'iPhone', modelo: '15', producto: 'Pantalla iPhone 15', stock: 30, recibidos: 10, categoria: 'Pantallas' },
-    { key: '7', sucursal: 'Montevideo', marca: 'Samsung', modelo: 'S23', producto: 'Pantalla Samsung S23', stock: 18, recibidos: 5, categoria: 'Pantallas' },
-    { key: '8', sucursal: 'Montevideo', marca: 'Huawei', modelo: 'P40', producto: 'Batería Huawei P40', stock: 15, recibidos: 0, categoria: 'Baterías' },
-    { key: '9', sucursal: 'Montevideo', marca: 'iPhone', modelo: '13 Pro', producto: 'Flex iPhone 13 Pro', stock: 10, recibidos: 4, categoria: 'Flex' },
-    { key: '10', sucursal: 'Montevideo', marca: 'Samsung', modelo: 'A34', producto: 'Cargador Samsung A34', stock: 22, recibidos: 0, categoria: 'Cargadores' },
-    
-    // Punta del Este
-    { key: '11', sucursal: 'Punta del Este', marca: 'iPhone', modelo: '12', producto: 'Pantalla iPhone 12', stock: 6, recibidos: 8, categoria: 'Pantallas' },
-    { key: '12', sucursal: 'Punta del Este', marca: 'Xiaomi', modelo: 'Mi 11', producto: 'Batería Xiaomi Mi 11', stock: 14, recibidos: 2, categoria: 'Baterías' },
-    { key: '13', sucursal: 'Punta del Este', marca: 'TCL', modelo: '20 Pro', producto: 'Pantalla TCL 20 Pro', stock: 5, recibidos: 0, categoria: 'Pantallas' },
-    { key: '14', sucursal: 'Punta del Este', marca: 'ZTE', modelo: 'Blade A7', producto: 'Carcasa ZTE Blade A7', stock: 18, recibidos: 3, categoria: 'Carcasas' },
-    { key: '15', sucursal: 'Punta del Este', marca: 'iPhone', modelo: '11', producto: 'Herramientas Reparación', stock: 50, recibidos: 0, categoria: 'Herramientas' },
-    
-    // Más productos distribuidos
-    { key: '16', sucursal: 'Maldonado', marca: 'Samsung', modelo: 'A14', producto: 'Hidrogel Samsung A14', stock: 35, recibidos: 15, categoria: 'Hidrogel' },
-    { key: '17', sucursal: 'Casa Matriz', marca: 'iPhone', modelo: '14 Pro', producto: 'Tapa Trasera iPhone 14 Pro', stock: 8, recibidos: 0, categoria: 'Tapa Trasera' },
-    { key: '18', sucursal: 'Tacuarembó', marca: 'Xiaomi', modelo: 'Poco X5', producto: 'Pin de Carga Xiaomi Poco X5', stock: 12, recibidos: 6, categoria: 'Pin de Carga' },
-    { key: '19', sucursal: 'Maldonado', marca: 'Huawei', modelo: 'Y9', producto: 'Flex Huawei Y9', stock: 7, recibidos: 0, categoria: 'Flex' },
-    { key: '20', sucursal: 'Casa Matriz', marca: 'Samsung', modelo: 'S22', producto: 'Batería Samsung S22', stock: 16, recibidos: 4, categoria: 'Baterías' }
-  ]);
+  // Datos de inventario desde la BD
+  const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
+  
+  // Estados para marcas y modelos dinámicos
+  const [marcasDisponibles, setMarcasDisponibles] = useState<string[]>([]);
+  const [modelosDisponibles, setModelosDisponibles] = useState<string[]>([]);
+
+  // Cargar sucursales disponibles
+  const cargarSucursales = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3456/api'}/sucursales`);
+      const data = await response.json();
+      if (data.success && data.data) {
+        const nombresSucursales = data.data.map((s: any) => s.sucursal);
+        setSucursales(nombresSucursales);
+      }
+    } catch (error) {
+      console.error('Error al cargar sucursales:', error);
+    }
+  };
+
+  // Cargar filtros dinámicos (marcas y modelos)
+  const cargarFiltros = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+      const url = new URL(`${API_URL}/productos/filtros`);
+      
+      // Filtrar por sucursal si está seleccionada
+      if (selectedSucursal && selectedSucursal !== 'all') {
+        url.searchParams.append('sucursal', selectedSucursal);
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setMarcasDisponibles(data.data.marcas || []);
+        setModelosDisponibles(data.data.modelos || []);
+      }
+    } catch (error) {
+      console.error('Error al cargar filtros:', error);
+    }
+  };
+
+  // Cargar inventario desde la API
+  const cargarInventario = async () => {
+    try {
+      setLoading(true);
+      // Pasar filtro de sucursal al API
+      const filtros: any = {};
+      if (selectedSucursal && selectedSucursal !== 'all') {
+        filtros.sucursal = selectedSucursal;
+      }
+      
+      const datos = await productosService.obtenerInventario(filtros);
+      
+      // Transformar datos de la API al formato del componente
+      const datosTransformados = datos.map((item: any, index: number) => ({
+        key: `${item.producto_id}-${item.sucursal}`,
+        sucursal: item.sucursal,
+        marca: item.marca || 'Sin marca',
+        modelo: item.modelo || 'Sin modelo',
+        producto: item.producto,
+        stock: item.stock || 0,
+        recibidos: item.recibidos || 0,
+        categoria: item.modelo || 'Sin categoría' // Usar tipo/modelo como categoría
+      }));
+      
+      setInventoryData(datosTransformados);
+    } catch (error) {
+      console.error('Error al cargar inventario:', error);
+      message.error('Error al cargar el inventario');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar sucursales al montar el componente
+  useEffect(() => {
+    cargarSucursales();
+  }, []);
+
+  // Recargar inventario y filtros cuando cambia la sucursal seleccionada
+  useEffect(() => {
+    cargarInventario();
+    cargarFiltros();
+  }, [selectedSucursal]);
 
   // Filtrar datos
   const filteredData = useMemo(() => {
@@ -405,87 +472,302 @@ const Inventory: React.FC = () => {
       </Card>
 
       {/* Filtros y búsqueda */}
-      <Card className="hover-lift" style={{ marginBottom: 16 }}>
-        <Row gutter={16} align="middle">
-          <Col xs={24} sm={8}>
-            <Input
-              placeholder="Buscar producto, marca o modelo..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col xs={24} sm={5}>
-            <div>
-              <Text strong style={{ display: 'block', marginBottom: 8, color: '#1890ff' }}>Marca</Text>
-              <Select
-                placeholder="Marca"
-                value={selectedBrand}
-                onChange={setSelectedBrand}
-                style={{ width: '100%' }}
-              >
-                <Option value="all">Todas</Option>
-                <Option value="iPhone">iPhone</Option>
-                <Option value="Samsung">Samsung</Option>
-                <Option value="Xiaomi">Xiaomi</Option>
-                <Option value="Huawei">Huawei</Option>
-                <Option value="TCL">TCL</Option>
-                <Option value="ZTE">ZTE</Option>
-              </Select>
-            </div>
-          </Col>
-          <Col xs={24} sm={5}>
-            <div>
-              <Text strong style={{ display: 'block', marginBottom: 8, color: '#1890ff' }}>Producto</Text>
-              <Select
-                placeholder="Categoría"
-                value={selectedCategory}
-                onChange={setSelectedCategory}
-                style={{ width: '100%' }}
-              >
-              <Option value="all">Todas</Option>
-              <Option value="Pantallas">Pantallas</Option>
-              <Option value="Baterías">Baterías</Option>
-              <Option value="Carcasas">Carcasas</Option>
-              <Option value="Herramientas">Herramientas</Option>
-              <Option value="Flex">Flex</Option>
-              <Option value="Cargadores">Cargadores</Option>
-              <Option value="Hidrogel">Hidrogel</Option>
-              <Option value="Tapa Trasera">Tapa Trasera</Option>
-              <Option value="Pin de Carga">Pin de Carga</Option>
-            </Select>
-            </div>
-          </Col>
-          <Col xs={24} sm={4}>
-            <Button 
-              type="primary" 
-              icon={<FilterOutlined />}
-              onClick={() => {
-                setSearchText('');
-                setSelectedBrand('all');
-                setSelectedCategory('all');
-              }}
-              style={{ width: '100%' }}
+      <Card 
+        className="hover-lift" 
+        style={{ 
+          marginBottom: 16,
+          background: 'linear-gradient(to right, #f8fafc, #ffffff)',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+        }}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          {/* Fila de Filtros */}
+          <Row gutter={[12, 12]} align="middle">
+            <Col xs={24} sm={24} md={12} lg={6}>
+              <div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  marginBottom: 8,
+                  gap: 8
+                }}>
+                  <ShopOutlined style={{ fontSize: 16, color: '#10b981' }} />
+                  <Text strong style={{ fontSize: 13, color: '#374151' }}>
+                    Sucursal
+                  </Text>
+                </div>
+                <Select
+                  value={selectedSucursal}
+                  onChange={setSelectedSucursal}
+                  style={{ width: '100%' }}
+                  size="large"
+                  onWheel={(e) => e.stopPropagation()}
+                  showSearch
+                  optionFilterProp="children"
+                  placeholder="Seleccionar sucursal"
+                  dropdownStyle={{
+                    borderRadius: '12px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  }}
+                  suffixIcon={
+                    <div style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '6px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}>
+                      🏢
+                    </div>
+                  }
+                  style={{
+                    width: '100%',
+                  }}
+                  className="custom-select-sucursal"
+                >
+                  <Option value="all">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ 
+                        fontSize: 18,
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '6px',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      }}>
+                        🌐
+                      </span>
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>Todas las Sucursales</span>
+                    </div>
+                  </Option>
+                  {sucursales.map((sucursal) => (
+                    <Option key={sucursal} value={sucursal}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ 
+                          fontSize: 18,
+                          width: 28,
+                          height: 28,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '6px',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        }}>
+                          🏪
+                        </span>
+                        <span style={{ fontWeight: 500, fontSize: 14 }}>
+                          {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
+                        </span>
+                      </div>
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+            </Col>
+            <Col 
+              xs={searchExpanded ? 24 : 6} 
+              sm={searchExpanded ? 24 : 4} 
+              md={searchExpanded ? 12 : 2} 
+              lg={searchExpanded ? 7 : 1} 
+              style={{ transition: 'all 0.3s ease' }}
             >
-              Limpiar Filtros
-            </Button>
-          </Col>
-          <Col xs={24} sm={4}>
-            <Button 
-              type="default" 
-              icon={<FilePdfOutlined />}
-              onClick={generatePDF}
-              style={{ 
-                width: '100%',
-                borderColor: '#722ed1',
-                color: '#722ed1'
-              }}
+              {!searchExpanded ? (
+                <Tooltip title="Buscar productos">
+                  <Button
+                    type="primary"
+                    icon={<SearchOutlined style={{ fontSize: 18 }} />}
+                    onClick={() => setSearchExpanded(true)}
+                    size="large"
+                    block
+                    style={{
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      border: 'none',
+                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                    }}
+                  />
+                </Tooltip>
+              ) : (
+                <Input
+                  autoFocus
+                  placeholder="🔍 Buscar producto, marca o modelo..."
+                  prefix={<SearchOutlined style={{ color: '#3b82f6' }} />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                  size="large"
+                  onBlur={() => {
+                    if (!searchText) {
+                      setSearchExpanded(false);
+                    }
+                  }}
+                  onClear={() => {
+                    setSearchText('');
+                    setSearchExpanded(false);
+                  }}
+                  style={{
+                    borderRadius: '12px',
+                    border: '2px solid #3b82f6',
+                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                    height: '48px',
+                    animation: 'expandSearch 0.3s ease-out'
+                  }}
+                />
+              )}
+            </Col>
+            
+            <Col 
+              xs={12} 
+              sm={searchExpanded ? 8 : 10} 
+              md={searchExpanded ? 6 : 5} 
+              lg={searchExpanded ? 4 : 5}
             >
-              Imprimir PDF
-            </Button>
-          </Col>
-        </Row>
+              <div>
+                <Text strong style={{ 
+                  display: 'block', 
+                  marginBottom: 8, 
+                  color: '#6b7280',
+                  fontSize: 13
+                }}>
+                  🏷️ Marca
+                </Text>
+                <Select
+                  placeholder="Marca"
+                  value={selectedBrand}
+                  onChange={setSelectedBrand}
+                  style={{ width: '100%' }}
+                  size="large"
+                  variant="filled"
+                  onWheel={(e) => e.stopPropagation()}
+                  suffixIcon={<FilterOutlined style={{ color: '#9ca3af' }} />}
+                >
+                  <Option value="all">
+                    <span style={{ fontWeight: 500 }}>✨ Todas</span>
+                  </Option>
+                  {marcasDisponibles.map(marca => (
+                    <Option key={marca} value={marca}>
+                      📱 {marca}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+            </Col>
+            
+            <Col 
+              xs={12} 
+              sm={searchExpanded ? 8 : 10} 
+              md={searchExpanded ? 6 : 5} 
+              lg={searchExpanded ? 4 : 5}
+            >
+              <div>
+                <Text strong style={{ 
+                  display: 'block', 
+                  marginBottom: 8, 
+                  color: '#6b7280',
+                  fontSize: 13
+                }}>
+                  📦 Producto
+                </Text>
+                <Select
+                  placeholder="Modelo"
+                  value={selectedCategory}
+                  onChange={setSelectedCategory}
+                  style={{ width: '100%' }}
+                  size="large"
+                  variant="filled"
+                  onWheel={(e) => e.stopPropagation()}
+                  suffixIcon={<FilterOutlined style={{ color: '#9ca3af' }} />}
+                >
+                  <Option value="all">
+                    <span style={{ fontWeight: 500 }}>✨ Todos</span>
+                  </Option>
+                  {modelosDisponibles.map(modelo => (
+                    <Option key={modelo} value={modelo}>
+                      📦 {modelo}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+            </Col>
+            
+            <Col 
+              xs={12} 
+              sm={searchExpanded ? 4 : 5} 
+              md={searchExpanded ? 3 : 4} 
+              lg={searchExpanded ? 2 : 3}
+            >
+              <Button 
+                type="primary" 
+                danger
+                icon={<FilterOutlined />}
+                onClick={() => {
+                  setSearchText('');
+                  setSelectedBrand('all');
+                  setSelectedCategory('all');
+                  setSelectedSucursal('pando');
+                  setSearchExpanded(false);
+                }}
+                block
+                size="large"
+                style={{
+                  borderRadius: '8px',
+                  height: '48px',
+                  fontWeight: 600,
+                  marginTop: 24
+                }}
+              >
+                Limpiar
+              </Button>
+            </Col>
+            
+            <Col 
+              xs={12} 
+              sm={searchExpanded ? 4 : 5} 
+              md={searchExpanded ? 3 : 4} 
+              lg={searchExpanded ? 2 : 3}
+            >
+              <Button 
+                type="default" 
+                icon={<FilePdfOutlined />}
+                onClick={generatePDF}
+                size="large"
+                style={{ 
+                  width: '100%',
+                  borderColor: '#722ed1',
+                  color: '#722ed1',
+                  borderRadius: '8px',
+                  height: '48px',
+                  fontWeight: 600,
+                  marginTop: 24
+                }}
+              >
+                PDF
+              </Button>
+            </Col>
+          </Row>
+        </Space>
       </Card>
 
       {/* Tabla principal */}
@@ -506,6 +788,7 @@ const Inventory: React.FC = () => {
         <Table 
           columns={columns} 
           dataSource={filteredData}
+          loading={loading}
           pagination={{ 
             pageSize: 15,
             showSizeChanger: true,

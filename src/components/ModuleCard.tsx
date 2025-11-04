@@ -38,37 +38,39 @@ const ModuleCard: React.FC<ModuleCardProps> = ({
       hoverable
       onClick={handleClick}
       style={{
-        borderRadius: '16px',
+        borderRadius: '12px',
         border: 'none',
-        boxShadow: `0 4px 20px ${color}20`,
+        boxShadow: `0 3px 12px ${color}20`,
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         cursor: 'pointer',
         overflow: 'hidden',
-        height: '160px'
+        height: '120px'
       }}
-      bodyStyle={{
-        padding: '20px',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between'
+      styles={{
+        body: {
+          padding: '14px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }
       }}
     >
       <div className="module-card-content">
         <div 
           className="module-card-icon"
           style={{
-            width: '56px',
-            height: '56px',
-            borderRadius: '16px',
+            width: '46px',
+            height: '46px',
+            borderRadius: '12px',
             background: gradient,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '24px',
-            marginBottom: '16px',
-            boxShadow: `0 8px 24px ${color}30`,
+            fontSize: '22px',
+            marginBottom: '10px',
+            boxShadow: `0 6px 16px ${color}30`,
             transition: 'transform 0.3s ease'
           }}
         >
@@ -79,10 +81,10 @@ const ModuleCard: React.FC<ModuleCardProps> = ({
           <h3 
             style={{
               margin: 0,
-              fontSize: '16px',
+              fontSize: '13px',
               fontWeight: 600,
               color: '#1a1a1a',
-              marginBottom: '4px',
+              marginBottom: '2px',
               lineHeight: '1.3'
             }}
           >
@@ -91,7 +93,7 @@ const ModuleCard: React.FC<ModuleCardProps> = ({
           <p 
             style={{
               margin: 0,
-              fontSize: '13px',
+              fontSize: '11px',
               color: '#666',
               lineHeight: '1.4'
             }}

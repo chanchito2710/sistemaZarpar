@@ -109,9 +109,9 @@ const Products: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Estados para categorías (marcas, tipos y calidades)
-  const [marcas, setMarcas] = useState<string[]>([]);
-  const [tipos, setTipos] = useState<string[]>([]);
-  const [calidades, setCalidades] = useState<string[]>([]);
+  const [marcas, setMarcas] = useState<Array<{ id: number; valor: string }>>([]);
+  const [tipos, setTipos] = useState<Array<{ id: number; valor: string }>>([]);
+  const [calidades, setCalidades] = useState<Array<{ id: number; valor: string }>>([]);
   const [loadingMarcas, setLoadingMarcas] = useState(false);
   const [loadingTipos, setLoadingTipos] = useState(false);
   const [loadingCalidades, setLoadingCalidades] = useState(false);
@@ -128,10 +128,13 @@ const Products: React.FC = () => {
   const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
   const [modalAgregarTipo, setModalAgregarTipo] = useState(false);
   const [modalAgregarCalidad, setModalAgregarCalidad] = useState(false);
+  const [modalGestionarCalidades, setModalGestionarCalidades] = useState(false);
   const [productoEditando, setProductoEditando] = useState<ProductoCompleto | null>(null);
   const [nuevaMarca, setNuevaMarca] = useState('');
   const [nuevoTipo, setNuevoTipo] = useState('');
   const [nuevaCalidad, setNuevaCalidad] = useState('');
+  const [calidadEditando, setCalidadEditando] = useState<{ id: number; valor: string } | null>(null);
+  const [valorEditandoCalidad, setValorEditandoCalidad] = useState('');
 
   // Forms
   const [formCrear] = Form.useForm();
@@ -302,6 +305,49 @@ const Products: React.FC = () => {
         message.error('Esta calidad ya existe');
       } else {
         message.error('Error al agregar calidad');
+      }
+    }
+  };
+
+  /**
+   * Editar una calidad existente
+   */
+  const handleEditarCalidad = async () => {
+    if (!calidadEditando || !valorEditandoCalidad.trim()) {
+      message.warning('Por favor ingresa un nombre válido para la calidad');
+      return;
+    }
+
+    try {
+      await productosService.editarCategoria(calidadEditando.id, 'calidad', valorEditandoCalidad.trim());
+      message.success('Calidad actualizada exitosamente');
+      setCalidadEditando(null);
+      setValorEditandoCalidad('');
+      await cargarCalidades(); // Recargar lista
+    } catch (error: any) {
+      console.error('Error al editar calidad:', error);
+      if (error.response?.status === 409) {
+        message.error('Ya existe una calidad con este nombre');
+      } else {
+        message.error('Error al editar calidad');
+      }
+    }
+  };
+
+  /**
+   * Eliminar una calidad
+   */
+  const handleEliminarCalidad = async (id: number, nombre: string) => {
+    try {
+      await productosService.eliminarCategoria(id, 'calidad');
+      message.success(`Calidad "${nombre}" eliminada exitosamente`);
+      await cargarCalidades(); // Recargar lista
+    } catch (error: any) {
+      console.error('Error al eliminar calidad:', error);
+      if (error.response?.status === 409) {
+        message.error('No se puede eliminar esta calidad porque hay productos que la están usando');
+      } else {
+        message.error('Error al eliminar calidad');
       }
     }
   };
@@ -537,7 +583,7 @@ const Products: React.FC = () => {
       dataIndex: 'calidad',
       key: 'calidad',
       width: 120,
-      filters: calidades.map(c => ({ text: c, value: c })),
+      filters: calidades.map(c => ({ text: c.valor, value: c.valor })),
       onFilter: (value, record) => record.calidad === value,
       render: (calidad: string) => {
         const color = {
@@ -901,13 +947,18 @@ const Products: React.FC = () => {
                       showSearch
                       allowClear
                       style={{ flex: 1 }}
-                      options={calidades.map(c => ({ label: c, value: c }))}
+                      options={calidades.map(c => ({ label: c.valor, value: c.valor }))}
                     />
                 </Form.Item>
                   <Button
                     type="primary"
                     icon={<PlusOutlined />}
                     onClick={() => setModalAgregarCalidad(true)}
+                  />
+                  <Button
+                    icon={<SettingOutlined />}
+                    onClick={() => setModalGestionarCalidades(true)}
+                    title="Gestionar Calidades"
                   />
                 </Space.Compact>
               </div>
@@ -970,13 +1021,18 @@ const Products: React.FC = () => {
                         showSearch
                         allowClear
                         style={{ flex: 1 }}
-                        options={calidades.map(c => ({ label: c, value: c }))}
+                        options={calidades.map(c => ({ label: c.valor, value: c.valor }))}
                       />
                     </Form.Item>
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={() => setModalAgregarCalidad(true)}
+                    />
+                    <Button
+                      icon={<SettingOutlined />}
+                      onClick={() => setModalGestionarCalidades(true)}
+                      title="Gestionar Calidades"
                     />
                   </Input.Group>
                 </Form.Item>
@@ -1131,6 +1187,146 @@ const Products: React.FC = () => {
           autoFocus
         />
         </Modal>
+
+      {/* 🎯 Modal: Gestionar Calidades */}
+      <Modal
+        title={
+          <Space>
+            <SettingOutlined style={{ color: '#1890ff' }} />
+            <span>Gestionar Calidades</span>
+          </Space>
+        }
+        open={modalGestionarCalidades}
+        onCancel={() => {
+          setModalGestionarCalidades(false);
+          setCalidadEditando(null);
+          setValorEditandoCalidad('');
+        }}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => {
+              setModalGestionarCalidades(false);
+              setCalidadEditando(null);
+              setValorEditandoCalidad('');
+            }}
+          >
+            Cerrar
+          </Button>
+        ]}
+        width={600}
+      >
+        <Spin spinning={loadingCalidades}>
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            {/* Descripción */}
+            <Card size="small" style={{ background: '#e6f7ff', border: '1px solid #91d5ff' }}>
+              <Text>
+                💡 Aquí puedes <strong>editar</strong> o <strong>eliminar</strong> las calidades existentes.
+                Las calidades en uso no podrán eliminarse.
+              </Text>
+            </Card>
+
+            {/* Lista de Calidades */}
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                {calidades.length === 0 ? (
+                  <Card>
+                    <Text type="secondary">No hay calidades registradas</Text>
+                  </Card>
+                ) : (
+                  calidades.map((calidad) => (
+                    <Card
+                      key={calidad.id}
+                      size="small"
+                      style={{
+                        border: calidadEditando?.id === calidad.id ? '2px solid #1890ff' : '1px solid #d9d9d9'
+                      }}
+                    >
+                      {calidadEditando?.id === calidad.id ? (
+                        // Modo edición
+                        <Space style={{ width: '100%' }} size="middle">
+                          <Input
+                            value={valorEditandoCalidad}
+                            onChange={(e) => setValorEditandoCalidad(e.target.value)}
+                            onPressEnter={handleEditarCalidad}
+                            placeholder="Nuevo nombre"
+                            style={{ flex: 1 }}
+                            autoFocus
+                          />
+                          <Button
+                            type="primary"
+                            icon={<SaveOutlined />}
+                            onClick={handleEditarCalidad}
+                          >
+                            Guardar
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setCalidadEditando(null);
+                              setValorEditandoCalidad('');
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </Space>
+                      ) : (
+                        // Modo visualización
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Space>
+                            <TagOutlined style={{ color: '#1890ff' }} />
+                            <Text strong>{calidad.valor}</Text>
+                          </Space>
+                          <Space>
+                            <Button
+                              type="link"
+                              icon={<EditOutlined />}
+                              onClick={() => {
+                                setCalidadEditando(calidad);
+                                setValorEditandoCalidad(calidad.valor);
+                              }}
+                            >
+                              Editar
+                            </Button>
+                            <Popconfirm
+                              title="¿Eliminar calidad?"
+                              description={`¿Estás seguro de eliminar "${calidad.valor}"? Esta acción no se puede deshacer.`}
+                              onConfirm={() => handleEliminarCalidad(calidad.id, calidad.valor)}
+                              okText="Sí, eliminar"
+                              cancelText="Cancelar"
+                              okButtonProps={{ danger: true }}
+                            >
+                              <Button
+                                type="link"
+                                danger
+                                icon={<WarningOutlined />}
+                              >
+                                Eliminar
+                              </Button>
+                            </Popconfirm>
+                          </Space>
+                        </div>
+                      )}
+                    </Card>
+                  ))
+                )}
+              </Space>
+            </div>
+
+            {/* Botón para agregar nueva calidad */}
+            <Button
+              type="dashed"
+              block
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setModalGestionarCalidades(false);
+                setModalAgregarCalidad(true);
+              }}
+            >
+              Agregar Nueva Calidad
+            </Button>
+          </Space>
+        </Spin>
+      </Modal>
 
       {/* 🎯 Modal: Gestionar Precios y Stock por Sucursal */}
       <Modal

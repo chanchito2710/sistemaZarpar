@@ -228,7 +228,11 @@ const CustomerAccounts: React.FC = () => {
         sucursalSeleccionada,
         cliente.cliente_id
       );
-      setMovimientos(response.movimientos);
+      // Ordenar movimientos de más viejo a más nuevo (ascendente por fecha)
+      const movimientosOrdenados = [...response.movimientos].sort((a, b) => {
+        return new Date(a.fecha_movimiento).getTime() - new Date(b.fecha_movimiento).getTime();
+      });
+      setMovimientos(movimientosOrdenados);
       setModalDetalleVisible(true);
     } catch (error) {
       console.error('Error al cargar movimientos:', error);

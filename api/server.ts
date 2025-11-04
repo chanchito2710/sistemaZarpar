@@ -3,6 +3,7 @@
  */
 import app from './app.js';
 import { testConnection } from './config/database.js';
+import { inicializarCronJobs } from './services/cronService.js';
 
 /**
  * start server with port
@@ -15,6 +16,9 @@ const server = app.listen(PORT, async () => {
   
   // Verificar conexión a la base de datos
   await testConnection();
+  
+  // Inicializar tareas programadas (Cron Jobs)
+  inicializarCronJobs();
 });
 
 /**

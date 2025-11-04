@@ -1,447 +1,575 @@
-import React, { useState, useMemo } from 'react';
-import { Card, Table, Button, Space, Statistic, Row, Col, DatePicker, Select, Input, Modal, Tabs, Progress, Typography } from 'antd';
-import { SearchOutlined, FileExcelOutlined, FilePdfOutlined, BarChartOutlined, EyeOutlined, DollarOutlined, ShoppingCartOutlined, TrophyOutlined, BranchesOutlined } from '@ant-design/icons';
+/**
+ * Página de Historial de Ventas
+ * Muestra todas las ventas realizadas desde el POS con filtros dinámicos
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  Card,
+  Table,
+  Button,
+  Space,
+  Statistic,
+  Row,
+  Col,
+  DatePicker,
+  Select,
+  Tag,
+  message,
+  Spin,
+  Modal,
+  Descriptions,
+  Typography,
+  Alert
+} from 'antd';
+import {
+  SearchOutlined,
+  FileExcelOutlined,
+  FilePdfOutlined,
+  DollarOutlined,
+  ReloadOutlined,
+  EyeOutlined,
+  CalendarOutlined,
+  BankOutlined,
+  UserOutlined,
+  ShopOutlined,
+  BarChartOutlined,
+  RightOutlined
+} from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
+import { ventasService, type Venta, vendedoresService } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
-const { TabPane } = Tabs;
-const { Text } = Typography;
+const { Title, Text } = Typography;
 
-interface ProductSale {
-  id: string;
-  productName: string;
-  category: string;
-  brand: string;
-  price: number;
-  quantity: number;
-  total: number;
-  date: string;
-  branch: string;
-  customer: string;
+/**
+ * Interfaz para sucursales
+ */
+interface Sucursal {
+  sucursal: string;
 }
 
-interface ProductReport {
-  productName: string;
-  category: string;
-  brand: string;
-  totalQuantity: number;
-  totalRevenue: number;
-  averagePrice: number;
-  notes?: string;
-  branches: {
-    [key: string]: {
-      quantity: number;
-      revenue: number;
-    };
-  };
-  stockMaldonado: number;
-  stockPando: number;
-  stockMelo: number;
-  stockPaysandu: number;
-  stockSalto: number;
-  stockRivera: number;
-}
-
-import { BRANCHES, getBranchOptions } from '../../data/branches';
-
-const branches = BRANCHES.map(branch => branch.name);
-
-// Datos mock realistas de ventas de los últimos 3 meses
-const mockSalesData: ProductSale[] = [
-  // Noviembre 2023
-  { id: 'S001', productName: 'Pantalla iPhone 12', category: 'Pantallas', brand: 'Apple', price: 15000, quantity: 2, total: 30000, date: '2023-11-05', branch: 'Maldonado', customer: 'Juan Pérez' },
-  { id: 'S002', productName: 'Batería Samsung A54', category: 'Baterías', brand: 'Samsung', price: 3500, quantity: 1, total: 3500, date: '2023-11-08', branch: 'Pando', customer: 'María García' },
-  { id: 'S003', productName: 'Carcasa iPhone 13', category: 'Carcasas', brand: 'Apple', price: 2500, quantity: 3, total: 7500, date: '2023-11-12', branch: 'Melo', customer: 'Carlos López' },
-  { id: 'S004', productName: 'Pantalla Xiaomi Redmi Note 11', category: 'Pantallas', brand: 'Xiaomi', price: 8000, quantity: 1, total: 8000, date: '2023-11-15', branch: 'Paysandú', customer: 'Ana Martínez' },
-  { id: 'S005', productName: 'Batería iPhone 11', category: 'Baterías', brand: 'Apple', price: 4500, quantity: 2, total: 9000, date: '2023-11-18', branch: 'Salto', customer: 'Luis Rodríguez' },
-  { id: 'S006', productName: 'Cargador Samsung', category: 'Accesorios', brand: 'Samsung', price: 1200, quantity: 5, total: 6000, date: '2023-11-22', branch: 'Rivera', customer: 'Elena Fernández' },
-  { id: 'S007', productName: 'Pantalla Samsung A32', category: 'Pantallas', brand: 'Samsung', price: 12000, quantity: 1, total: 12000, date: '2023-11-25', branch: 'Maldonado', customer: 'Roberto Silva' },
-  { id: 'S008', productName: 'Auriculares Bluetooth', category: 'Accesorios', brand: 'Generic', price: 2800, quantity: 2, total: 5600, date: '2023-11-28', branch: 'Pando', customer: 'Sofia Morales' },
-  
-  // Diciembre 2023
-  { id: 'S009', productName: 'Pantalla iPhone 12', category: 'Pantallas', brand: 'Apple', price: 15000, quantity: 3, total: 45000, date: '2023-12-02', branch: 'Melo', customer: 'Diego Castro' },
-  { id: 'S010', productName: 'Batería Motorola G8', category: 'Baterías', brand: 'Motorola', price: 3200, quantity: 1, total: 3200, date: '2023-12-05', branch: 'Paysandú', customer: 'Valentina Ruiz' },
-  { id: 'S011', productName: 'Carcasa Samsung A54', category: 'Carcasas', brand: 'Samsung', price: 1800, quantity: 4, total: 7200, date: '2023-12-08', branch: 'Salto', customer: 'Mateo Vega' },
-  { id: 'S012', productName: 'Pantalla Xiaomi Redmi Note 11', category: 'Pantallas', brand: 'Xiaomi', price: 8000, quantity: 2, total: 16000, date: '2023-12-12', branch: 'Rivera', customer: 'Isabella Torres' },
-  { id: 'S013', productName: 'Batería iPhone 11', category: 'Baterías', brand: 'Apple', price: 4500, quantity: 1, total: 4500, date: '2023-12-15', branch: 'Maldonado', customer: 'Sebastián Herrera' },
-  { id: 'S014', productName: 'Protector de Pantalla', category: 'Accesorios', brand: 'Generic', price: 800, quantity: 8, total: 6400, date: '2023-12-18', branch: 'Pando', customer: 'Camila Jiménez' },
-  { id: 'S015', productName: 'Pantalla Samsung A32', category: 'Pantallas', brand: 'Samsung', price: 12000, quantity: 2, total: 24000, date: '2023-12-22', branch: 'Melo', customer: 'Nicolás Mendoza' },
-  { id: 'S016', productName: 'Cargador iPhone', category: 'Accesorios', brand: 'Apple', price: 1500, quantity: 3, total: 4500, date: '2023-12-28', branch: 'Paysandú', customer: 'Lucía Paredes' },
-  
-  // Enero 2024
-  { id: 'S017', productName: 'Pantalla iPhone 13', category: 'Pantallas', brand: 'Apple', price: 18000, quantity: 1, total: 18000, date: '2024-01-03', branch: 'Salto', customer: 'Andrés Romero' },
-  { id: 'S018', productName: 'Batería Samsung A54', category: 'Baterías', brand: 'Samsung', price: 3500, quantity: 2, total: 7000, date: '2024-01-08', branch: 'Rivera', customer: 'Gabriela Soto' },
-  { id: 'S019', productName: 'Carcasa Xiaomi', category: 'Carcasas', brand: 'Xiaomi', price: 2200, quantity: 2, total: 4400, date: '2024-01-12', branch: 'Maldonado', customer: 'Fernando Aguilar' },
-  { id: 'S020', productName: 'Pantalla Motorola G8', category: 'Pantallas', brand: 'Motorola', price: 9500, quantity: 1, total: 9500, date: '2024-01-15', branch: 'Pando', customer: 'Valeria Cruz' },
-  { id: 'S021', productName: 'Batería iPhone 12', category: 'Baterías', brand: 'Apple', price: 5000, quantity: 1, total: 5000, date: '2024-01-18', branch: 'Melo', customer: 'Joaquín Vargas' },
-  { id: 'S022', productName: 'Auriculares Samsung', category: 'Accesorios', brand: 'Samsung', price: 3200, quantity: 2, total: 6400, date: '2024-01-22', branch: 'Paysandú', customer: 'Martina Flores' },
-  { id: 'S023', productName: 'Pantalla iPhone 12', category: 'Pantallas', brand: 'Apple', price: 15000, quantity: 2, total: 30000, date: '2024-01-25', branch: 'Salto', customer: 'Emilio Ramos' },
-  { id: 'S024', productName: 'Cargador Inalámbrico', category: 'Accesorios', brand: 'Generic', price: 2500, quantity: 1, total: 2500, date: '2024-01-28', branch: 'Rivera', customer: 'Renata Ortiz' }
-];
-
-type SortOption = 'none' | 'brand-asc' | 'brand-desc' | 'product-asc' | 'product-desc';
-
+/**
+ * Componente principal
+ */
 const Sales: React.FC = () => {
-  const [selectedDateRange, setSelectedDateRange] = useState<any>(null);
-  const [selectedBranch, setSelectedBranch] = useState<string>('all');
-  const [searchProduct, setSearchProduct] = useState<string>('');
-  const [selectedProduct, setSelectedProduct] = useState<ProductReport | null>(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [productNotes, setProductNotes] = useState<{ [key: string]: string }>({});
-  const [sortOption, setSortOption] = useState<SortOption>('none');
+  const navigate = useNavigate();
+  
+  // Estados para filtros
+  const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(null);
+  const [fechaHasta, setFechaHasta] = useState<Dayjs | null>(null);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('todas');
+  const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState<string>('todos');
+  const [estadoPagoSeleccionado, setEstadoPagoSeleccionado] = useState<string>('todos');
 
-  // Filtrar datos según los filtros seleccionados
-  const filteredData = useMemo(() => {
-    let filtered = mockSalesData;
+  // Estados de datos
+  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
 
-    // Filtro por rango de fechas
-    if (selectedDateRange && selectedDateRange.length === 2) {
-      const [startDate, endDate] = selectedDateRange;
-      filtered = filtered.filter(sale => {
-        const saleDate = dayjs(sale.date);
-        return saleDate.isAfter(startDate.startOf('day')) && saleDate.isBefore(endDate.endOf('day'));
-      });
+  // Estado de modal de detalle
+  const [modalVisible, setModalVisible] = useState(false);
+  const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(null);
+
+  /**
+   * Cargar sucursales al montar el componente
+   */
+  useEffect(() => {
+    cargarSucursales();
+  }, []);
+
+  /**
+   * Cargar ventas al montar el componente
+   */
+  useEffect(() => {
+    cargarVentas();
+  }, []);
+
+  /**
+   * Cargar sucursales desde la API
+   */
+  const cargarSucursales = async () => {
+    setLoadingSucursales(true);
+    try {
+      const sucursalesData = await vendedoresService.obtenerSucursales();
+      setSucursales(sucursalesData.map((s: string) => ({ sucursal: s })));
+    } catch (error) {
+      console.error('Error al cargar sucursales:', error);
+      message.error('Error al cargar sucursales');
+    } finally {
+      setLoadingSucursales(false);
     }
+  };
 
-    // Filtro por sucursal
-    if (selectedBranch !== 'all') {
-      filtered = filtered.filter(sale => sale.branch.toLowerCase() === selectedBranch.toLowerCase());
-    }
+  /**
+   * Cargar ventas con los filtros aplicados
+   */
+  const cargarVentas = async () => {
+    setLoading(true);
+    try {
+      const filtros: any = {};
 
-    // Filtro por producto
-    if (searchProduct) {
-      filtered = filtered.filter(sale => 
-        sale.productName.toLowerCase().includes(searchProduct.toLowerCase()) ||
-        sale.category.toLowerCase().includes(searchProduct.toLowerCase()) ||
-        sale.brand.toLowerCase().includes(searchProduct.toLowerCase())
-      );
-    }
-
-    return filtered;
-  }, [selectedDateRange, selectedBranch, searchProduct]);
-
-
-
-  // Generar reporte de productos con ordenamiento
-  const productReports = useMemo(() => {
-    const reports: { [key: string]: ProductReport } = {};
-
-    // Datos de stock realistas por producto y sucursal
-    const stockData: { [key: string]: { [key: string]: number } } = {
-      'Pantalla iPhone 12': { Maldonado: 15, Pando: 8, Melo: 12, Paysandú: 6, Salto: 10, Rivera: 4 },
-      'Batería Samsung A54': { Maldonado: 25, Pando: 18, Melo: 22, Paysandú: 15, Salto: 20, Rivera: 12 },
-      'Carcasa iPhone 13': { Maldonado: 30, Pando: 25, Melo: 28, Paysandú: 20, Salto: 24, Rivera: 18 },
-      'Pantalla Xiaomi Redmi Note 11': { Maldonado: 12, Pando: 9, Melo: 14, Paysandú: 7, Salto: 11, Rivera: 5 },
-      'Batería iPhone 11': { Maldonado: 20, Pando: 15, Melo: 18, Paysandú: 12, Salto: 16, Rivera: 10 },
-      'Cargador Samsung': { Maldonado: 40, Pando: 35, Melo: 38, Paysandú: 30, Salto: 33, Rivera: 25 },
-      'Pantalla Samsung A32': { Maldonado: 8, Pando: 6, Melo: 10, Paysandú: 4, Salto: 7, Rivera: 3 },
-      'Auriculares Bluetooth': { Maldonado: 22, Pando: 18, Melo: 25, Paysandú: 16, Salto: 20, Rivera: 14 },
-      'Batería Motorola G8': { Maldonado: 18, Pando: 14, Melo: 16, Paysandú: 10, Salto: 13, Rivera: 8 },
-      'Carcasa Samsung A54': { Maldonado: 35, Pando: 28, Melo: 32, Paysandú: 24, Salto: 29, Rivera: 20 },
-      'Protector de Pantalla': { Maldonado: 50, Pando: 45, Melo: 48, Paysandú: 40, Salto: 42, Rivera: 35 },
-      'Cargador iPhone': { Maldonado: 28, Pando: 22, Melo: 26, Paysandú: 18, Salto: 24, Rivera: 16 },
-      'Pantalla iPhone 13': { Maldonado: 10, Pando: 7, Melo: 9, Paysandú: 5, Salto: 8, Rivera: 4 },
-      'Carcasa Xiaomi': { Maldonado: 32, Pando: 26, Melo: 30, Paysandú: 22, Salto: 27, Rivera: 19 },
-      'Pantalla Motorola G8': { Maldonado: 14, Pando: 10, Melo: 12, Paysandú: 8, Salto: 11, Rivera: 6 },
-      'Batería iPhone 12': { Maldonado: 16, Pando: 12, Melo: 15, Paysandú: 9, Salto: 13, Rivera: 7 },
-      'Auriculares Samsung': { Maldonado: 24, Pando: 19, Melo: 22, Paysandú: 16, Salto: 20, Rivera: 13 },
-      'Cargador Inalámbrico': { Maldonado: 18, Pando: 14, Melo: 17, Paysandú: 11, Salto: 15, Rivera: 9 }
-    };
-
-    filteredData.forEach(sale => {
-      if (!reports[sale.productName]) {
-        const productStock = stockData[sale.productName] || BRANCHES.reduce((acc, branch) => ({ ...acc, [branch.name]: 0 }), {} as Record<string, number>);
-        
-        reports[sale.productName] = {
-          productName: sale.productName,
-          category: sale.category,
-          brand: sale.brand,
-          totalQuantity: 0,
-          totalRevenue: 0,
-          averagePrice: 0,
-          branches: {},
-          stockMaldonado: productStock.Maldonado,
-          stockPando: productStock.Pando,
-          stockMelo: productStock.Melo,
-          stockPaysandu: productStock.Paysandú,
-          stockSalto: productStock.Salto,
-          stockRivera: productStock.Rivera
-        };
+      // Aplicar filtros
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtros.sucursal = sucursalSeleccionada;
       }
 
-      const report = reports[sale.productName];
-      report.totalQuantity += sale.quantity;
-      report.totalRevenue += sale.total;
-
-      if (!report.branches[sale.branch]) {
-        report.branches[sale.branch] = { quantity: 0, revenue: 0 };
+      if (fechaDesde) {
+        filtros.fecha_desde = fechaDesde.format('YYYY-MM-DD');
       }
-      report.branches[sale.branch].quantity += sale.quantity;
-      report.branches[sale.branch].revenue += sale.total;
-    });
 
-    // Calcular precio promedio
-    Object.values(reports).forEach(report => {
-      report.averagePrice = report.totalQuantity > 0 ? report.totalRevenue / report.totalQuantity : 0;
-    });
+      if (fechaHasta) {
+        filtros.fecha_hasta = fechaHasta.format('YYYY-MM-DD');
+      }
 
-    let sortedReports = Object.values(reports);
-    
-    // Aplicar ordenamiento según la opción seleccionada
-    switch (sortOption) {
-      case 'brand-asc':
-        sortedReports.sort((a, b) => a.brand.localeCompare(b.brand));
-        break;
-      case 'brand-desc':
-        sortedReports.sort((a, b) => b.brand.localeCompare(a.brand));
-        break;
-      case 'product-asc':
-        sortedReports.sort((a, b) => a.productName.localeCompare(b.productName));
-        break;
-      case 'product-desc':
-        sortedReports.sort((a, b) => b.productName.localeCompare(a.productName));
-        break;
-      default:
-        // Ordenamiento por defecto: por ingresos totales (descendente)
-        sortedReports.sort((a, b) => b.totalRevenue - a.totalRevenue);
-        break;
+      if (metodoPagoSeleccionado && metodoPagoSeleccionado !== 'todos') {
+        filtros.metodo_pago = metodoPagoSeleccionado;
+      }
+
+      if (estadoPagoSeleccionado && estadoPagoSeleccionado !== 'todos') {
+        filtros.estado_pago = estadoPagoSeleccionado;
+      }
+
+      console.log('🔍 Filtros aplicados:', filtros);
+
+      const ventasData = await ventasService.obtenerHistorial(filtros);
+      
+      console.log('✅ Ventas cargadas:', ventasData.length);
+      setVentas(ventasData);
+
+      if (ventasData.length === 0) {
+        message.info('No se encontraron ventas con los filtros aplicados');
+      } else {
+        message.success(`${ventasData.length} ventas cargadas`);
+      }
+    } catch (error) {
+      console.error('Error al cargar ventas:', error);
+      message.error('Error al cargar el historial de ventas');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return sortedReports;
-  }, [filteredData, sortOption]);
+  /**
+   * Manejar cambio de rango de fechas
+   */
+  const handleRangeFechasChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
+    if (dates) {
+      setFechaDesde(dates[0]);
+      setFechaHasta(dates[1]);
+    } else {
+      setFechaDesde(null);
+      setFechaHasta(null);
+    }
+  };
 
-  // Estadísticas generales
-  const statistics = useMemo(() => {
-    const totalRevenue = filteredData.reduce((sum, sale) => sum + sale.total, 0);
-    const totalQuantity = filteredData.reduce((sum, sale) => sum + sale.quantity, 0);
-    const uniqueProducts = new Set(filteredData.map(sale => sale.productName)).size;
-    
-    const branchSales = branches.reduce((acc, branch) => {
-      acc[branch] = filteredData
-        .filter(sale => sale.branch === branch)
-        .reduce((sum, sale) => sum + sale.total, 0);
-      return acc;
-    }, {} as { [key: string]: number });
+  /**
+   * Ver detalle de una venta
+   */
+  const verDetalleVenta = async (venta: Venta) => {
+    try {
+      const detalleCompleto = await ventasService.obtenerDetalle(venta.id);
+      setVentaSeleccionada(detalleCompleto);
+      setModalVisible(true);
+    } catch (error) {
+      console.error('Error al obtener detalle:', error);
+      message.error('Error al cargar el detalle de la venta');
+    }
+  };
 
-    const topBranch = Object.entries(branchSales)
-      .sort(([,a], [,b]) => b - a)[0];
+  /**
+   * Calcular estadísticas
+   */
+  const totalVentas = ventas.length;
+  const totalIngresos = ventas.reduce((sum, venta) => sum + Number(venta.total), 0);
+  const totalDescuentos = ventas.reduce((sum, venta) => sum + Number(venta.descuento), 0);
+  const promedioVenta = totalVentas > 0 ? totalIngresos / totalVentas : 0;
 
-    return {
-      totalRevenue,
-      totalQuantity,
-      uniqueProducts,
-      topBranch: topBranch ? { name: topBranch[0], revenue: topBranch[1] } : null,
-      branchSales
+  // Contar ventas por método de pago
+  const ventasPorMetodo = ventas.reduce((acc, venta) => {
+    acc[venta.metodo_pago] = (acc[venta.metodo_pago] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  /**
+   * Formatear método de pago para mostrar
+   */
+  const formatearMetodoPago = (metodo: string): React.ReactNode => {
+    const estilos: Record<string, { color: string; text: string }> = {
+      'efectivo': { color: 'green', text: 'Efectivo' },
+      'transferencia': { color: 'blue', text: 'Transfer.' },
+      'cuenta_corriente': { color: 'orange', text: 'C. Cte.' }
     };
-  }, [filteredData]);
 
-  // Columnas para la tabla de productos
-  const productColumns: ColumnsType<ProductReport> = [
-    {
-      title: 'Producto',
-      dataIndex: 'productName',
-      key: 'productName',
-      width: 200,
-      render: (text, record) => (
-        <div>
-          <div className="font-medium">{text}</div>
-          <div className="text-sm text-gray-500">{record.brand} - {record.category}</div>
-        </div>
-      ),
-    },
+    const estilo = estilos[metodo] || { color: 'default', text: metodo };
 
+    return (
+      <Tag color={estilo.color} style={{ fontSize: 11, padding: '0 4px', margin: 0 }}>
+        {estilo.text}
+      </Tag>
+    );
+  };
+
+  /**
+   * Formatear estado de pago para mostrar
+   */
+  const formatearEstadoPago = (estado: string): React.ReactNode => {
+    const estilos: Record<string, { color: string; text: string }> = {
+      'pagado': { color: 'success', text: '✅' },
+      'pendiente': { color: 'warning', text: '⏳' },
+      'parcial': { color: 'processing', text: '🔄' }
+    };
+
+    const estilo = estilos[estado] || { color: 'default', text: estado };
+
+    return (
+      <Tag color={estilo.color} style={{ fontSize: 11, padding: '2px 6px', margin: 0 }}>
+        {estilo.text}
+      </Tag>
+    );
+  };
+
+  /**
+   * Columnas de la tabla
+   */
+  const columns: ColumnsType<Venta> = [
     {
-      title: 'Cantidad Total',
-      dataIndex: 'totalQuantity',
-      key: 'totalQuantity',
-      width: 120,
-      align: 'center',
-      sorter: (a, b) => a.totalQuantity - b.totalQuantity,
+      title: 'N° Venta',
+      dataIndex: 'numero_venta',
+      key: 'numero_venta',
+      width: 130,
+      render: (text: string) => <Text strong style={{ fontSize: 12 }}>{text}</Text>,
     },
     {
-      title: 'Notas',
-      key: 'notes',
-      width: 200,
-      render: (_, record) => (
-        <Input
-          placeholder="Agregar nota..."
-          value={productNotes[record.productName] || ''}
-          onChange={(e) => setProductNotes(prev => ({
-            ...prev,
-            [record.productName]: e.target.value
-          }))}
-          size="small"
-          className="border-gray-300"
-        />
-      ),
-    },
-    ...branches.map(branch => ({
-      title: branch,
-      key: branch,
-      width: 100,
-      align: 'center' as const,
-      render: (_: any, record: ProductReport) => {
-        const branchData = record.branches[branch];
-        const soldQuantity = branchData ? branchData.quantity : 0;
-        const stockKey = `stock${branch}` as keyof ProductReport;
-        const stockQuantity = record[stockKey] as number || 0;
-        
-        return (
-          <div className="text-center">
-            <div className="font-medium text-gray-900">{soldQuantity}</div>
-            <div className="text-xs text-red-500 bg-white px-2 py-1 rounded border border-red-200">Stock: {stockQuantity}</div>
-          </div>
-        );
+      title: 'Fecha',
+      dataIndex: 'fecha_venta',
+      key: 'fecha_venta',
+      width: 140,
+      render: (fecha: string) => {
+        const fechaFormateada = dayjs(fecha).format('DD/MM/YY HH:mm');
+        return <Text style={{ fontSize: 12 }}>{fechaFormateada}</Text>;
       },
-    })),
+      sorter: (a, b) => dayjs(a.fecha_venta).unix() - dayjs(b.fecha_venta).unix(),
+    },
     {
-      title: 'Acciones',
-      key: 'actions',
+      title: 'Sucursal',
+      dataIndex: 'sucursal',
+      key: 'sucursal',
+      width: 90,
+      render: (sucursal: string) => (
+        <Tag color="blue" style={{ fontSize: 11, padding: '0 4px' }}>
+          {sucursal.toUpperCase()}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Cliente',
+      dataIndex: 'cliente_nombre',
+      key: 'cliente_nombre',
+      width: 150,
+      ellipsis: true,
+      render: (nombre: string) => (
+        <Text style={{ fontSize: 12 }} ellipsis={{ tooltip: nombre }}>
+          {nombre}
+        </Text>
+      ),
+    },
+    {
+      title: 'Vendedor',
+      dataIndex: 'vendedor_nombre',
+      key: 'vendedor_nombre',
+      width: 140,
+      ellipsis: true,
+      render: (nombre: string) => (
+        <Text style={{ fontSize: 12 }} ellipsis={{ tooltip: nombre }}>
+          {nombre}
+        </Text>
+      ),
+    },
+    {
+      title: 'Método',
+      dataIndex: 'metodo_pago',
+      key: 'metodo_pago',
+      width: 110,
+      render: (metodo: string) => formatearMetodoPago(metodo),
+    },
+    {
+      title: 'Estado',
+      dataIndex: 'estado_pago',
+      key: 'estado_pago',
+      width: 90,
+      render: (estado: string) => formatearEstadoPago(estado),
+    },
+    {
+      title: 'Total',
+      dataIndex: 'total',
+      key: 'total',
       width: 100,
+      align: 'right',
+      render: (total: number) => (
+        <Text strong style={{ color: '#52c41a', fontSize: 13 }}>
+          ${Number(total).toFixed(2)}
+        </Text>
+      ),
+      sorter: (a, b) => Number(a.total) - Number(b.total),
+    },
+    {
+      title: '',
+      key: 'acciones',
+      width: 70,
+      align: 'center',
       render: (_, record) => (
         <Button
-          type="text"
-          icon={<EyeOutlined />}
+          type="link"
           size="small"
-          className="text-blue-600 hover:text-blue-800"
-          onClick={() => {
-            setSelectedProduct(record);
-            setIsModalVisible(true);
-          }}
+          icon={<EyeOutlined />}
+          onClick={() => verDetalleVenta(record)}
         />
       ),
-    },
-    {
-      title: 'Precio Promedio',
-      dataIndex: 'averagePrice',
-      key: 'averagePrice',
-      width: 150,
-      render: (value: number) => `$${Math.round(value).toLocaleString()}`,
-    },
-    {
-      title: 'Ingresos Totales',
-      dataIndex: 'totalRevenue',
-      key: 'totalRevenue',
-      width: 150,
-      render: (value: number) => `$${value.toLocaleString()}`,
-      sorter: (a, b) => a.totalRevenue - b.totalRevenue,
     },
   ];
 
-  const handleExportExcel = () => {
-    console.log('Exportar a Excel');
-  };
-
-  const handleExportPDF = () => {
-    console.log('Exportar a PDF');
-  };
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Reportes de Ventas</h1>
-        <p className="text-gray-600">Análisis detallado de ventas por producto y sucursal</p>
+    <div style={{ padding: '24px' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '24px' }}>
+        <Title level={2}>📊 Historial de Ventas</Title>
+        <Text type="secondary">
+          Consulta todas las ventas realizadas desde el punto de venta
+        </Text>
       </div>
 
       {/* Filtros */}
-      <Card className="mb-6">
-        <div className="flex flex-wrap gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Rango de fechas
-            </label>
+      <Card style={{ marginBottom: '24px' }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Row gutter={[16, 16]}>
+            {/* Filtro de Fechas */}
+            <Col xs={24} sm={12} lg={8}>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                📅 Rango de Fechas
+              </Text>
             <RangePicker 
-              onChange={setSelectedDateRange}
-              className="w-64"
-              placeholder={['Fecha inicio', 'Fecha fin']}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sucursal
-            </label>
+                style={{ width: '100%' }}
+                placeholder={['Fecha Desde', 'Fecha Hasta']}
+                format="DD/MM/YYYY"
+                value={[fechaDesde, fechaHasta]}
+                onChange={handleRangeFechasChange}
+              />
+            </Col>
+
+            {/* Filtro de Sucursal */}
+            <Col xs={24} sm={12} lg={4}>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                🏢 Sucursal
+              </Text>
             <Select
-              value={selectedBranch}
-              onChange={setSelectedBranch}
-              className="w-48"
-            >
-              <Option value="all">Todas las sucursales</Option>
-              {branches.map(branch => (
-                <Option key={branch.toLowerCase()} value={branch.toLowerCase()}>
-                  {branch}
+                style={{ width: '100%' }}
+                placeholder="Seleccionar"
+                value={sucursalSeleccionada}
+                onChange={setSucursalSeleccionada}
+                loading={loadingSucursales}
+              >
+                <Option value="todas">Todas</Option>
+                {sucursales.map(suc => (
+                  <Option key={suc.sucursal} value={suc.sucursal}>
+                    {suc.sucursal.toUpperCase()}
                 </Option>
               ))}
             </Select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Buscar producto
-            </label>
-            <Input
-              placeholder="Buscar por producto, marca o categoría"
-              prefix={<SearchOutlined />}
-              value={searchProduct}
-              onChange={(e) => setSearchProduct(e.target.value)}
-              className="w-64"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ordenar por
-            </label>
+            </Col>
+
+            {/* Filtro de Método de Pago */}
+            <Col xs={24} sm={12} lg={5}>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                💳 Método de Pago
+              </Text>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Seleccionar"
+                value={metodoPagoSeleccionado}
+                onChange={setMetodoPagoSeleccionado}
+              >
+                <Option value="todos">Todos</Option>
+                <Option value="efectivo">Efectivo</Option>
+                <Option value="transferencia">Transferencia</Option>
+                <Option value="cuenta_corriente">Cuenta Corriente</Option>
+              </Select>
+            </Col>
+
+            {/* Filtro de Estado */}
+            <Col xs={24} sm={12} lg={4}>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                ✅ Estado
+              </Text>
             <Select
-              value={sortOption}
-              onChange={setSortOption}
-              className="w-48"
-              placeholder="Seleccionar ordenamiento"
-            >
-              <Option value="none">Por defecto (Ingresos)</Option>
-              <Option value="brand-asc">Marca (A-Z)</Option>
-              <Option value="brand-desc">Marca (Z-A)</Option>
-              <Option value="product-asc">Producto (A-Z)</Option>
-              <Option value="product-desc">Producto (Z-A)</Option>
+                style={{ width: '100%' }}
+                placeholder="Seleccionar"
+                value={estadoPagoSeleccionado}
+                onChange={setEstadoPagoSeleccionado}
+              >
+                <Option value="todos">Todos</Option>
+                <Option value="pagado">Pagado</Option>
+                <Option value="pendiente">Pendiente</Option>
+                <Option value="parcial">Parcial</Option>
             </Select>
-          </div>
-          <div className="flex items-end gap-2">
+            </Col>
+
+            {/* Botón Buscar */}
+            <Col xs={24} sm={12} lg={3}>
+              <Text strong style={{ display: 'block', marginBottom: 8, visibility: 'hidden' }}>
+                -
+              </Text>
             <Button 
-              icon={<FileExcelOutlined />} 
-              onClick={handleExportExcel}
-              className="bg-green-600 text-white hover:bg-green-700"
-            >
-              Excel
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={cargarVentas}
+                loading={loading}
+                style={{ width: '100%' }}
+              >
+                Buscar
             </Button>
+            </Col>
+          </Row>
+
+          {/* Botones de Acción */}
+          <Row gutter={[16, 16]}>
+            <Col>
             <Button 
-              icon={<FilePdfOutlined />} 
-              onClick={handleExportPDF}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              PDF
+                icon={<ReloadOutlined />}
+                onClick={cargarVentas}
+                loading={loading}
+              >
+                Actualizar
+              </Button>
+            </Col>
+            <Col>
+              <Button icon={<FileExcelOutlined />} style={{ color: '#52c41a' }}>
+                Exportar Excel
+              </Button>
+            </Col>
+            <Col>
+              <Button icon={<FilePdfOutlined />} style={{ color: '#ff4d4f' }}>
+                Exportar PDF
             </Button>
-          </div>
-        </div>
+            </Col>
+          </Row>
+        </Space>
       </Card>
 
-      {/* Estadísticas generales */}
-      <Row gutter={16} className="mb-6">
+      {/* Botón SUPER LLAMATIVO de Ventas Globales */}
+      <Card
+        style={{
+          marginBottom: '24px',
+          borderRadius: '16px',
+          border: '3px solid #1890ff',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
+          boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
+          cursor: 'pointer',
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+        styles={{ body: { padding: '24px' } }}
+        onClick={() => navigate('/global-sales')}
+        hoverable
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+          e.currentTarget.style.boxShadow = '0 16px 48px rgba(102, 126, 234, 0.6)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0) scale(1)';
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.4)';
+        }}
+      >
+        <Row align="middle" gutter={24}>
+          <Col>
+            <div
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <BarChartOutlined
+                style={{
+                  fontSize: 48,
+                  color: '#ffffff',
+                  filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
+                }}
+              />
+            </div>
+          </Col>
+          <Col flex="auto">
+            <Title
+              level={3}
+              style={{
+                margin: '0 0 8px 0',
+                color: '#ffffff',
+                fontWeight: 700,
+                textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+            >
+              📊 VENTAS GLOBALES - Historial Diario
+            </Title>
+            <Text
+              style={{
+                fontSize: 16,
+                color: '#ffffff',
+                fontWeight: 500,
+                textShadow: '0 1px 4px rgba(0,0,0,0.2)',
+              }}
+            >
+              🔥 ¡Consulta el resumen histórico completo! Filtra por fecha, sucursal y descarga reportes
+            </Text>
+          </Col>
+          <Col>
+            <Button
+              type="primary"
+              size="large"
+              icon={<RightOutlined />}
+              style={{
+                height: 56,
+                fontSize: 18,
+                fontWeight: 600,
+                borderRadius: 12,
+                background: '#ffffff',
+                color: '#667eea',
+                border: 'none',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                padding: '0 32px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+              }}
+            >
+              VER AHORA
+            </Button>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* Estadísticas */}
+      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Ingresos Totales"
-              value={statistics.totalRevenue}
+              title="Total Ventas"
+              value={totalVentas}
               prefix={<DollarOutlined />}
-              formatter={(value) => `$${value?.toLocaleString()}`}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Productos Vendidos"
-              value={statistics.totalQuantity}
-              prefix={<ShoppingCartOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
           </Card>
@@ -449,139 +577,207 @@ const Sales: React.FC = () => {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Productos Únicos"
-              value={statistics.uniqueProducts}
-              prefix={<BarChartOutlined />}
-              valueStyle={{ color: '#722ed1' }}
+              title="Ingresos Totales"
+              value={totalIngresos}
+              precision={2}
+              prefix="$"
+              valueStyle={{ color: '#52c41a' }}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Mejor Sucursal"
-              value={statistics.topBranch?.revenue || 0}
-              prefix={<TrophyOutlined />}
-              formatter={(value) => `$${value?.toLocaleString()}`}
-              suffix={statistics.topBranch ? ` (${statistics.topBranch.name})` : ''}
-              valueStyle={{ color: '#cf1322' }}
+              title="Descuentos Aplicados"
+              value={totalDescuentos}
+              precision={2}
+              prefix="$"
+              valueStyle={{ color: '#faad14' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Promedio por Venta"
+              value={promedioVenta}
+              precision={2}
+              prefix="$"
+              valueStyle={{ color: '#722ed1' }}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Ventas por sucursal */}
-      <Card className="mb-6" title="Ventas por Sucursal">
-        <Row gutter={16}>
-          {branches.map(branch => {
-            const branchRevenue = statistics.branchSales[branch] || 0;
-            const percentage = statistics.totalRevenue > 0 
-              ? (branchRevenue / statistics.totalRevenue) * 100 
-              : 0;
-            
-            return (
-              <Col xs={24} sm={12} lg={4} key={branch} className="mb-4">
-                <div className="text-center">
-                  <div className="font-medium text-gray-800 mb-2">{branch}</div>
-                  <Progress 
-                    type="circle" 
-                    percent={Math.round(percentage)} 
-                    format={() => `$${branchRevenue.toLocaleString()}`}
-                    size={80}
-                  />
+      {/* Resumen por Método de Pago */}
+      {totalVentas > 0 && (
+        <Card style={{ marginBottom: '24px' }} title="📊 Resumen por Método de Pago">
+          <Row gutter={[16, 16]}>
+            {Object.entries(ventasPorMetodo).map(([metodo, cantidad]) => (
+              <Col key={metodo} xs={24} sm={8}>
+                <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', textAlign: 'center' }}>
+                  {formatearMetodoPago(metodo)}
+                  <div style={{ marginTop: '8px' }}>
+                    <Text strong style={{ fontSize: 18 }}>{cantidad}</Text>
+                    <Text type="secondary"> ventas</Text>
+                  </div>
                 </div>
               </Col>
-            );
-          })}
+            ))}
         </Row>
       </Card>
+      )}
 
-      {/* Tabla de productos */}
-      <Card title={`Reporte de Productos (${productReports.length} productos)`}>
+      {/* Tabla de Ventas */}
+      <Card title={`Historial de Ventas (${totalVentas} registros)`}>
+        {totalVentas === 0 && !loading && (
+          <Alert
+            message="No hay ventas para mostrar"
+            description="No se encontraron ventas con los filtros aplicados. Intenta cambiar los filtros o realiza ventas desde el punto de venta."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        
         <Table
-          columns={productColumns}
-          dataSource={productReports}
-          rowKey="productName"
+          columns={columns}
+          dataSource={ventas}
+          rowKey="id"
+          loading={loading}
+          size="small"
+          scroll={{ x: 1000 }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} de ${total} productos`,
+            showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} ventas`,
           }}
-          scroll={{ x: 1200 }}
-          className="overflow-x-auto"
         />
       </Card>
 
-      {/* Modal de detalles del producto */}
+      {/* Modal de Detalle de Venta */}
       <Modal
-        title={`Detalle: ${selectedProduct?.productName}`}
-        visible={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        footer={null}
+        title={
+          <Space>
+            <EyeOutlined />
+            <span>Detalle de Venta - {ventaSeleccionada?.numero_venta}</span>
+          </Space>
+        }
+        open={modalVisible}
+        onCancel={() => {
+          setModalVisible(false);
+          setVentaSeleccionada(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>
+            Cerrar
+          </Button>,
+        ]}
         width={800}
       >
-        {selectedProduct && (
-          <Tabs defaultActiveKey="1">
-            <TabPane tab="Resumen" key="1">
-              <Row gutter={16} className="mb-4">
-                <Col span={8}>
-                  <Statistic
-                    title="Cantidad Total Vendida"
-                    value={selectedProduct.totalQuantity}
-                    prefix={<ShoppingCartOutlined />}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="Ingresos Totales"
-                    value={selectedProduct.totalRevenue}
-                    prefix={<DollarOutlined />}
-                    formatter={(value) => `$${value?.toLocaleString()}`}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="Precio Promedio"
-                    value={Math.round(selectedProduct.averagePrice)}
-                    prefix={<DollarOutlined />}
-                    formatter={(value) => `$${value?.toLocaleString()}`}
-                  />
-                </Col>
-              </Row>
-              <div className="mb-4">
-                <h4 className="font-medium mb-2">Información del Producto</h4>
-                <p><strong>Marca:</strong> {selectedProduct.brand}</p>
-                <p><strong>Categoría:</strong> {selectedProduct.category}</p>
-              </div>
-            </TabPane>
-            <TabPane tab="Por Sucursal" key="2">
-              <div className="space-y-4">
-                {branches.map(branch => {
-                  const branchData = selectedProduct.branches[branch];
-                  const percentage = selectedProduct.totalQuantity > 0 
-                    ? (branchData?.quantity || 0) / selectedProduct.totalQuantity * 100 
-                    : 0;
-                  
-                  return (
-                    <div key={branch} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <div className="flex-1">
-                        <div className="font-medium">{branch}</div>
-                        <div className="text-sm text-gray-600">
-                          {branchData?.quantity || 0} unidades - $
-                          {(branchData?.revenue || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="w-32">
-                        <Progress percent={Math.round(percentage)} size="small" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </TabPane>
-          </Tabs>
+        {ventaSeleccionada && (
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            {/* Información General */}
+            <Card title="Información General" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="N° Venta">
+                  <Text strong>{ventaSeleccionada.numero_venta}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Fecha">
+                  {dayjs(ventaSeleccionada.fecha_venta).format('DD/MM/YYYY HH:mm')}
+                </Descriptions.Item>
+                <Descriptions.Item label="Sucursal">
+                  {ventaSeleccionada.sucursal.toUpperCase()}
+                </Descriptions.Item>
+                <Descriptions.Item label="Cliente">
+                  {ventaSeleccionada.cliente_nombre}
+                </Descriptions.Item>
+                <Descriptions.Item label="Vendedor">
+                  {ventaSeleccionada.vendedor_nombre}
+                </Descriptions.Item>
+                <Descriptions.Item label="Método de Pago">
+                  {formatearMetodoPago(ventaSeleccionada.metodo_pago)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Estado">
+                  {formatearEstadoPago(ventaSeleccionada.estado_pago)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Saldo Pendiente">
+                  <Text type={Number(ventaSeleccionada.saldo_pendiente) > 0 ? 'danger' : 'success'}>
+                    ${Number(ventaSeleccionada.saldo_pendiente).toFixed(2)}
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* Productos */}
+            {(ventaSeleccionada as any).productos && (ventaSeleccionada as any).productos.length > 0 && (
+              <Card title="Productos" size="small">
+                <Table
+                  dataSource={(ventaSeleccionada as any).productos}
+                  rowKey="id"
+                  size="small"
+                  pagination={false}
+                  columns={[
+                    {
+                      title: 'Producto',
+                      dataIndex: 'producto_nombre',
+                      key: 'producto_nombre',
+                    },
+                    {
+                      title: 'Cantidad',
+                      dataIndex: 'cantidad',
+                      key: 'cantidad',
+                      align: 'center',
+                    },
+                    {
+                      title: 'Precio Unit.',
+                      dataIndex: 'precio_unitario',
+                      key: 'precio_unitario',
+                      align: 'right',
+                      render: (precio: number) => `$${Number(precio).toFixed(2)}`,
+                    },
+                    {
+                      title: 'Subtotal',
+                      dataIndex: 'subtotal',
+                      key: 'subtotal',
+                      align: 'right',
+                      render: (subtotal: number) => (
+                        <Text strong>${Number(subtotal).toFixed(2)}</Text>
+                      ),
+                    },
+                  ]}
+                />
+              </Card>
+            )}
+
+            {/* Totales */}
+            <Card title="Totales" size="small">
+              <Descriptions column={1} bordered size="small">
+                <Descriptions.Item label="Subtotal">
+                  ${Number(ventaSeleccionada.subtotal).toFixed(2)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Descuento">
+                  <Text type="success">-${Number(ventaSeleccionada.descuento).toFixed(2)}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Total">
+                  <Text strong style={{ fontSize: 18, color: '#52c41a' }}>
+                    ${Number(ventaSeleccionada.total).toFixed(2)}
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* Observaciones */}
+            {ventaSeleccionada.observaciones && (
+              <Alert
+                message="Observaciones"
+                description={ventaSeleccionada.observaciones}
+                type="info"
+                showIcon
+              />
+            )}
+          </Space>
         )}
       </Modal>
     </div>

@@ -62,6 +62,8 @@ app.use(
  * error handler middleware
  */
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('❌ ERROR EN EL SERVIDOR:', error);
+  console.error('Stack:', error.stack);
   res.status(500).json({
     success: false,
     error: 'Server internal error',

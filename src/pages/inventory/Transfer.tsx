@@ -22,13 +22,22 @@ import {
   Tooltip,
   Alert,
   List,
-  Checkbox
+  Checkbox,
+  Tabs,
+  Select,
+  Badge
 } from 'antd';
 import { 
   SearchOutlined, 
   SendOutlined, 
   ReloadOutlined,
-  WarningOutlined 
+  WarningOutlined,
+  HistoryOutlined,
+  PrinterOutlined,
+  FilterOutlined,
+  SwapOutlined,
+  MinusOutlined,
+  PlusOutlined
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { 
@@ -124,6 +133,14 @@ const Transfer: React.FC = () => {
   const [ventasPorSucursal, setVentasPorSucursal] = useState<{
     [sucursal: string]: VentasPorProducto[];
   }>({});
+  
+  // Estados del historial
+  const [activeTab, setActiveTab] = useState<'transfers' | 'history'>('transfers');
+  const [historial, setHistorial] = useState<any[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const [historialFechaDesde, setHistorialFechaDesde] = useState<Dayjs | null>(dayjs().subtract(30, 'days'));
+  const [historialFechaHasta, setHistorialFechaHasta] = useState<Dayjs | null>(dayjs());
+  const [historialSucursal, setHistorialSucursal] = useState<string>('todas');
   
   /**
    * ===================================
@@ -308,6 +325,61 @@ const Transfer: React.FC = () => {
 
   /**
    * ===================================
+   * CARGAR HISTORIAL DE TRANSFERENCIAS
+   * ===================================
+   */
+  const cargarHistorial = async () => {
+    setLoadingHistorial(true);
+    try {
+      const token = localStorage.getItem('token');
+      console.log('🔑 Token en localStorage:', token ? 'Existe' : 'No existe');
+      console.log('🔑 Token completo:', token);
+      console.log('🔑 Token length:', token?.length);
+      
+      const params = new URLSearchParams();
+      
+      if (historialFechaDesde) {
+        params.append('fecha_desde', historialFechaDesde.format('YYYY-MM-DD'));
+      }
+      if (historialFechaHasta) {
+        params.append('fecha_hasta', historialFechaHasta.format('YYYY-MM-DD'));
+      }
+      if (historialSucursal && historialSucursal !== 'todas') {
+        params.append('sucursal_destino', historialSucursal);
+      }
+      
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3456/api'}/productos/historial-transferencias?${params.toString()}`;
+      console.log('📡 URL:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('📊 Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Error response:', errorData);
+        throw new Error(errorData.error || 'Error al cargar historial');
+      }
+      
+      const data = await response.json();
+      console.log('✅ Historial cargado:', data.data?.length || 0, 'registros');
+      setHistorial(data.data || []);
+      
+    } catch (error) {
+      console.error('Error al cargar historial:', error);
+      message.error('Error al cargar historial de transferencias');
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  /**
+   * ===================================
    * EFFECTS
    * ===================================
    */
@@ -328,6 +400,13 @@ const Transfer: React.FC = () => {
       cargarVentas();
     }
   }, [productos.length, sucursales.length, dateRange]);
+  
+  // Effect para cargar historial cuando se cambia de tab o filtros
+  useEffect(() => {
+    if (activeTab === 'history') {
+      cargarHistorial();
+    }
+  }, [activeTab, historialFechaDesde, historialFechaHasta, historialSucursal]);
 
   /**
    * ===================================
@@ -509,15 +588,21 @@ const Transfer: React.FC = () => {
    */
   const handleEnviarClick = () => {
     const totalPending = getTotalPendingTransfers();
+    console.log('🔍 DEBUG handleEnviarClick:');
+    console.log('Total pending:', totalPending);
+    console.log('pendingTransfers:', JSON.stringify(pendingTransfers, null, 2));
+    
     if (totalPending > 0) {
       // Inicializar estado del modal con copias de pendingTransfers
       setModalTransfers(JSON.parse(JSON.stringify(pendingTransfers)));
       
-      // Seleccionar todos por defecto
+      // ❌ NO seleccionar por defecto - el usuario debe hacerlo manualmente
       const selections: { [key: string]: boolean } = {};
       Object.entries(pendingTransfers).forEach(([productoId, sucursales]) => {
         Object.keys(sucursales).forEach(sucursal => {
-          selections[`${productoId}-${sucursal}`] = true;
+          const cantidad = sucursales[sucursal];
+          console.log(`Producto ${productoId} -> Sucursal ${sucursal}: ${cantidad} unidades`);
+          selections[`${productoId}-${sucursal}`] = false; // ⚠️ Cambiado a false
         });
       });
       setSelectedTransfers(selections);
@@ -610,6 +695,9 @@ const Transfer: React.FC = () => {
       // Confirmar transferencias (stock_en_transito → stock real)
       await productosService.confirmarTransferencia(transferenciasAConfirmar);
       
+      // 🔄 RECARGAR PRODUCTOS DESDE LA BASE DE DATOS para actualizar stock_en_transito
+      await cargarProductos();
+      
       // Mostrar resultados
       Modal.success({
         title: '✅ Transferencias Confirmadas',
@@ -632,7 +720,7 @@ const Transfer: React.FC = () => {
             />
             <Alert
               message="Stock actualizado"
-              description="El stock en tránsito se ha sumado al stock real de cada sucursal."
+              description="El stock en tránsito se ha sumado al stock real de cada sucursal y los avisos 'En camino' han sido eliminados."
               type="success"
               showIcon
               style={{ marginTop: 12 }}
@@ -710,10 +798,11 @@ const Transfer: React.FC = () => {
       title: 'Tipo',
       dataIndex: 'tipo',
       key: 'tipo',
+      fixed: 'left' as const,
       width: 120,
       render: (tipo: string) => tipo ? <Tag color="blue">{tipo}</Tag> : '-'
     },
-    // Columna Sucursal Principal (Casa Central) - Siempre primero (DINÁMICO)
+    // Columna Sucursal Principal (Casa Central) - Siempre primero (DINÁMICO) - FIJA AL HACER SCROLL
     {
       title: () => (
         <div style={{ textAlign: 'center' }}>
@@ -722,6 +811,7 @@ const Transfer: React.FC = () => {
         </div>
       ),
       key: sucursalPrincipal || 'principal',
+      fixed: 'left' as const,
       width: 150,
       render: (record: ProductoTransfer) => {
         const stockPrincipal = record.sucursales?.[sucursalPrincipal]?.stock || 0;
@@ -800,28 +890,6 @@ const Transfer: React.FC = () => {
                 </div>
               </Tooltip>
               
-              {/* Stock a enviar (solo si hay cantidad pendiente) */}
-              {pendingTransfers[record.id]?.[suc] > 0 && (
-                <Tooltip title="Cantidad que se enviará a esta sucursal">
-                  <div style={{ 
-                    color: '#52c41a', 
-                    fontSize: '11px', 
-                    fontWeight: 'bold',
-                    backgroundColor: '#f6ffed',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    border: '1px solid #b7eb8f',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    <span style={{ fontSize: '13px' }}>🚀</span>
-                    <span>A enviar: {pendingTransfers[record.id][suc]}</span>
-                  </div>
-                </Tooltip>
-              )}
-              
               {/* Ventas del período - SIEMPRE visible */}
               <Tooltip title={ventas > 0 ? "Vendidas en el período seleccionado" : "No hay ventas en el período seleccionado"}>
                 <div style={{ 
@@ -874,7 +942,193 @@ const Transfer: React.FC = () => {
           );
         }
       }))
-  ], [sucursales]);
+  ], [sucursales, sucursalPrincipal, pendingTransfers]);
+
+  /**
+   * ===================================
+   * COLUMNAS DEL HISTORIAL
+   * ===================================
+   */
+  const columnasHistorial = [
+    {
+      title: 'Fecha',
+      dataIndex: 'fecha_envio',
+      key: 'fecha_envio',
+      width: 180,
+      render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm'),
+      sorter: (a: any, b: any) => dayjs(a.fecha_envio).valueOf() - dayjs(b.fecha_envio).valueOf(),
+    },
+    {
+      title: 'Producto',
+      dataIndex: 'producto_nombre',
+      key: 'producto_nombre',
+      width: 250,
+    },
+    {
+      title: 'Origen',
+      dataIndex: 'sucursal_origen',
+      key: 'sucursal_origen',
+      width: 150,
+      render: (sucursal: string) => (
+        <Tag color="blue">{sucursal.toUpperCase()}</Tag>
+      ),
+    },
+    {
+      title: 'Destino',
+      dataIndex: 'sucursal_destino',
+      key: 'sucursal_destino',
+      width: 150,
+      render: (sucursal: string) => (
+        <Tag color="green">{sucursal.toUpperCase()}</Tag>
+      ),
+    },
+    {
+      title: 'Cantidad',
+      dataIndex: 'cantidad',
+      key: 'cantidad',
+      width: 120,
+      align: 'center' as const,
+      render: (cantidad: number) => (
+        <Badge count={cantidad} showZero color="#52c41a" />
+      ),
+    },
+    {
+      title: 'Usuario',
+      dataIndex: 'usuario_email',
+      key: 'usuario_email',
+      width: 200,
+    },
+  ];
+
+  /**
+   * ===================================
+   * FUNCIÓN DE IMPRESIÓN
+   * ===================================
+   */
+  const handleImprimir = () => {
+    const ventanaImpresion = window.open('', '_blank');
+    if (!ventanaImpresion) {
+      message.error('No se pudo abrir la ventana de impresión');
+      return;
+    }
+    
+    const fechaReporte = dayjs().format('DD/MM/YYYY HH:mm');
+    const rangoFechas = `${historialFechaDesde?.format('DD/MM/YYYY')} - ${historialFechaHasta?.format('DD/MM/YYYY')}`;
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Historial de Transferencias - Sistema ZARPAR</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 20px;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #1890ff;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              margin: 0;
+              color: #1890ff;
+            }
+            .info {
+              margin: 20px 0;
+              padding: 15px;
+              background-color: #f0f2f5;
+              border-radius: 4px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #d9d9d9;
+              padding: 12px;
+              text-align: left;
+            }
+            th {
+              background-color: #1890ff;
+              color: white;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #fafafa;
+            }
+            .footer {
+              margin-top: 30px;
+              text-align: center;
+              font-size: 12px;
+              color: #8c8c8c;
+            }
+            @media print {
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>📦 Sistema ZARPAR</h1>
+            <h2>Historial de Transferencias de Mercadería</h2>
+          </div>
+          
+          <div class="info">
+            <p><strong>Fecha del Reporte:</strong> ${fechaReporte}</p>
+            <p><strong>Período:</strong> ${rangoFechas}</p>
+            <p><strong>Sucursal:</strong> ${historialSucursal === 'todas' ? 'Todas las sucursales' : historialSucursal.toUpperCase()}</p>
+            <p><strong>Total de Transferencias:</strong> ${historial.length}</p>
+            <p><strong>Total de Unidades:</strong> ${historial.reduce((sum, h) => sum + h.cantidad, 0)}</p>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Producto</th>
+                <th>Origen</th>
+                <th>Destino</th>
+                <th>Cantidad</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${historial.map(h => `
+                <tr>
+                  <td>${dayjs(h.fecha_envio).format('DD/MM/YYYY HH:mm')}</td>
+                  <td>${h.producto_nombre}</td>
+                  <td>${h.sucursal_origen.toUpperCase()}</td>
+                  <td>${h.sucursal_destino.toUpperCase()}</td>
+                  <td style="text-align: center;">${h.cantidad}</td>
+                  <td>${h.usuario_email}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="footer">
+            <p>Sistema ZARPAR - Gestión de Inventario</p>
+            <p>Documento generado automáticamente</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    
+    ventanaImpresion.document.write(html);
+    ventanaImpresion.document.close();
+  };
 
   /**
    * ===================================
@@ -886,7 +1140,25 @@ const Transfer: React.FC = () => {
       <Card>
         {/* Header */}
         <div className="transfer-header">
-          <Title level={2}>Transferencia de Mercadería</Title>
+          <Title level={2}>📦 Gestión de Transferencias de Mercadería</Title>
+        </div>
+        
+        {/* Tabs: Transferencias y Historial */}
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key as 'transfers' | 'history')}
+          items={[
+            {
+              key: 'transfers',
+              label: (
+                <span>
+                  <SwapOutlined /> Transferencias
+                </span>
+              ),
+              children: (
+                <>
+                  {/* Barra de búsqueda */}
+                  <div style={{ marginBottom: 16 }}>
           <Search
             placeholder="Buscar producto..."
             allowClear
@@ -919,20 +1191,6 @@ const Transfer: React.FC = () => {
               <Card size="small" className="stat-card">
                 <div className="stat-number">{sucursales.length - 1}</div>
                 <div className="stat-label">Sucursales</div>
-              </Card>
-              
-              <Card size="small" className="stat-card" style={{ minWidth: '220px' }}>
-                <div className="stat-label" style={{ marginBottom: '8px' }}>
-                  Período de Ventas
-                </div>
-                <RangePicker
-                  size="small"
-                  value={dateRange}
-                  onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null])}
-                  format="DD/MM/YYYY"
-                  placeholder={['Desde', 'Hasta']}
-                  style={{ width: '100%' }}
-                />
               </Card>
             </Space>
             
@@ -1025,6 +1283,141 @@ const Transfer: React.FC = () => {
             className="transfer-table"
           />
         </Spin>
+                </>
+              ),
+            },
+            {
+              key: 'history',
+              label: (
+                <span>
+                  <HistoryOutlined /> Historial
+                  {historial.length > 0 && (
+                    <Badge
+                      count={historial.length}
+                      style={{ marginLeft: 8 }}
+                      overflowCount={999}
+                    />
+                  )}
+                </span>
+              ),
+              children: (
+                <>
+                  {/* Filtros del historial */}
+                  <div style={{ marginBottom: 24 }}>
+                    <Space size="large" wrap>
+                      <div>
+                        <Text strong style={{ marginRight: 8 }}>
+                          <FilterOutlined /> Filtros:
+                        </Text>
+                      </div>
+                      
+                      <div>
+                        <Text style={{ marginRight: 8 }}>Período:</Text>
+                        <RangePicker
+                          value={[historialFechaDesde, historialFechaHasta]}
+                          onChange={(dates) => {
+                            setHistorialFechaDesde(dates?.[0] || null);
+                            setHistorialFechaHasta(dates?.[1] || null);
+                          }}
+                          format="DD/MM/YYYY"
+                          placeholder={['Desde', 'Hasta']}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Text style={{ marginRight: 8 }}>Sucursal:</Text>
+                        <Select
+                          value={historialSucursal}
+                          onChange={setHistorialSucursal}
+                          style={{ width: 180 }}
+                          options={[
+                            { label: 'Todas las sucursales', value: 'todas' },
+                            ...sucursales
+                              .filter(s => s.toLowerCase() !== sucursalPrincipal.toLowerCase())
+                              .map(s => ({ label: s.toUpperCase(), value: s }))
+                          ]}
+                        />
+                      </div>
+                      
+                      <Button
+                        icon={<ReloadOutlined />}
+                        onClick={cargarHistorial}
+                        loading={loadingHistorial}
+                      >
+                        Actualizar
+                      </Button>
+                      
+                      <Button
+                        type="primary"
+                        icon={<PrinterOutlined />}
+                        onClick={handleImprimir}
+                        disabled={historial.length === 0}
+                      >
+                        Imprimir Reporte
+                      </Button>
+                    </Space>
+                  </div>
+                  
+                  {/* Estadísticas del historial */}
+                  <div style={{ marginBottom: 24 }}>
+                    <Space size="large">
+                      <Card size="small">
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1890ff' }}>
+                            {historial.length}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                            Transferencias
+                          </div>
+                        </div>
+                      </Card>
+                      
+                      <Card size="small">
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>
+                            {historial.reduce((sum, h) => sum + h.cantidad, 0)}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                            Unidades Totales
+                          </div>
+                        </div>
+                      </Card>
+                      
+                      <Card size="small">
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fa8c16' }}>
+                            {new Set(historial.map(h => h.producto_id)).size}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                            Productos Diferentes
+                          </div>
+                        </div>
+                      </Card>
+                    </Space>
+                  </div>
+                  
+                  {/* Tabla del historial */}
+                  <Table
+                    columns={columnasHistorial}
+                    dataSource={historial}
+                    rowKey="id"
+                    loading={loadingHistorial}
+                    scroll={{ x: 1200 }}
+                    pagination={{
+                      pageSize: 20,
+                      showSizeChanger: true,
+                      showQuickJumper: true,
+                      showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} registros`,
+                    }}
+                    locale={{
+                      emptyText: 'No hay transferencias registradas en este período'
+                    }}
+                  />
+                </>
+              ),
+            },
+          ]}
+        />
       </Card>
       
       {/* Modal de confirmación */}
@@ -1043,12 +1436,16 @@ const Transfer: React.FC = () => {
           setIsConfirmModalVisible(false);
           message.info('Transferencia cancelada. No se realizaron cambios.');
         }}
-        okText="✅ SÍ, ENVIAR STOCK"
-        cancelText="❌ NO, CANCELAR"
+        okText="📦 Enviar"
+        cancelText="❌ Cancelar"
         okButtonProps={{ 
           danger: false, 
           size: 'large',
-          style: { fontWeight: 'bold' }
+          style: { 
+            fontWeight: 'bold',
+            backgroundColor: '#52c41a',
+            borderColor: '#52c41a'
+          }
         }}
         cancelButtonProps={{ 
           size: 'large',
@@ -1127,9 +1524,22 @@ const Transfer: React.FC = () => {
           </Space>
         </Card>
 
+        {/* ⚠️ ALERTA IMPORTANTE: Seleccionar sucursales */}
+        <Alert
+          message="⚠️ ¡ATENCIÓN! Debes seleccionar las sucursales"
+          description="Por defecto NINGUNA sucursal está seleccionada. Marca las casillas ✅ de las sucursales a las que deseas enviar stock."
+          type="warning"
+          showIcon
+          style={{ 
+            marginBottom: 16,
+            border: '2px solid #faad14',
+            backgroundColor: '#fffbe6'
+          }}
+        />
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Title level={5} style={{ margin: 0 }}>
-            📦 Detalle por sucursal - Selecciona y edita:
+          <Title level={5} style={{ margin: 0, color: '#fa8c16' }}>
+            ⚠️ Selecciona las sucursales que recibirán el stock:
           </Title>
           <Space>
             <Button
@@ -1168,8 +1578,13 @@ const Transfer: React.FC = () => {
                 }[];
               } = {};
               
+              console.log('🔍 DEBUG modalTransfers en render:', JSON.stringify(modalTransfers, null, 2));
+              
               Object.entries(modalTransfers).forEach(([productoId, sucursales]) => {
+                console.log(`📦 Producto ${productoId}:`, sucursales);
                 Object.entries(sucursales).forEach(([sucursal, cantidad]) => {
+                  console.log(`  → Sucursal ${sucursal}: ${cantidad} unidades`);
+                  
                   if (!transferenciasAgrupadas[sucursal]) {
                     transferenciasAgrupadas[sucursal] = [];
                   }
@@ -1215,7 +1630,15 @@ const Transfer: React.FC = () => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '12px' }}>
-                          {/* Checkbox */}
+                          {/* Checkbox - MUY LLAMATIVO */}
+                          <div style={{
+                            padding: '4px',
+                            borderRadius: '8px',
+                            backgroundColor: isSelected ? '#f6ffed' : '#fff7e6',
+                            border: isSelected ? '3px solid #52c41a' : '3px solid #faad14',
+                            boxShadow: isSelected ? '0 0 10px rgba(82, 196, 26, 0.5)' : '0 0 10px rgba(250, 173, 20, 0.5)',
+                            animation: isSelected ? 'none' : 'pulse 2s infinite'
+                          }}>
                           <Checkbox
                             checked={isSelected}
                             onChange={(e) => {
@@ -1224,7 +1647,11 @@ const Transfer: React.FC = () => {
                                 [key]: e.target.checked
                               }));
                             }}
+                              style={{
+                                transform: 'scale(1.5)'
+                              }}
                           />
+                          </div>
                           
                           {/* Info del producto */}
                           <div style={{ flex: 1 }}>
@@ -1232,42 +1659,104 @@ const Transfer: React.FC = () => {
                             <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                               Stock disponible: <strong>{item.stock_principal}</strong>
                               {' → '}
-                              Quedará: <strong style={{ color: item.stock_principal - item.cantidad < 0 ? '#ff4d4f' : '#52c41a' }}>
-                                {item.stock_principal - item.cantidad}
+                              Quedará: <strong style={{ 
+                                color: item.stock_principal - (modalTransfers[item.producto_id]?.[sucursal] || 0) < 0 ? '#ff4d4f' : '#52c41a' 
+                              }}>
+                                {item.stock_principal - (modalTransfers[item.producto_id]?.[sucursal] || 0)}
                               </strong>
                             </div>
                           </div>
                           
-                          {/* Input editable */}
+                          {/* Selector de cantidad con botones + y - */}
                           <div style={{ textAlign: 'right' }}>
-                            <InputNumber
-                              size="small"
-                              min={0}
-                              max={item.stock_principal}
-                              value={item.cantidad}
-                              disabled={!isSelected}
-                              onChange={(value) => {
-                                if (value !== null) {
+                            {(() => {
+                              const currentValue = modalTransfers[item.producto_id]?.[sucursal] || 0;
+                              const maxValue = item.stock_principal;
+                              
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {/* Botón - */}
+                                  <Button
+                                    type="primary"
+                                    danger
+                                    shape="circle"
+                                    icon={<MinusOutlined />}
+                                    size="large"
+                                    disabled={!isSelected || currentValue <= 0}
+                                    onClick={() => {
+                                      const newValue = Math.max(0, currentValue - 1);
                                   setModalTransfers(prev => ({
                                     ...prev,
                                     [item.producto_id]: {
                                       ...prev[item.producto_id],
-                                      [sucursal]: value
+                                          [sucursal]: newValue
                                     }
                                   }));
-                                }
+                                    }}
+                                    style={{
+                                      boxShadow: '0 2px 8px rgba(255, 77, 79, 0.3)',
+                                      transition: 'all 0.3s'
+                                    }}
+                                  />
+                                  
+                                  {/* Display de cantidad */}
+                                  <div style={{
+                                    minWidth: '80px',
+                                    padding: '8px 16px',
+                                    backgroundColor: isSelected ? '#f6ffed' : '#f5f5f5',
+                                    border: isSelected ? '2px solid #52c41a' : '2px solid #d9d9d9',
+                                    borderRadius: '8px',
+                                    textAlign: 'center',
+                                    fontWeight: 'bold',
+                                    fontSize: '16px',
+                                    color: isSelected ? '#52c41a' : '#8c8c8c',
+                                    boxShadow: isSelected ? '0 0 8px rgba(82, 196, 26, 0.3)' : 'none',
+                                    transition: 'all 0.3s'
+                                  }}>
+                                    {currentValue}
+                                    <span style={{ fontSize: '12px', marginLeft: '4px', fontWeight: 'normal' }}>
+                                      unid
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Botón + */}
+                                  <Button
+                                    type="primary"
+                                    shape="circle"
+                                    icon={<PlusOutlined />}
+                                    size="large"
+                                    disabled={!isSelected || currentValue >= maxValue}
+                                    onClick={() => {
+                                      const newValue = Math.min(maxValue, currentValue + 1);
+                                      setModalTransfers(prev => ({
+                                        ...prev,
+                                        [item.producto_id]: {
+                                          ...prev[item.producto_id],
+                                          [sucursal]: newValue
+                                        }
+                                      }));
                               }}
                               style={{ 
-                                width: '80px',
-                                fontWeight: 'bold'
+                                      boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)',
+                                      transition: 'all 0.3s'
                               }}
-                              addonAfter="unid"
-                            />
-                            {item.stock_principal < item.cantidad && (
+                                  />
+                                </div>
+                              );
+                            })()}
+                            
+                            {/* Advertencia de stock insuficiente */}
+                            {(() => {
+                              const currentValue = modalTransfers[item.producto_id]?.[sucursal] || 0;
+                              if (item.stock_principal < currentValue) {
+                                return (
                               <div style={{ fontSize: '11px', color: '#ff4d4f', marginTop: '4px' }}>
                                 ⚠️ Stock insuficiente
                               </div>
-                            )}
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
                       </List.Item>
@@ -1286,7 +1775,8 @@ const Transfer: React.FC = () => {
                   <Text strong style={{ fontSize: '16px', color: '#1890ff' }}>
                     {items.reduce((sum, i) => {
                       const key = `${i.producto_id}-${sucursal}`;
-                      return selectedTransfers[key] ? sum + i.cantidad : sum;
+                      const cantidadActual = modalTransfers[i.producto_id]?.[sucursal] || 0;
+                      return selectedTransfers[key] ? sum + cantidadActual : sum;
                     }, 0)} unidades
                   </Text>
                 </div>
