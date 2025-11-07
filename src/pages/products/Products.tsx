@@ -4,7 +4,7 @@
  * Sistema ZARPAR
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -41,7 +41,8 @@ import {
   TagOutlined,
   SettingOutlined,
   ThunderboltOutlined,
-  RocketOutlined
+  RocketOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth } from '../../contexts/AuthContext';
@@ -107,6 +108,10 @@ const Products: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [loadingSucursales, setLoadingSucursales] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Estados para selección y eliminación de productos
+  const [productosSeleccionados, setProductosSeleccionados] = useState<number[]>([]);
+  const [loadingEliminar, setLoadingEliminar] = useState(false);
 
   // Estados para categorías (marcas, tipos y calidades)
   const [marcas, setMarcas] = useState<Array<{ id: number; valor: string }>>([]);
@@ -140,6 +145,21 @@ const Products: React.FC = () => {
   const [formCrear] = Form.useForm();
   const [formEditar] = Form.useForm();
   const [formStock] = Form.useForm();
+
+  /**
+   * Orden de prioridad para tipos de producto
+   */
+  const obtenerOrdenTipo = (tipo: string): number => {
+    const orden: { [key: string]: number } = {
+      'Display': 1,
+      'Batería': 2,
+      'Flex': 3,
+      'Placa Carga': 4,
+      'Botón': 5,
+      'Antena': 6
+    };
+    return orden[tipo] || 999; // Cualquier otro tipo va al final
+  };
 
   /**
    * Cargar sucursales disponibles desde la base de datos
@@ -177,7 +197,17 @@ const Products: React.FC = () => {
     setLoading(true);
     try {
       const data = await productosService.obtenerPorSucursal(sucursalSeleccionada);
-      setProductos(data);
+      // Ordenar productos por tipo: Display, Batería, Flex, etc.
+      const datosOrdenados = [...data].sort((a, b) => {
+        const ordenA = obtenerOrdenTipo(a.tipo);
+        const ordenB = obtenerOrdenTipo(b.tipo);
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB;
+        }
+        // Si son del mismo tipo, ordenar por nombre
+        return a.nombre.localeCompare(b.nombre);
+      });
+      setProductos(datosOrdenados);
     } catch (error) {
       console.error('Error al cargar productos:', error);
       message.error('Error al cargar productos');
@@ -381,7 +411,17 @@ const Products: React.FC = () => {
     setLoading(true);
     try {
       const data = await productosService.buscar(value, sucursalSeleccionada);
-      setProductos(data);
+      // Ordenar resultados de búsqueda por tipo
+      const datosOrdenados = [...data].sort((a, b) => {
+        const ordenA = obtenerOrdenTipo(a.tipo);
+        const ordenB = obtenerOrdenTipo(b.tipo);
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB;
+        }
+        // Si son del mismo tipo, ordenar por nombre
+        return a.nombre.localeCompare(b.nombre);
+      });
+      setProductos(datosOrdenados);
     } catch (error) {
       console.error('Error al buscar productos:', error);
       message.error('Error al buscar productos');
@@ -550,9 +590,119 @@ const Products: React.FC = () => {
   };
 
   /**
+   * ===================================
+   * FUNCIONES DE ELIMINACIÓN
+   * ===================================
+   */
+
+  /**
+   * Manejar selección/deselección de todos los productos
+   */
+  const handleSeleccionarTodos = (checked: boolean) => {
+    if (checked) {
+      const todosLosIds = productos.map(p => p.id);
+      setProductosSeleccionados(todosLosIds);
+    } else {
+      setProductosSeleccionados([]);
+    }
+  };
+
+  /**
+   * Manejar selección/deselección de un producto individual
+   */
+  const handleSeleccionarProducto = (id: number, checked: boolean) => {
+    if (checked) {
+      setProductosSeleccionados(prev => [...prev, id]);
+    } else {
+      setProductosSeleccionados(prev => prev.filter(pid => pid !== id));
+    }
+  };
+
+  /**
+   * Eliminar un producto individual
+   */
+  const handleEliminarProducto = async (id: number, nombre: string) => {
+    try {
+      setLoadingEliminar(true);
+      await productosService.eliminar(id);
+      message.success(`Producto "${nombre}" eliminado permanentemente`);
+      cargarProductos(); // Recargar lista
+      setProductosSeleccionados(prev => prev.filter(pid => pid !== id)); // Quitar de selección
+    } catch (error) {
+      console.error('Error al eliminar producto:', error);
+      message.error('Error al eliminar el producto');
+    } finally {
+      setLoadingEliminar(false);
+    }
+  };
+
+  /**
+   * Eliminar múltiples productos seleccionados
+   */
+  const handleEliminarSeleccionados = async () => {
+    if (productosSeleccionados.length === 0) {
+      message.warning('No hay productos seleccionados para eliminar');
+      return;
+    }
+
+    try {
+      setLoadingEliminar(true);
+      const resultado = await productosService.eliminarMultiple(productosSeleccionados);
+      message.success(
+        `${resultado.productosEliminados} producto(s) eliminado(s) permanentemente de la base de datos`
+      );
+      setProductosSeleccionados([]); // Limpiar selección
+      cargarProductos(); // Recargar lista
+    } catch (error) {
+      console.error('Error al eliminar productos:', error);
+      message.error('Error al eliminar los productos seleccionados');
+    } finally {
+      setLoadingEliminar(false);
+    }
+  };
+
+  /**
    * Columnas de la tabla
    */
+  /**
+   * Productos ordenados: Display primero, Batería segundo, resto después
+   * Se aplica el orden cada vez que cambian los productos
+   */
+  const productosOrdenados = useMemo(() => {
+    return [...productos].sort((a, b) => {
+      const ordenA = obtenerOrdenTipo(a.tipo);
+      const ordenB = obtenerOrdenTipo(b.tipo);
+      if (ordenA !== ordenB) {
+        return ordenA - ordenB;
+      }
+      // Si son del mismo tipo, ordenar por nombre
+      return a.nombre.localeCompare(b.nombre);
+    });
+  }, [productos]);
+
   const columns: ColumnsType<ProductoCompleto> = [
+    // 🔐 Columna de selección: SOLO para administradores
+    ...(esAdministrador ? [{
+      title: (
+        <input
+          type="checkbox"
+          checked={productosSeleccionados.length === productos.length && productos.length > 0}
+          onChange={(e) => handleSeleccionarTodos(e.target.checked)}
+          style={{ cursor: 'pointer' }}
+        />
+      ),
+      key: 'seleccion',
+      width: 50,
+      fixed: 'left' as const,
+      render: (_: any, record: ProductoCompleto) => (
+        <input
+          type="checkbox"
+          checked={productosSeleccionados.includes(record.id)}
+          onChange={(e) => handleSeleccionarProducto(record.id, e.target.checked)}
+          style={{ cursor: 'pointer' }}
+        />
+      )
+    }] : []),
     {
       title: 'Producto',
       dataIndex: 'nombre',
@@ -565,7 +715,7 @@ const Products: React.FC = () => {
       dataIndex: 'marca',
       key: 'marca',
       width: 120,
-      filters: marcas.map(m => ({ text: m, value: m })),
+      filters: marcas.map(m => ({ text: m.valor, value: m.valor })),
       onFilter: (value, record) => record.marca === value,
       render: (marca: string) => marca ? <Text>{marca}</Text> : <Text type="secondary">-</Text>
     },
@@ -574,9 +724,29 @@ const Products: React.FC = () => {
       dataIndex: 'tipo',
       key: 'tipo',
       width: 120,
-      filters: tipos.map(t => ({ text: t, value: t })),
+      filters: tipos.map(t => ({ text: t.valor, value: t.valor })),
       onFilter: (value, record) => record.tipo === value,
-      render: (tipo: string) => tipo ? <Tag color="blue">{tipo}</Tag> : <Text type="secondary">-</Text>
+      sorter: (a, b) => {
+        const ordenA = obtenerOrdenTipo(a.tipo);
+        const ordenB = obtenerOrdenTipo(b.tipo);
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB;
+        }
+        return a.nombre.localeCompare(b.nombre);
+      },
+      defaultSortOrder: 'ascend' as const,
+      render: (tipo: string) => {
+        // Colores según tipo para mejor visualización
+        const colorTipo: { [key: string]: string } = {
+          'Display': 'blue',
+          'Batería': 'green',
+          'Flex': 'purple',
+          'Placa Carga': 'orange',
+          'Botón': 'cyan',
+          'Antena': 'magenta'
+        };
+        return tipo ? <Tag color={colorTipo[tipo] || 'default'} style={{ fontSize: '10px' }}>{tipo}</Tag> : <Text type="secondary">-</Text>;
+      }
     },
     {
       title: 'Calidad',
@@ -663,7 +833,7 @@ const Products: React.FC = () => {
     ...(esAdministrador ? [{
       title: 'Acciones',
       key: 'acciones',
-      width: 180,
+      width: 200,
       fixed: 'right' as const,
       render: (_: any, record: ProductoCompleto) => (
         <Space>
@@ -682,6 +852,31 @@ const Products: React.FC = () => {
               size="small"
             />
           </Tooltip>
+          <Popconfirm
+            title="¿Eliminar producto?"
+            description={
+              <>
+                <Text>¿Estás seguro de eliminar <strong>"{record.nombre}"</strong>?</Text>
+                <br />
+                <Text type="danger" style={{ fontSize: '12px' }}>
+                  Esta acción es IRREVERSIBLE y eliminará el producto de todas las sucursales.
+                </Text>
+              </>
+            }
+            onConfirm={() => handleEliminarProducto(record.id, record.nombre)}
+            okText="Eliminar"
+            cancelText="Cancelar"
+            okButtonProps={{ danger: true }}
+          >
+            <Tooltip title="Eliminar producto">
+              <Button
+                icon={<DeleteOutlined />}
+                danger
+                size="small"
+                loading={loadingEliminar}
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       )
     }] : [])
@@ -750,6 +945,35 @@ const Products: React.FC = () => {
                   >
                     Gestionar Precios
                   </Button>
+
+                  {/* 🗑️ Botón Eliminar Seleccionados */}
+                  {productosSeleccionados.length > 0 && (
+                    <Popconfirm
+                      title={`¿Eliminar ${productosSeleccionados.length} producto(s)?`}
+                      description={
+                        <>
+                          <Text>Estás a punto de eliminar <strong>{productosSeleccionados.length}</strong> producto(s).</Text>
+                          <br />
+                          <Text type="danger" style={{ fontSize: '12px' }}>
+                            Esta acción es IRREVERSIBLE y eliminará los productos de TODAS las sucursales.
+                          </Text>
+                        </>
+                      }
+                      onConfirm={handleEliminarSeleccionados}
+                      okText="Eliminar Todos"
+                      cancelText="Cancelar"
+                      okButtonProps={{ danger: true, loading: loadingEliminar }}
+                    >
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        size="large"
+                        loading={loadingEliminar}
+                      >
+                        Eliminar Seleccionados ({productosSeleccionados.length})
+                      </Button>
+                    </Popconfirm>
+                  )}
                 </>
               )}
               <Button
@@ -853,7 +1077,7 @@ const Products: React.FC = () => {
       <Card>
           <Table
             columns={columns}
-          dataSource={productos}
+          dataSource={productosOrdenados}
           rowKey={(record) => `${record.id}-${sucursalSeleccionada}`}
           loading={loading}
             pagination={{

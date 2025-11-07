@@ -223,7 +223,7 @@ const importarProductosASucursal = async (nombreSucursal: string): Promise<numbe
           `INSERT INTO productos_sucursal 
            (producto_id, sucursal, stock, precio, stock_minimo, es_stock_principal, activo)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [producto.id, nombreSucursal.toLowerCase(), 0, precio, stockMinimo, 0, 1]
+          [producto.id, nombreSucursal.toLowerCase(), 100, precio, stockMinimo, 0, 1]
         );
         
         productosImportados++;

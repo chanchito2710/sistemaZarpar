@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty } from 'antd';
+import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col } from 'antd';
 import './MainLayout.css';
 import {
   UserOutlined,
@@ -13,6 +13,8 @@ import {
   BankOutlined,
   ReloadOutlined,
   ShoppingCartOutlined,
+  PrinterOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { menuItems } from '../../utils/menuItems';
@@ -32,6 +34,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [ventasDelDia, setVentasDelDia] = useState<any>(null);
   const [ultimasVentas, setUltimasVentas] = useState<any[]>([]);
   const [loadingVentas, setLoadingVentas] = useState(false);
+  
+  // Estados para modal de comprobante
+  const [modalComprobanteVisible, setModalComprobanteVisible] = useState(false);
+  const [ventaSeleccionada, setVentaSeleccionada] = useState<any>(null);
+  const [detallesVenta, setDetallesVenta] = useState<any[]>([]);
+  const [loadingComprobante, setLoadingComprobante] = useState(false);
+  
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
@@ -69,8 +78,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     };
 
     cargarUltimasVentas();
-    // Actualizar cada 2 minutos
-    const interval = setInterval(cargarUltimasVentas, 2 * 60 * 1000);
+    // Actualizar cada 1 minuto
+    const interval = setInterval(cargarUltimasVentas, 1 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -108,6 +117,196 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         return <CreditCardOutlined />;
       default:
         return <CreditCardOutlined />;
+    }
+  };
+
+  // Abrir modal de comprobante
+  const handleVerComprobante = async (ventaId: number) => {
+    try {
+      setLoadingComprobante(true);
+      setModalComprobanteVisible(true);
+      
+      const datos = await ventasService.obtenerDetalle(ventaId);
+      setVentaSeleccionada(datos);
+      setDetallesVenta(datos.productos || []);
+    } catch (error) {
+      console.error('Error al cargar comprobante:', error);
+    } finally {
+      setLoadingComprobante(false);
+    }
+  };
+
+  // Cerrar modal de comprobante
+  const handleCerrarComprobante = () => {
+    setModalComprobanteVisible(false);
+    setVentaSeleccionada(null);
+    setDetallesVenta([]);
+  };
+
+  // Imprimir comprobante
+  const imprimirComprobante = () => {
+    if (!ventaSeleccionada) return;
+
+    const metodoPagoTexto: Record<string, string> = {
+      efectivo: 'Efectivo',
+      transferencia: 'Transferencia',
+      cuenta_corriente: 'Cuenta Corriente',
+      tarjeta: 'Tarjeta',
+    };
+
+    const formatoFecha = (fecha: string) => {
+      try {
+        const date = new Date(fecha);
+        return date.toLocaleString('es-UY', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      } catch {
+        return 'Fecha no disponible';
+      }
+    };
+
+    const contenidoImpresion = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Comprobante - ${ventaSeleccionada.numero_venta}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: 'Courier New', monospace; 
+              padding: 20px; 
+              background: white;
+              color: black;
+            }
+            .comprobante { 
+              max-width: 300px; 
+              margin: 0 auto; 
+              border: 2px solid #000;
+              padding: 15px;
+            }
+            .header { text-align: center; margin-bottom: 15px; }
+            .header h1 { font-size: 18px; margin-bottom: 5px; }
+            .header p { font-size: 11px; margin: 2px 0; }
+            .divider { border-top: 1px dashed #000; margin: 10px 0; }
+            .info-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 5px 0;
+              font-size: 11px;
+            }
+            .info-row strong { font-weight: bold; }
+            .productos { margin: 10px 0; }
+            .producto-item { margin: 8px 0; font-size: 11px; }
+            .producto-item .nombre { font-weight: bold; }
+            .producto-item .detalle { 
+              display: flex; 
+              justify-content: space-between;
+              margin-top: 2px;
+            }
+            .totales { margin-top: 15px; }
+            .total-item { 
+              display: flex; 
+              justify-content: space-between;
+              margin: 5px 0;
+              font-size: 12px;
+            }
+            .total-item.final { 
+              font-size: 16px; 
+              font-weight: bold; 
+              margin-top: 10px;
+              padding-top: 10px;
+              border-top: 2px solid #000;
+            }
+            .footer { 
+              text-align: center; 
+              margin-top: 15px; 
+              font-size: 10px;
+            }
+            @media print {
+              body { padding: 0; }
+              @page { margin: 0.5cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="comprobante">
+            <div class="header">
+              <h1>SISTEMA ZARPAR</h1>
+              <p>Sucursal: ${ventaSeleccionada.sucursal.toUpperCase()}</p>
+              <p>Fecha: ${formatoFecha(ventaSeleccionada.fecha_venta)}</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="info-row">
+              <strong>N° Venta:</strong>
+              <span>${ventaSeleccionada.numero_venta}</span>
+            </div>
+            <div class="info-row">
+              <strong>Cliente:</strong>
+              <span>${ventaSeleccionada.cliente_nombre || 'Sin nombre'}</span>
+            </div>
+            <div class="info-row">
+              <strong>Método de Pago:</strong>
+              <span>${metodoPagoTexto[ventaSeleccionada.metodo_pago] || ventaSeleccionada.metodo_pago}</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="productos">
+              <strong style="font-size: 12px;">PRODUCTOS</strong>
+              ${detallesVenta.map(item => `
+                <div class="producto-item">
+                  <div class="nombre">${item.nombre}</div>
+                  <div class="detalle">
+                    <span>${item.cantidad} x $${item.precio.toFixed(2)}</span>
+                    <strong>$${item.subtotal.toFixed(2)}</strong>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="totales">
+              <div class="total-item">
+                <span>Subtotal:</span>
+                <strong>$${Number(ventaSeleccionada.subtotal).toFixed(2)}</strong>
+              </div>
+              ${Number(ventaSeleccionada.descuento) > 0 ? `
+                <div class="total-item">
+                  <span>Descuento:</span>
+                  <strong style="color: #f5222d;">-$${Number(ventaSeleccionada.descuento).toFixed(2)}</strong>
+                </div>
+              ` : ''}
+              <div class="total-item final">
+                <span>TOTAL:</span>
+                <span>$${Number(ventaSeleccionada.total).toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="footer">
+              <p>¡Gracias por su compra!</p>
+              <p>Sistema ZARPAR</p>
+            </div>
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+
+    const ventanaImpresion = window.open('', '_blank', 'width=800,height=600');
+    if (ventanaImpresion) {
+      ventanaImpresion.document.write(contenidoImpresion);
+      ventanaImpresion.document.close();
     }
   };
 
@@ -218,7 +417,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: collapsed ? 'center' : 'flex-start',
-            padding: collapsed ? '0' : '0 24px',
+            paddingTop: 0,
+            paddingBottom: 0,
+            paddingLeft: collapsed ? 0 : 24,
+            paddingRight: collapsed ? 0 : 24,
             borderBottom: `1px solid ${token.colorBorderSecondary}`,
             background: token.colorBgContainer,
           }}
@@ -294,7 +496,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
         {/* Métricas en el sidebar */}
         <div style={{ 
-          padding: collapsed ? '12px 8px' : '12px 16px',
+          paddingTop: 12,
+          paddingBottom: 12,
+          paddingLeft: collapsed ? 8 : 16,
+          paddingRight: collapsed ? 8 : 16,
           display: 'flex',
           flexDirection: 'column',
           gap: '12px'
@@ -303,7 +508,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           <div style={{
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             borderRadius: '10px',
-            padding: collapsed ? '10px 8px' : '12px',
+            paddingTop: collapsed ? 10 : 12,
+            paddingBottom: collapsed ? 10 : 12,
+            paddingLeft: collapsed ? 8 : 12,
+            paddingRight: collapsed ? 8 : 12,
             boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
           }}>
             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.9)', marginBottom: '4px', fontWeight: 500 }}>
@@ -323,7 +531,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           <div style={{
             background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
             borderRadius: '10px',
-            padding: collapsed ? '10px 8px' : '12px',
+            paddingTop: collapsed ? 10 : 12,
+            paddingBottom: collapsed ? 10 : 12,
+            paddingLeft: collapsed ? 8 : 12,
+            paddingRight: collapsed ? 8 : 12,
             boxShadow: '0 2px 8px rgba(59, 130, 246, 0.2)',
           }}>
             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.9)', marginBottom: '4px', fontWeight: 500 }}>
@@ -438,20 +649,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                           {venta.cliente_nombre}
                         </Text>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text 
-                          type="secondary" 
-                          style={{ 
-                            fontSize: 8,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            flex: 1
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                        <Button
+                          type="primary"
+                          size="small"
+                          onClick={() => handleVerComprobante(venta.id)}
+                          style={{
+                            fontSize: 9,
+                            height: 20,
+                            padding: '0 8px',
+                            borderRadius: 4
                           }}
-                          title={venta.primer_producto}
                         >
-                          📦 {venta.primer_producto || 'Sin productos'}
-                        </Text>
+                          Ver
+                        </Button>
                         <Tag 
                           color={getMetodoPagoColor(venta.metodo_pago)}
                           icon={getMetodoPagoIcon(venta.metodo_pago)}
@@ -576,6 +787,195 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           {children || <Outlet />}
         </Content>
       </Layout>
+
+      {/* Modal de Comprobante */}
+      <Modal
+        title={
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <CheckCircleOutlined
+              style={{
+                fontSize: 36,
+                color: '#52c41a',
+                marginBottom: 8,
+                display: 'block',
+              }}
+            />
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              Comprobante de Venta
+            </Typography.Title>
+          </div>
+        }
+        open={modalComprobanteVisible}
+        onCancel={handleCerrarComprobante}
+        footer={[
+          <Button key="cerrar" onClick={handleCerrarComprobante}>
+            Cerrar
+          </Button>,
+          <Button
+            key="imprimir"
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={imprimirComprobante}
+            disabled={!ventaSeleccionada}
+          >
+            Imprimir Comprobante
+          </Button>,
+        ]}
+        width={500}
+        centered
+      >
+        {loadingComprobante ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Spin size="large" />
+            <div style={{ marginTop: 16 }}>Cargando comprobante...</div>
+          </div>
+        ) : ventaSeleccionada ? (
+          <div>
+            {/* Información de la venta */}
+            <Row gutter={[16, 12]} style={{ marginBottom: 16 }}>
+              <Col span={12}>
+                <Text strong>N° Venta:</Text>
+              </Col>
+              <Col span={12} style={{ textAlign: 'right' }}>
+                <Tag color="blue">{ventaSeleccionada.numero_venta}</Tag>
+              </Col>
+
+              <Col span={12}>
+                <Text strong>Sucursal:</Text>
+              </Col>
+              <Col span={12} style={{ textAlign: 'right' }}>
+                <Text>{ventaSeleccionada.sucursal.toUpperCase()}</Text>
+              </Col>
+
+              <Col span={12}>
+                <Text strong>Cliente:</Text>
+              </Col>
+              <Col span={12} style={{ textAlign: 'right' }}>
+                <Text>{ventaSeleccionada.cliente_nombre || 'Sin nombre'}</Text>
+              </Col>
+
+              <Col span={12}>
+                <Text strong>Fecha:</Text>
+              </Col>
+              <Col span={12} style={{ textAlign: 'right' }}>
+                <Text type="secondary">
+                  {new Date(ventaSeleccionada.fecha_venta).toLocaleString('es-UY', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </Col>
+
+              <Col span={12}>
+                <Text strong>Método de Pago:</Text>
+              </Col>
+              <Col span={12} style={{ textAlign: 'right' }}>
+                <Tag color="green">
+                  {ventaSeleccionada.metodo_pago === 'efectivo' && 'Efectivo'}
+                  {ventaSeleccionada.metodo_pago === 'transferencia' && 'Transferencia'}
+                  {ventaSeleccionada.metodo_pago === 'cuenta_corriente' && 'Cuenta Corriente'}
+                  {ventaSeleccionada.metodo_pago === 'tarjeta' && 'Tarjeta'}
+                </Tag>
+              </Col>
+            </Row>
+
+            <Divider />
+
+            {/* Productos */}
+            <Typography.Title level={5} style={{ marginBottom: 12 }}>
+              Productos
+            </Typography.Title>
+            <Space direction="vertical" style={{ width: '100%' }} size="small">
+              {detallesVenta.map((item, index) => (
+                <div
+                  key={index}
+                  style={{
+                    background: '#fafafa',
+                    padding: 12,
+                    borderRadius: 6,
+                    border: '1px solid #f0f0f0',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Text strong>{item.nombre}</Text>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: 4,
+                    }}
+                  >
+                    <Text type="secondary">
+                      {item.cantidad} x ${item.precio.toFixed(2)}
+                    </Text>
+                    <Text strong style={{ color: '#1890ff' }}>
+                      ${item.subtotal.toFixed(2)}
+                    </Text>
+                  </div>
+                </div>
+              ))}
+            </Space>
+
+            <Divider />
+
+            {/* Totales */}
+            <div style={{ marginBottom: 8 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: 8,
+                }}
+              >
+                <Text>Subtotal:</Text>
+                <Text strong>${Number(ventaSeleccionada.subtotal).toFixed(2)}</Text>
+              </div>
+              {Number(ventaSeleccionada.descuento) > 0 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text>Descuento:</Text>
+                  <Text strong style={{ color: '#f5222d' }}>
+                    -${Number(ventaSeleccionada.descuento).toFixed(2)}
+                  </Text>
+                </div>
+              )}
+              <Divider style={{ margin: '12px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography.Title level={4} style={{ margin: 0 }}>
+                  TOTAL:
+                </Typography.Title>
+                <Typography.Title level={4} style={{ margin: 0, color: '#52c41a' }}>
+                  ${Number(ventaSeleccionada.total).toFixed(2)}
+                </Typography.Title>
+              </div>
+            </div>
+
+            <Divider />
+
+            {/* Footer */}
+            <div style={{ textAlign: 'center' }}>
+              <Text type="secondary">¡Gracias por su compra!</Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Sistema ZARPAR
+              </Text>
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Text type="secondary">No se encontró el comprobante</Text>
+          </div>
+        )}
+      </Modal>
     </Layout>
   );
 };

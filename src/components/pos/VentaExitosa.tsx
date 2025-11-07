@@ -5,8 +5,11 @@ import {
   PrinterOutlined,
   CloseOutlined,
   CheckCircleOutlined,
+  FilePdfOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import type { Venta } from '../../services/api';
 import './VentaExitosa.css';
 
@@ -18,6 +21,7 @@ interface VentaExitosaProps {
   carrito: Array<{
     producto_id: number;
     nombre: string;
+    tipo?: string; // ⭐ NUEVO: Tipo de producto
     marca?: string;
     precio: number;
     cantidad: number;
@@ -43,10 +47,14 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
     fecha_venta: venta?.fecha_venta || new Date().toISOString(),
   };
 
-  // Debug: verificar que el nombre del cliente esté presente
+  // Debug: verificar datos de la venta
   if (!venta?.cliente_nombre) {
     console.warn('⚠️ VentaExitosa: cliente_nombre no está presente en venta', venta);
   }
+  if (!venta?.sucursal) {
+    console.warn('⚠️ VentaExitosa: sucursal no está presente en venta', venta);
+  }
+  console.log('🏪 Sucursal recibida:', venta?.sucursal);
 
   useEffect(() => {
     if (visible) {
@@ -162,6 +170,7 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
               ${carrito && carrito.length > 0 ? carrito.map(item => `
                 <div style="margin: 10px 0; padding: 8px; border-bottom: 1px dashed #ccc;">
                   <div style="font-weight: bold; font-size: 13px;">${item.nombre}</div>
+                  ${item.tipo ? `<div style="font-size: 11px; color: #1890ff; font-weight: 500;">${item.tipo}</div>` : ''}
                   ${item.marca ? `<div style="font-size: 11px; color: #666;">${item.marca}</div>` : ''}
                   <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px;">
                     <span>${item.cantidad} x $${Number(item.precio || 0).toFixed(2)}</span>
@@ -213,6 +222,175 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
         ventanaImpresion.print();
       }, 250);
     }
+  };
+
+  const descargarComprobantePDF = () => {
+    const doc = new jsPDF();
+
+    // ========================================
+    // 1. HEADER - Logo y título
+    // ========================================
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ZARPAR', 105, 20, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Sucursal: ${ventaSafe.sucursal.toUpperCase()}`, 105, 28, { align: 'center' });
+
+    // Línea separadora
+    doc.setLineWidth(0.5);
+    doc.line(20, 33, 190, 33);
+
+    // ========================================
+    // 2. INFORMACIÓN DE LA VENTA
+    // ========================================
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('COMPROBANTE DE VENTA', 105, 42, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+
+    let yPos = 52;
+
+    // Número de venta
+    doc.setFont('helvetica', 'bold');
+    doc.text('N° Venta:', 20, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(ventaSafe.numero_venta, 60, yPos);
+
+    // Fecha
+    yPos += 7;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Fecha:', 20, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatoFecha(ventaSafe.fecha_venta), 60, yPos);
+
+    // Cliente
+    yPos += 7;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Cliente:', 20, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(ventaSafe.cliente_nombre, 60, yPos);
+
+    // Método de pago
+    yPos += 7;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Método de Pago:', 20, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(metodoPagoTexto[ventaSafe.metodo_pago as keyof typeof metodoPagoTexto], 60, yPos);
+
+    yPos += 10;
+
+    // ========================================
+    // 3. TABLA DE PRODUCTOS
+    // ========================================
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Producto', 'Tipo', 'Marca', 'Cant.', 'P. Unit.', 'Subtotal']],
+      body: carrito.map((item) => [
+        item.nombre || '-',
+        item.tipo || '-',
+        item.marca || '-',
+        item.cantidad.toString(),
+        `$${Number(item.precio || 0).toFixed(2)}`,
+        `$${Number(item.subtotal || 0).toFixed(2)}`,
+      ]),
+      theme: 'striped',
+      headStyles: {
+        fillColor: [102, 126, 234],
+        textColor: 255,
+        fontSize: 10,
+        fontStyle: 'bold',
+        halign: 'center',
+      },
+      bodyStyles: {
+        fontSize: 9,
+        cellPadding: 3,
+      },
+      alternateRowStyles: {
+        fillColor: [245, 247, 250],
+      },
+      columnStyles: {
+        0: { cellWidth: 50 }, // Producto
+        1: { cellWidth: 30 }, // Tipo
+        2: { cellWidth: 30 }, // Marca
+        3: { halign: 'center', cellWidth: 15 }, // Cantidad
+        4: { halign: 'right', cellWidth: 25 }, // Precio Unit.
+        5: { halign: 'right', cellWidth: 30 }, // Subtotal
+      },
+      styles: {
+        overflow: 'linebreak',
+        cellWidth: 'wrap',
+      },
+    });
+
+    // ========================================
+    // 4. TOTALES
+    // ========================================
+    const finalY = (doc as any).lastAutoTable.finalY || yPos + 50;
+    yPos = finalY + 10;
+
+    // Línea separadora
+    doc.setLineWidth(0.5);
+    doc.line(120, yPos, 190, yPos);
+    yPos += 7;
+
+    // Subtotal
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Subtotal:', 120, yPos);
+    doc.text(`$${ventaSafe.subtotal.toFixed(2)}`, 190, yPos, { align: 'right' });
+
+    // Descuento (si existe)
+    if (ventaSafe.descuento > 0) {
+      yPos += 7;
+      doc.setTextColor(220, 38, 38); // Rojo
+      doc.text('Descuento:', 120, yPos);
+      doc.text(`-$${ventaSafe.descuento.toFixed(2)}`, 190, yPos, { align: 'right' });
+      doc.setTextColor(0, 0, 0); // Volver a negro
+    }
+
+    // Total
+    yPos += 7;
+    doc.setLineWidth(0.5);
+    doc.line(120, yPos - 2, 190, yPos - 2);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('TOTAL:', 120, yPos + 3);
+    doc.text(`$${ventaSafe.total.toFixed(2)}`, 190, yPos + 3, { align: 'right' });
+
+    // ========================================
+    // 5. FOOTER
+    // ========================================
+    yPos += 15;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(128);
+    doc.text('¡Gracias por su compra!', 105, yPos, { align: 'center' });
+    yPos += 5;
+    doc.text('www.zarparuy.com', 105, yPos, { align: 'center' });
+
+    // Número de página
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Página ${i} de ${pageCount}`,
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: 'center' }
+      );
+    }
+
+    // ========================================
+    // 6. GUARDAR PDF
+    // ========================================
+    const fecha = new Date().toLocaleDateString('es-UY').replace(/\//g, '-');
+    doc.save(`Comprobante_${ventaSafe.numero_venta}_${fecha}.pdf`);
   };
 
   const handleFinalizar = () => {
@@ -369,6 +547,11 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
                         <Text strong style={{ fontSize: '12px', display: 'block' }}>
                           {item.nombre}
                         </Text>
+                        {item.tipo && (
+                          <Text style={{ fontSize: '10px', display: 'block', color: '#1890ff', fontWeight: 500 }}>
+                            {item.tipo}
+                          </Text>
+                        )}
                         {item.marca && (
                           <Text type="secondary" style={{ fontSize: '10px', display: 'block' }}>
                             {item.marca}
@@ -464,6 +647,24 @@ const VentaExitosa: React.FC<VentaExitosaProps> = ({ visible, venta, carrito, on
               }}
             >
               Imprimir Comprobante
+            </Button>
+
+            <Button
+              type="default"
+              size="large"
+              block
+              icon={<FilePdfOutlined />}
+              onClick={descargarComprobantePDF}
+              style={{
+                height: '40px',
+                fontSize: '14px',
+                borderRadius: '10px',
+                fontWeight: 600,
+                borderColor: '#dc2626',
+                color: '#dc2626',
+              }}
+            >
+              Descargar Comprobante
             </Button>
 
             <Button

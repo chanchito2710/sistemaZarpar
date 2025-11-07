@@ -239,6 +239,134 @@ export const crearVenta = async (req: Request, res: Response): Promise<void> => 
       ]);
     }
 
+    // ==========================================
+    // REGISTRAR COMISIONES
+    // ==========================================
+    
+    // ⭐ VERIFICAR SI EL VENDEDOR COBRA COMISIONES
+    const queryVendedor = 'SELECT cobra_comisiones FROM vendedores WHERE id = ?';
+    const [vendedorData] = await executeQuery<RowDataPacket[]>(queryVendedor, [datos.vendedor_id]);
+    
+    // Si el vendedor NO cobra comisiones, saltar este paso
+    if (!vendedorData || vendedorData.cobra_comisiones === 0) {
+      console.log(`Vendedor ${datos.vendedor_id} no cobra comisiones. Omitiendo registro de comisiones.`);
+    } else {
+      // El vendedor SÍ cobra comisiones, proceder normalmente
+      for (const producto of datos.productos) {
+        // Obtener tipo del producto
+        const queryProducto = 'SELECT tipo, nombre FROM productos WHERE id = ?';
+        const [productoData] = await executeQuery<RowDataPacket[]>(queryProducto, [producto.producto_id]);
+        
+        if (productoData && productoData.tipo) {
+        // ⭐ PRIMERO: Buscar comisión personalizada del vendedor
+        const queryComisionPersonalizada = `
+          SELECT monto_comision 
+          FROM comisiones_por_vendedor 
+          WHERE vendedor_id = ? AND tipo_producto = ? AND activo = 1
+        `;
+        const [comisionPersonalizada] = await executeQuery<RowDataPacket[]>(queryComisionPersonalizada, [
+          datos.vendedor_id,
+          productoData.tipo
+        ]);
+        
+        // Si no tiene comisión personalizada, usar la global
+        let comisionConfig = comisionPersonalizada;
+        
+        if (!comisionPersonalizada) {
+          const queryComisionGlobal = `
+            SELECT monto_comision 
+            FROM configuracion_comisiones 
+            WHERE tipo = ? AND activo = 1
+          `;
+          const [comisionGlobal] = await executeQuery<RowDataPacket[]>(queryComisionGlobal, [productoData.tipo]);
+          comisionConfig = comisionGlobal;
+        }
+        
+        if (comisionConfig && comisionConfig.monto_comision > 0) {
+          const montoComision = comisionConfig.monto_comision * producto.cantidad;
+          
+          // Determinar estado de comisión según método de pago
+          let estadoComision: 'pendiente' | 'pagada' = 'pagada';
+          let montoCobrado = montoComision;
+          let montoPendiente = 0;
+          
+          if (datos.metodo_pago === 'cuenta_corriente') {
+            // Si es a crédito, la comisión queda pendiente
+            estadoComision = 'pendiente';
+            montoCobrado = 0;
+            montoPendiente = montoComision;
+          }
+          
+          // Registrar comisión
+          const queryInsertComision = `
+            INSERT INTO comisiones_vendedores (
+              vendedor_id, venta_id, cliente_id, sucursal,
+              producto_id, producto_nombre, tipo_producto, cantidad,
+              monto_comision, monto_cobrado, monto_pendiente, estado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+          
+          await executeQuery<ResultSetHeader>(queryInsertComision, [
+            datos.vendedor_id,
+            ventaId,
+            datos.cliente_id,
+            datos.sucursal,
+            producto.producto_id,
+            productoData.nombre,
+            productoData.tipo,
+            producto.cantidad,
+            montoComision,
+            montoCobrado,
+            montoPendiente,
+            estadoComision
+          ]);
+        }
+      }
+      }
+    }
+
+    // 📦 REGISTRAR INGRESO A CAJA SI ES EFECTIVO
+    if (datos.metodo_pago === 'efectivo') {
+      try {
+        // Obtener caja actual
+        const [cajaActual] = await executeQuery<RowDataPacket[]>(
+          'SELECT * FROM caja WHERE sucursal = ?',
+          [datos.sucursal.toLowerCase()]
+        );
+        
+        if (cajaActual) {
+          const montoActual = Number(cajaActual.monto_actual);
+          const nuevoMonto = montoActual + Number(datos.total);
+          
+          // Actualizar caja
+          await executeQuery(
+            'UPDATE caja SET monto_actual = ? WHERE sucursal = ?',
+            [nuevoMonto, datos.sucursal.toLowerCase()]
+          );
+          
+          // Registrar movimiento
+          await executeQuery(
+            `INSERT INTO movimientos_caja 
+             (sucursal, tipo_movimiento, monto, monto_anterior, monto_nuevo, concepto, venta_id, usuario_id, usuario_email)
+             VALUES (?, 'ingreso_venta', ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              datos.sucursal.toLowerCase(),
+              datos.total,
+              montoActual,
+              nuevoMonto,
+              `Venta ${numeroVenta} - ${datos.cliente_nombre}`,
+              ventaId,
+              datos.vendedor_id,
+              (req as any).user?.email || null
+            ]
+          );
+        }
+      } catch (cajaError) {
+        console.error('⚠️ Error al registrar ingreso a caja:', cajaError);
+        // No interrumpir la venta si falla el registro de caja
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: 'Venta creada exitosamente',
@@ -347,8 +475,15 @@ export const obtenerDetalleVenta = async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Obtener detalles de productos
-    const queryDetalle = `SELECT * FROM ventas_detalle WHERE venta_id = ?`;
+    // Obtener detalles de productos con tipo
+    const queryDetalle = `
+      SELECT 
+        vd.*,
+        p.tipo
+      FROM ventas_detalle vd
+      LEFT JOIN productos p ON vd.producto_id = p.id
+      WHERE vd.venta_id = ?
+    `;
     const detalles = await executeQuery<RowDataPacket[]>(queryDetalle, [id]);
 
     res.status(200).json({
@@ -423,6 +558,56 @@ export const obtenerCuentaCorriente = async (req: Request, res: Response): Promi
 
     const movimientos = await executeQuery<RowDataPacket[]>(queryMovimientos, [sucursal, cliente_id]);
 
+    // Para cada movimiento de tipo 'venta', obtener los productos
+    for (const mov of movimientos) {
+      if (mov.tipo === 'venta' && mov.venta_id) {
+        console.log(`🔍 Cargando productos para venta_id: ${mov.venta_id}`);
+        
+        // Obtener el detalle de la venta (incluyendo subtotal, descuento, total)
+        const queryVenta = `
+          SELECT subtotal, descuento, total
+          FROM ventas
+          WHERE id = ?
+        `;
+        const ventaInfoArray = await executeQuery<RowDataPacket[]>(queryVenta, [mov.venta_id]);
+        const ventaInfo = ventaInfoArray.length > 0 ? ventaInfoArray[0] : null;
+        
+        // Obtener los productos de la venta
+        const queryProductos = `
+          SELECT 
+            vd.producto_id,
+            vd.producto_nombre,
+            vd.producto_marca,
+            p.tipo as producto_tipo,
+            vd.cantidad,
+            vd.precio_unitario,
+            vd.subtotal
+          FROM ventas_detalle vd
+          LEFT JOIN productos p ON vd.producto_id = p.id
+          WHERE vd.venta_id = ?
+          ORDER BY vd.id ASC
+        `;
+        
+        const productos = await executeQuery<RowDataPacket[]>(queryProductos, [mov.venta_id]);
+        
+        console.log(`📦 Productos encontrados: ${productos.length}`);
+        if (productos.length > 0) {
+          console.log('📦 Primer producto:', productos[0]);
+        }
+        
+        // Agregar productos y datos de la venta al movimiento
+        mov.productos = productos;
+        if (ventaInfo) {
+          mov.subtotal_venta = ventaInfo.subtotal;
+          mov.descuento_venta = ventaInfo.descuento;
+          mov.total_venta = ventaInfo.total;
+          console.log(`💰 Descuento de venta: ${ventaInfo.descuento}`);
+        }
+      }
+    }
+    
+    console.log(`📊 Total movimientos procesados: ${movimientos.length}`);
+
     // Calcular saldo actual
     const querySaldo = `
       SELECT 
@@ -459,7 +644,20 @@ export const obtenerCuentaCorriente = async (req: Request, res: Response): Promi
  */
 export const registrarPagoCuentaCorriente = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sucursal, cliente_id, cliente_nombre, monto, metodo_pago, comprobante, observaciones } = req.body;
+    const { sucursal, cliente_id, cliente_nombre, monto, metodo_pago, comprobante, observaciones, vendedor_id } = req.body;
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('💳 REGISTRAR PAGO DE CUENTA CORRIENTE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📝 Datos recibidos:', {
+      sucursal,
+      cliente_id,
+      cliente_nombre,
+      monto,
+      metodo_pago,
+      comprobante,
+      vendedor_id_recibido: vendedor_id || 'NO ENVIADO'
+    });
 
     // Validaciones
     if (!sucursal || !cliente_id || !monto || !metodo_pago) {
@@ -529,7 +727,7 @@ export const registrarPagoCuentaCorriente = async (req: Request, res: Response):
 
     // Actualizar ventas pendientes (aplicar pago a las más antiguas)
     const queryVentasPendientes = `
-      SELECT id, saldo_pendiente FROM ventas
+      SELECT id, saldo_pendiente, vendedor_id FROM ventas
       WHERE sucursal = ? AND cliente_id = ? AND estado_pago != 'pagado'
       ORDER BY fecha_venta ASC
     `;
@@ -558,13 +756,225 @@ export const registrarPagoCuentaCorriente = async (req: Request, res: Response):
       }
     }
 
+    // ==========================================
+    // ⭐ PROCESAR COMISIONES BASADO EN PRODUCTOS PAGADOS COMPLETAMENTE
+    // ==========================================
+    const comisionesCobradas: any[] = [];
+    
+    // 🔍 Si no se proporcionó vendedor_id, detectarlo automáticamente desde las comisiones pendientes
+    let vendedorIdFinal = vendedor_id;
+    
+    if (!vendedorIdFinal) {
+      const queryDetectarVendedor = `
+        SELECT DISTINCT vendedor_id 
+        FROM comisiones_vendedores 
+        WHERE cliente_id = ? 
+          AND sucursal = ? 
+          AND estado = 'pendiente'
+        LIMIT 1
+      `;
+      const vendedoresData = await executeQuery<RowDataPacket[]>(queryDetectarVendedor, [cliente_id, sucursal]);
+      
+      if (vendedoresData && vendedoresData.length > 0) {
+        vendedorIdFinal = vendedoresData[0].vendedor_id;
+        console.log(`🔍 Vendedor detectado automáticamente: ${vendedorIdFinal}`);
+      } else {
+        console.log('⚠️ No se encontró ningún vendedor con comisiones pendientes para este cliente');
+      }
+    }
+    
+    // Solo procesar comisiones si se encontró un vendedor Y el pago es en efectivo o transferencia
+    if (vendedorIdFinal && (metodo_pago === 'efectivo' || metodo_pago === 'transferencia')) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('💰 PROCESANDO COMISIONES PROPORCIONALES');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Obtener la deuda total y las comisiones pendientes del cliente
+      const queryDeudaTotal = `
+        SELECT 
+          COALESCE(SUM(v.saldo_pendiente), 0) as deuda_total,
+          COALESCE(SUM(cv.monto_comision), 0) as comisiones_totales
+        FROM ventas v
+        LEFT JOIN comisiones_vendedores cv ON cv.venta_id = v.id AND cv.estado = 'pendiente'
+        WHERE v.sucursal = ? 
+          AND v.cliente_id = ? 
+          AND v.estado_pago != 'pagado'
+          AND v.vendedor_id = ?
+      `;
+      
+      const resultDeuda = await executeQuery<RowDataPacket[]>(queryDeudaTotal, [sucursal, cliente_id, vendedorIdFinal]);
+      const deudaTotal = parseFloat(resultDeuda[0]?.deuda_total || 0);
+      const comisionesTotales = parseFloat(resultDeuda[0]?.comisiones_totales || 0);
+      
+      console.log(`💵 Monto del pago: $${monto}`);
+      console.log(`💰 Deuda total: $${deudaTotal.toFixed(2)}`);
+      console.log(`🎯 Comisiones totales pendientes: $${comisionesTotales.toFixed(2)}`);
+      
+      if (deudaTotal > 0 && comisionesTotales > 0) {
+        // Calcular el porcentaje pagado
+        const porcentajePagado = monto / deudaTotal;
+        const montoComisPorPagar = comisionesTotales * porcentajePagado;
+        
+        console.log(`📊 Porcentaje pagado: ${(porcentajePagado * 100).toFixed(2)}%`);
+        console.log(`💰 Monto de comisiones a cobrar: $${montoComisPorPagar.toFixed(2)}`);
+        
+        // Obtener comisiones pendientes ordenadas por MAYOR comisión primero
+        const queryComisionesPendientes = `
+          SELECT 
+            id as comision_id,
+            tipo_producto,
+            producto_nombre,
+            cantidad,
+            monto_comision
+          FROM comisiones_vendedores
+          WHERE vendedor_id = ?
+            AND cliente_id = ?
+            AND sucursal = ?
+            AND estado = 'pendiente'
+          ORDER BY 
+            monto_comision DESC,
+            id ASC
+        `;
+        
+        const comisionesPendientes = await executeQuery<RowDataPacket[]>(queryComisionesPendientes, [vendedorIdFinal, cliente_id, sucursal]);
+        
+        console.log(`📦 Comisiones pendientes: ${comisionesPendientes.length}`);
+        
+        let montoRestanteComision = montoComisPorPagar;
+        
+        // Ir cubriendo comisiones en orden de prioridad (mayor comisión primero)
+        for (const comision of comisionesPendientes) {
+          const montoComision = parseFloat(comision.monto_comision);
+          
+          console.log(`\n📦 ${comision.tipo_producto} - ${comision.producto_nombre}`);
+          console.log(`   💰 Comisión: $${montoComision.toFixed(2)}`);
+          console.log(`   💳 Disponible: $${montoRestanteComision.toFixed(2)}`);
+          
+          if (montoRestanteComision >= montoComision) {
+            // ✅ Alcanza para cubrir esta comisión COMPLETA
+            montoRestanteComision -= montoComision;
+            
+            console.log(`   ✅ COMPLETA - Cobrado: $${montoComision.toFixed(2)}`);
+            
+            await executeQuery(`
+              UPDATE comisiones_vendedores 
+              SET 
+                monto_cobrado = monto_comision,
+                monto_pendiente = 0,
+                estado = 'pagada',
+                fecha_cobro = NOW(),
+                pago_cuenta_corriente_id = ?
+              WHERE id = ?
+            `, [pagoId, comision.comision_id]);
+            
+            comisionesCobradas.push({
+              tipo: comision.tipo_producto,
+              producto: comision.producto_nombre,
+              cantidad: comision.cantidad,
+              monto: montoComision
+            });
+            
+          } else if (montoRestanteComision > 0) {
+            // ⚠️ Cubre PARCIALMENTE esta comisión
+            const montoCobrado = montoRestanteComision;
+            const montoPendiente = montoComision - montoCobrado;
+            
+            console.log(`   ⚠️ PARCIAL - Cobrado: $${montoCobrado.toFixed(2)} | Pendiente: $${montoPendiente.toFixed(2)}`);
+            
+            await executeQuery(`
+              UPDATE comisiones_vendedores 
+              SET 
+                monto_cobrado = monto_cobrado + ?,
+                monto_pendiente = ?,
+                estado = 'parcial',
+                pago_cuenta_corriente_id = ?
+              WHERE id = ?
+            `, [montoCobrado, montoPendiente, pagoId, comision.comision_id]);
+            
+            comisionesCobradas.push({
+              tipo: comision.tipo_producto,
+              producto: comision.producto_nombre,
+              cantidad: comision.cantidad,
+              monto: montoCobrado
+            });
+            
+            montoRestanteComision = 0;
+            break;
+            
+          } else {
+            // ❌ No queda dinero
+            console.log(`   ❌ SIN FONDOS - Queda pendiente`);
+            break;
+          }
+        }
+        
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`✅ Total comisiones cobradas: $${(montoComisPorPagar - montoRestanteComision).toFixed(2)}`);
+        console.log(`📊 Comisiones procesadas: ${comisionesCobradas.length}`);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      }
+    }
+
+    // 📦 REGISTRAR INGRESO A CAJA SI ES EFECTIVO
+    if (metodo_pago === 'efectivo') {
+      try {
+        // Obtener caja actual
+        const [cajaActual] = await executeQuery<RowDataPacket[]>(
+          'SELECT * FROM caja WHERE sucursal = ?',
+          [sucursal.toLowerCase()]
+        );
+        
+        if (cajaActual) {
+          const montoActual = Number(cajaActual.monto_actual);
+          const nuevoMontoCaja = montoActual + Number(monto);
+          
+          // Actualizar caja
+          await executeQuery(
+            'UPDATE caja SET monto_actual = ? WHERE sucursal = ?',
+            [nuevoMontoCaja, sucursal.toLowerCase()]
+          );
+          
+          // Registrar movimiento
+          await executeQuery(
+            `INSERT INTO movimientos_caja 
+             (sucursal, tipo_movimiento, monto, monto_anterior, monto_nuevo, concepto, pago_cuenta_corriente_id, usuario_id, usuario_email)
+             VALUES (?, 'ingreso_cuenta_corriente', ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              sucursal.toLowerCase(),
+              monto,
+              montoActual,
+              nuevoMontoCaja,
+              `Pago cuenta corriente - ${cliente_nombre}${comprobante ? ` (${comprobante})` : ''}`,
+              pagoId,
+              vendedorIdFinal || null,
+              (req as any).user?.email || null
+            ]
+          );
+        }
+      } catch (cajaError) {
+        console.error('⚠️ Error al registrar ingreso a caja:', cajaError);
+        // No interrumpir el pago si falla el registro de caja
+      }
+    }
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✅ PAGO REGISTRADO EXITOSAMENTE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📊 Resumen final:');
+    console.log(`   - Pago ID: ${pagoId}`);
+    console.log(`   - Monto pagado: $${monto}`);
+    console.log(`   - Saldo nuevo: $${nuevoSaldo.toFixed(2)}`);
+    console.log(`   - Comisiones cobradas: ${comisionesCobradas.length}`);
+    
     res.status(201).json({
       success: true,
       message: 'Pago registrado exitosamente',
       data: {
         pago_id: pagoId,
         monto,
-        saldo_nuevo: nuevoSaldo
+        saldo_nuevo: nuevoSaldo,
+        comisiones_cobradas: comisionesCobradas.length,
+        detalle_comisiones: comisionesCobradas
       }
     });
 
@@ -1219,10 +1629,11 @@ export const obtenerVentasGlobales = async (req: Request, res: Response): Promis
     const resumenes = await executeQuery<RowDataPacket[]>(query, params);
 
     // Parsear JSON en los resultados
+    // MySQL ya devuelve los campos JSON como objetos, solo parseamos si son strings
     const resumenesParseados = resumenes.map(r => ({
       ...r,
-      por_sucursal: JSON.parse(r.por_sucursal || '[]'),
-      por_metodo_pago: JSON.parse(r.por_metodo_pago || '[]')
+      por_sucursal: typeof r.por_sucursal === 'string' ? JSON.parse(r.por_sucursal || '[]') : (r.por_sucursal || []),
+      por_metodo_pago: typeof r.por_metodo_pago === 'string' ? JSON.parse(r.por_metodo_pago || '[]') : (r.por_metodo_pago || [])
     }));
 
     res.status(200).json({

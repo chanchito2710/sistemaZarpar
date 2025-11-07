@@ -17,6 +17,7 @@ import {
   eliminarColumna,
   eliminarTabla
 } from '../controllers/databaseController.js';
+import { limpiarDatos } from '../controllers/cleanupController.js';
 
 const router = Router();
 
@@ -61,6 +62,11 @@ router.put('/tables/:tableName/records/:id', actualizarRegistro);
 
 // Eliminar un registro
 router.delete('/tables/:tableName/records/:id', eliminarRegistro);
+
+// ========== LIMPIEZA DE DATOS ==========
+
+// Limpiar datos de prueba (⚠️ USO EXCLUSIVO PARA DESARROLLO)
+router.post('/cleanup', limpiarDatos);
 
 export default router;
 

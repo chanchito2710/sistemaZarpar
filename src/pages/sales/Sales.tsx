@@ -32,14 +32,12 @@ import {
   CalendarOutlined,
   BankOutlined,
   UserOutlined,
-  ShopOutlined,
-  BarChartOutlined,
-  RightOutlined
+  ShopOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import { ventasService, type Venta, vendedoresService } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -56,12 +54,18 @@ interface Sucursal {
  * Componente principal
  */
 const Sales: React.FC = () => {
-  const navigate = useNavigate();
-  
+  // ⭐ AUTENTICACIÓN: Obtener usuario actual
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.esAdmin || false;
+  const sucursalUsuario = usuario?.sucursal || '';
+
   // Estados para filtros
   const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(null);
   const [fechaHasta, setFechaHasta] = useState<Dayjs | null>(null);
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('todas');
+  // ⭐ Si NO es admin, establecer automáticamente su sucursal
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>(
+    esAdmin ? 'todas' : sucursalUsuario
+  );
   const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState<string>('todos');
   const [estadoPagoSeleccionado, setEstadoPagoSeleccionado] = useState<string>('todos');
 
@@ -74,6 +78,16 @@ const Sales: React.FC = () => {
   // Estado de modal de detalle
   const [modalVisible, setModalVisible] = useState(false);
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(null);
+
+  /**
+   * ⭐ Actualizar sucursal cuando cambia el usuario
+   * Si NO es admin, fijar su sucursal automáticamente
+   */
+  useEffect(() => {
+    if (!esAdmin && sucursalUsuario) {
+      setSucursalSeleccionada(sucursalUsuario);
+    }
+  }, [esAdmin, sucursalUsuario]);
 
   /**
    * Cargar sucursales al montar el componente
@@ -372,13 +386,24 @@ const Sales: React.FC = () => {
                 value={sucursalSeleccionada}
                 onChange={setSucursalSeleccionada}
                 loading={loadingSucursales}
+                disabled={!esAdmin} // ⭐ Usuario normal NO puede cambiar sucursal
               >
-                <Option value="todas">Todas</Option>
-                {sucursales.map(suc => (
+                {/* ⭐ Solo admin puede ver "Todas" */}
+                {esAdmin && <Option value="todas">Todas las Sucursales</Option>}
+                
+                {/* ⭐ Usuario normal solo ve su sucursal */}
+                {!esAdmin ? (
+                  <Option value={sucursalUsuario}>
+                    {sucursalUsuario.toUpperCase()}
+                  </Option>
+                ) : (
+                  // ⭐ Admin ve todas las sucursales
+                  sucursales.map(suc => (
                   <Option key={suc.sucursal} value={suc.sucursal}>
                     {suc.sucursal.toUpperCase()}
                 </Option>
-              ))}
+                  ))
+                )}
             </Select>
             </Col>
 
@@ -458,108 +483,6 @@ const Sales: React.FC = () => {
             </Col>
           </Row>
         </Space>
-      </Card>
-
-      {/* Botón SUPER LLAMATIVO de Ventas Globales */}
-      <Card
-        style={{
-          marginBottom: '24px',
-          borderRadius: '16px',
-          border: '3px solid #1890ff',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
-          boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
-          cursor: 'pointer',
-          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-        styles={{ body: { padding: '24px' } }}
-        onClick={() => navigate('/global-sales')}
-        hoverable
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-          e.currentTarget.style.boxShadow = '0 16px 48px rgba(102, 126, 234, 0.6)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0) scale(1)';
-          e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.4)';
-        }}
-      >
-        <Row align="middle" gutter={24}>
-          <Col>
-            <div
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backdropFilter: 'blur(10px)',
-              }}
-            >
-              <BarChartOutlined
-                style={{
-                  fontSize: 48,
-                  color: '#ffffff',
-                  filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
-                }}
-              />
-            </div>
-          </Col>
-          <Col flex="auto">
-            <Title
-              level={3}
-              style={{
-                margin: '0 0 8px 0',
-                color: '#ffffff',
-                fontWeight: 700,
-                textShadow: '0 2px 8px rgba(0,0,0,0.3)',
-              }}
-            >
-              📊 VENTAS GLOBALES - Historial Diario
-            </Title>
-            <Text
-              style={{
-                fontSize: 16,
-                color: '#ffffff',
-                fontWeight: 500,
-                textShadow: '0 1px 4px rgba(0,0,0,0.2)',
-              }}
-            >
-              🔥 ¡Consulta el resumen histórico completo! Filtra por fecha, sucursal y descarga reportes
-            </Text>
-          </Col>
-          <Col>
-            <Button
-              type="primary"
-              size="large"
-              icon={<RightOutlined />}
-              style={{
-                height: 56,
-                fontSize: 18,
-                fontWeight: 600,
-                borderRadius: 12,
-                background: '#ffffff',
-                color: '#667eea',
-                border: 'none',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                padding: '0 32px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.1)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-              }}
-            >
-              VER AHORA
-            </Button>
-          </Col>
-        </Row>
       </Card>
 
       {/* Estadísticas */}
@@ -720,30 +643,51 @@ const Sales: React.FC = () => {
                   pagination={false}
                   columns={[
                     {
-                      title: 'Producto',
+                      title: 'PRODUCTO',
                       dataIndex: 'producto_nombre',
                       key: 'producto_nombre',
+                      width: 200,
+                      render: (nombre: string) => <Text strong>{nombre}</Text>
                     },
                     {
-                      title: 'Cantidad',
+                      title: 'TIPO',
+                      dataIndex: 'tipo',
+                      key: 'tipo',
+                      width: 100,
+                      align: 'center',
+                      render: (tipo: string) => (
+                        tipo ? (
+                          <Tag color="blue">{tipo}</Tag>
+                        ) : (
+                          <Text type="secondary">-</Text>
+                        )
+                      ),
+                    },
+                    {
+                      title: 'CANTIDAD',
                       dataIndex: 'cantidad',
                       key: 'cantidad',
+                      width: 100,
                       align: 'center',
                     },
                     {
-                      title: 'Precio Unit.',
+                      title: 'PRECIO UNIT.',
                       dataIndex: 'precio_unitario',
                       key: 'precio_unitario',
+                      width: 120,
                       align: 'right',
-                      render: (precio: number) => `$${Number(precio).toFixed(2)}`,
+                      render: (precio: number) => (
+                        <Text style={{ color: '#1890ff' }}>${Number(precio).toFixed(2)}</Text>
+                      ),
                     },
                     {
-                      title: 'Subtotal',
+                      title: 'SUBTOTAL',
                       dataIndex: 'subtotal',
                       key: 'subtotal',
+                      width: 120,
                       align: 'right',
                       render: (subtotal: number) => (
-                        <Text strong>${Number(subtotal).toFixed(2)}</Text>
+                        <Text strong style={{ color: '#52c41a', fontSize: 14 }}>${Number(subtotal).toFixed(2)}</Text>
                       ),
                     },
                   ]}

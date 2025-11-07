@@ -2026,7 +2026,1016 @@ database/
 
 ---
 
+## 🆕 REGLA #13: ENCODING UTF-8 - MANEJO CORRECTO (CRÍTICO)
+
+### 🎯 FILOSOFÍA: "Un Solo Charset para Gobernarlos a Todos"
+
+**CRÍTICO**: El sistema DEBE manejar caracteres especiales (á, é, í, ó, ú, ñ, Ñ) correctamente en TODA la cadena: MySQL → Node.js → React → PDF.
+
+---
+
+### ✅ CONFIGURACIÓN OBLIGATORIA
+
+#### 1. **Backend: Conexión MySQL** (`api/config/database.ts`)
+
+```typescript
+import mysql from 'mysql2/promise';
+
+export const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT) || 3307,
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'zarparDataBase',
+  
+  // ✅ CRÍTICO: Configuración UTF-8
+  charset: 'utf8mb4',
+  connectAttributes: {
+    charset: 'utf8mb4'
+  }
+});
+
+// ✅ CRÍTICO: Configurar UTF-8 en cada conexión
+const testConnection = async () => {
+  try {
+    const connection = await pool.getConnection();
+    
+    // ✅ Configurar UTF-8 explícitamente
+    await connection.query("SET NAMES 'utf8mb4'");
+    await connection.query("SET CHARACTER SET utf8mb4");
+    await connection.query("SET character_set_connection=utf8mb4");
+    
+    connection.release();
+    console.log('✅ Conexión a MySQL exitosa con UTF-8');
+  } catch (error) {
+    console.error('❌ Error de conexión a MySQL:', error);
+  }
+};
+```
+
+#### 2. **Scripts SQL: SIEMPRE Usar UTF-8**
+
+```bash
+# ✅ CORRECTO - Ejecutar SQL con UTF-8
+docker exec -i zarpar-mysql mysql -u root -pzarpar2025 --default-character-set=utf8mb4 zarparDataBase < archivo.sql
+
+# ❌ INCORRECTO - Sin charset
+docker exec -i zarpar-mysql mysql -u root -pzarpar2025 zarparDataBase < archivo.sql
+```
+
+#### 3. **Frontend: PDFs con UTF-8** (jsPDF)
+
+```typescript
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+const generarPDF = () => {
+  const doc = new jsPDF();
+  
+  // ✅ Los datos ya vienen correctos desde la API con UTF-8
+  // No necesitas hacer conversión
+  
+  doc.text(`Batería`, 10, 10);  // ✅ Se renderiza correctamente
+  doc.text(`Botón`, 10, 20);    // ✅ Se renderiza correctamente
+};
+```
+
+---
+
+### 🐛 PROBLEMAS COMUNES Y SOLUCIONES
+
+#### Problema 1: Doble Encoding (BaterÃ­a en vez de Batería)
+
+**Causa**: Datos guardados con charset incorrecto
+
+**Solución**:
+```sql
+-- Ejecutar script de corrección
+USE zarparDataBase;
+SET NAMES 'utf8mb4';
+
+-- Corregir datos corruptos
+UPDATE productos 
+SET tipo = REPLACE(tipo, 'BaterÃ­a', 'Batería') 
+WHERE tipo LIKE '%BaterÃ­a%';
+
+UPDATE productos 
+SET tipo = REPLACE(tipo, 'BotÃ³n', 'Botón') 
+WHERE tipo LIKE '%BotÃ³n%';
+```
+
+#### Problema 2: Caracteres Corruptos en Clientes
+
+**Solución**:
+```sql
+-- Corregir acentos comunes en todas las tablas de clientes
+UPDATE clientes_pando SET nombre = REPLACE(nombre, 'Ã¡', 'á') WHERE nombre LIKE '%Ã¡%';
+UPDATE clientes_pando SET nombre = REPLACE(nombre, 'Ã©', 'é') WHERE nombre LIKE '%Ã©%';
+UPDATE clientes_pando SET nombre = REPLACE(nombre, 'Ã­', 'í') WHERE nombre LIKE '%Ã­%';
+UPDATE clientes_pando SET nombre = REPLACE(nombre, 'Ã³', 'ó') WHERE nombre LIKE '%Ã³%';
+UPDATE clientes_pando SET nombre = REPLACE(nombre, 'Ãº', 'ú') WHERE nombre LIKE '%Ãº%';
+UPDATE clientes_pando SET nombre = REPLACE(nombre, 'Ã±', 'ñ') WHERE nombre LIKE '%Ã±%';
+
+-- Repetir para apellido y direccion
+-- Repetir para TODAS las tablas de clientes
+```
+
+---
+
+### 📋 VERIFICACIÓN DE ENCODING
+
+#### Verificar HEX de un Campo
+
+```sql
+-- Verificar encoding correcto
+SELECT 
+  tipo,
+  HEX(tipo) as hex_value,
+  CASE
+    WHEN HEX(tipo) = '4261746572C3AD61' THEN '✅ UTF-8 Correcto (Batería)'
+    WHEN HEX(tipo) LIKE '%C383C2AD%' THEN '❌ Doble Encoding'
+    ELSE '⚠️ Revisar'
+  END as estado
+FROM productos
+WHERE tipo LIKE '%Bater%';
+
+-- Resultado esperado:
+-- tipo: Batería
+-- hex_value: 4261746572C3AD61
+-- estado: ✅ UTF-8 Correcto
+```
+
+#### Buscar Datos Corruptos
+
+```sql
+-- Buscar caracteres corruptos en cualquier tabla
+SELECT * FROM clientes_pando
+WHERE nombre LIKE '%Ã%' 
+   OR apellido LIKE '%Ã%' 
+   OR direccion LIKE '%Ã%';
+
+-- Si retorna registros = HAY CORRUPCIÓN ❌
+-- Si retorna vacío = TODO CORRECTO ✅
+```
+
+---
+
+### 🔒 GARANTÍAS POST-CONFIGURACIÓN
+
+Una vez configurado correctamente, el sistema garantiza:
+
+✅ **Charset UTF-8 en toda la cadena**:
+```
+MySQL (utf8mb4) 
+    ↓
+Node.js Pool (utf8mb4) 
+    ↓
+API REST (UTF-8) 
+    ↓
+React Frontend (UTF-8) 
+    ↓
+PDF (UTF-8)
+```
+
+✅ **Datos almacenados correctamente**
+✅ **Datos recuperados correctamente**
+✅ **PDFs generados con acentos correctos**
+✅ **Futuras inserciones protegidas**
+
+---
+
+### ⚠️ REGLAS CRÍTICAS
+
+#### ❌ NUNCA HACER:
+1. **NO** modificar el charset del pool sin documentar
+2. **NO** ejecutar scripts SQL sin `--default-character-set=utf8mb4`
+3. **NO** copiar datos de fuentes externas sin verificar encoding
+4. **NO** asumir que los datos ya tienen el encoding correcto
+
+#### ✅ SIEMPRE HACER:
+1. **SIEMPRE** usar la configuración UTF-8 en el pool
+2. **SIEMPRE** ejecutar SQL con charset utf8mb4
+3. **SIEMPRE** verificar encoding después de importar datos
+4. **SIEMPRE** probar con caracteres especiales (José Pérez, Mónica López)
+5. **SIEMPRE** generar PDFs y verificar acentos
+
+---
+
+### 📚 SCRIPTS DE AUDITORÍA Y CORRECCIÓN
+
+**Ubicación**: `database/` y `scripts/`
+
+```
+database/
+├── fix_all_tipos.sql                  # Corrección de productos
+├── FIX_ALL_ENCODING_MAESTRO.sql       # Corrección de clientes
+├── verificar_datos_corruptos.sql      # Búsqueda de problemas
+└── AUDITORIA_ENCODING_COMPLETA.md     # Reporte completo
+
+scripts/
+└── audit-encoding-completo.sql        # Auditoría de todas las tablas
+```
+
+---
+
+### 🎯 CUANDO AGREGAR NUEVOS DATOS
+
+```typescript
+// Al insertar clientes, productos, etc.
+const insertarCliente = async (data: Cliente) => {
+  // ✅ La conexión ya tiene UTF-8 configurado
+  // NO necesitas hacer nada especial
+  const query = `
+    INSERT INTO clientes_pando 
+    (nombre, apellido, direccion) 
+    VALUES (?, ?, ?)
+  `;
+  
+  // Los acentos se guardarán correctamente automáticamente
+  await pool.execute(query, [
+    'José Pérez',        // ✅ Se guarda correctamente
+    'García Mónica',     // ✅ Se guarda correctamente
+    'Calle Núñez 123'    // ✅ Se guarda correctamente
+  ]);
+};
+```
+
+---
+
+### 📖 DOCUMENTACIÓN RELACIONADA
+
+- **`SOLUCION_ENCODING_UTF8.md`** - Solución técnica detallada
+- **`AUDITORIA_ENCODING_COMPLETA.md`** - Reporte de auditoría completa (32 tablas, 155 campos)
+
+---
+
+## 🆕 REGLA #14: GENERACIÓN DE PDFs PROFESIONALES
+
+### 🎯 FILOSOFÍA: "PDFs de Calidad Profesional"
+
+El sistema debe generar PDFs con diseño profesional, datos dinámicos y encoding correcto.
+
+---
+
+### ✅ DEPENDENCIAS REQUERIDAS
+
+```bash
+npm install jspdf jspdf-autotable
+```
+
+**TypeScript Types**:
+```bash
+npm install --save-dev @types/jspdf
+```
+
+---
+
+### 📦 ESTRUCTURA BÁSICA DE UN PDF
+
+```typescript
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+const generarPDF = (datos: any[], sucursal: string) => {
+  const doc = new jsPDF();
+  
+  // ========================================
+  // 1. HEADER - Información de la empresa
+  // ========================================
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ZARPAR - REPUESTOS', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Sucursal: ${sucursal.toUpperCase()}`, 105, 30, { align: 'center' });
+  
+  // ========================================
+  // 2. FECHA Y CÓDIGO
+  // ========================================
+  const fecha = new Date().toLocaleDateString('es-UY');
+  doc.setFontSize(10);
+  doc.text(`Fecha: ${fecha}`, 14, 40);
+  doc.text(`Código: ${generarCodigo()}`, 14, 45);
+  
+  // ========================================
+  // 3. TABLA DE DATOS (autoTable)
+  // ========================================
+  autoTable(doc, {
+    startY: 55,
+    head: [['#', 'Producto', 'Marca', 'Tipo', 'Precio']],
+    body: datos.map((item, index) => [
+      index + 1,
+      item.nombre,
+      item.marca,
+      item.tipo,
+      `$${item.precio.toLocaleString('es-UY')}`
+    ]),
+    
+    // ✅ Estilos profesionales
+    theme: 'striped',
+    headStyles: {
+      fillColor: [59, 130, 246],  // Azul
+      textColor: 255,
+      fontSize: 11,
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    bodyStyles: {
+      fontSize: 10,
+      cellPadding: 3
+    },
+    alternateRowStyles: {
+      fillColor: [245, 247, 250]
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 15 },   // #
+      4: { halign: 'right', cellWidth: 30 }     // Precio
+    },
+    
+    // ✅ Ajuste automático de texto
+    styles: {
+      overflow: 'linebreak',
+      cellWidth: 'wrap'
+    }
+  });
+  
+  // ========================================
+  // 4. FOOTER - Información adicional
+  // ========================================
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(9);
+    doc.setTextColor(128);
+    doc.text(
+      `Página ${i} de ${pageCount}`,
+      105,
+      doc.internal.pageSize.height - 10,
+      { align: 'center' }
+    );
+  }
+  
+  // ========================================
+  // 5. GUARDAR PDF
+  // ========================================
+  doc.save(`Lista_Precios_${sucursal}_${fecha}.pdf`);
+};
+```
+
+---
+
+### 🎨 ORDENAMIENTO DE DATOS EN PDFs
+
+**Caso: Lista de Precios de Productos**
+
+```typescript
+// ✅ Ordenar productos por tipo y marca
+const ordenarProductosPorTipo = (productos: Producto[]): Producto[] => {
+  return productos.sort((a, b) => {
+    const tipoA = (a.tipo || '').toLowerCase();
+    const tipoB = (b.tipo || '').toLowerCase();
+    const marcaA = (a.marca || '').toLowerCase();
+    const marcaB = (b.marca || '').toLowerCase();
+    
+    // Función para dar prioridad a tipos específicos
+    const obtenerPrioridad = (tipo: string): number => {
+      if (tipo.includes('display')) return 1;
+      if (tipo.includes('bateria') || tipo.includes('batería')) return 2;
+      if (tipo.includes('flex')) return 3;
+      return 4; // Resto
+    };
+    
+    const prioridadA = obtenerPrioridad(tipoA);
+    const prioridadB = obtenerPrioridad(tipoB);
+    
+    // 1. Ordenar por prioridad de tipo
+    if (prioridadA !== prioridadB) {
+      return prioridadA - prioridadB;
+    }
+    
+    // 2. Dentro del mismo tipo, ordenar por marca
+    if (marcaA !== marcaB) {
+      return marcaA.localeCompare(marcaB, 'es');
+    }
+    
+    // 3. Dentro de la misma marca, ordenar por nombre
+    return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+  });
+};
+```
+
+**Resultado esperado**:
+```
+Display
+  - Samsung Galaxy S10 Display
+  - Samsung Galaxy S20 Display
+  - iPhone 11 Display
+  - iPhone 12 Display
+  
+Batería
+  - Huawei P30 Batería
+  - Samsung Galaxy A50 Batería
+  - iPhone X Batería
+  
+Flex
+  - Samsung Galaxy Note 10 Flex
+  ...
+```
+
+---
+
+### 📄 PÁGINA: LISTA DE PRECIOS (`/products/prices`)
+
+**Archivo**: `src/pages/products/ProductPrices.tsx`
+
+#### Funcionalidades:
+- ✅ Selector de sucursal
+- ✅ Tabla con productos y precios
+- ✅ Botón "Generar PDF"
+- ✅ Productos ordenados por tipo y marca
+- ✅ Datos 100% dinámicos desde base de datos
+
+#### Código de Ejemplo:
+
+```typescript
+const ProductPrices: React.FC = () => {
+  const [sucursal, setSucursal] = useState('pando');
+  const [productos, setProductos] = useState<ProductoCompleto[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Cargar productos por sucursal
+  const cargarProductos = async () => {
+    setLoading(true);
+    try {
+      const data = await productosService.obtenerPorSucursal(sucursal);
+      
+      // Filtrar solo productos activos con precio > 0
+      const productosConPrecio = data
+        .filter(p => p.activo && p.precio > 0)
+        .map(p => ({ ...p }));
+      
+      // ✅ Ordenar antes de mostrar
+      setProductos(ordenarProductosPorTipo(productosConPrecio));
+    } catch (error) {
+      message.error('Error al cargar productos');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Generar PDF
+  const generarPDF = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text('LISTA DE PRECIOS', 105, 20, { align: 'center' });
+    doc.setFontSize(14);
+    doc.text(`Sucursal: ${sucursal.toUpperCase()}`, 105, 30, { align: 'center' });
+    
+    // Tabla con productos ya ordenados
+    autoTable(doc, {
+      startY: 40,
+      head: [['#', 'Producto', 'Marca', 'Tipo', 'Precio']],
+      body: productos.map((p, i) => [
+        i + 1,
+        p.nombre,
+        p.marca,
+        p.tipo,
+        `$${p.precio.toLocaleString('es-UY')}`
+      ]),
+      // ... estilos ...
+    });
+    
+    doc.save(`Lista_Precios_${sucursal}_${new Date().toLocaleDateString('es-UY')}.pdf`);
+  };
+  
+  return (
+    <div>
+      <Select value={sucursal} onChange={setSucursal}>
+        {sucursales.map(s => (
+          <Option key={s} value={s}>{s.toUpperCase()}</Option>
+        ))}
+      </Select>
+      
+      <Button onClick={generarPDF} icon={<FilePdfOutlined />}>
+        Generar PDF
+      </Button>
+      
+      <Table dataSource={productos} loading={loading} />
+    </div>
+  );
+};
+```
+
+---
+
+### ⚠️ REGLAS PARA PDFs
+
+#### ❌ NUNCA HACER:
+1. **NO** hardcodear datos en PDFs
+2. **NO** generar PDFs sin ordenar datos
+3. **NO** olvidar verificar encoding (acentos)
+4. **NO** usar tablas sin estilos profesionales
+
+#### ✅ SIEMPRE HACER:
+1. **SIEMPRE** usar datos dinámicos desde base de datos
+2. **SIEMPRE** ordenar datos antes de generar PDF
+3. **SIEMPRE** aplicar estilos profesionales (colores, bordes)
+4. **SIEMPRE** incluir header y footer
+5. **SIEMPRE** verificar acentos (Batería, Botón, etc.)
+
+---
+
+## 🆕 REGLA #15: SISTEMA DE CAJA - GESTIÓN DE EFECTIVO
+
+### 🎯 FILOSOFÍA: "Control Total del Flujo de Efectivo"
+
+El sistema debe rastrear TODOS los ingresos y egresos de efectivo por sucursal, con historial completo y ajustes manuales solo para administradores.
+
+---
+
+### 📊 ESTRUCTURA DE BASE DE DATOS
+
+#### Tabla: `caja`
+
+```sql
+CREATE TABLE IF NOT EXISTS caja (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sucursal VARCHAR(50) NOT NULL UNIQUE,
+  monto_actual DECIMAL(10, 2) DEFAULT 0.00,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sucursal (sucursal)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### Tabla: `movimientos_caja`
+
+```sql
+CREATE TABLE IF NOT EXISTS movimientos_caja (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sucursal VARCHAR(50) NOT NULL,
+  tipo_movimiento ENUM(
+    'ingreso_venta',                -- Venta en efectivo desde POS
+    'ingreso_cuenta_corriente',     -- Pago de cuenta corriente en efectivo
+    'envio',                        -- Envío de dinero
+    'ajuste_manual'                 -- Ajuste manual por admin
+  ) NOT NULL,
+  monto DECIMAL(10, 2) NOT NULL,
+  monto_anterior DECIMAL(10, 2) NOT NULL,
+  monto_nuevo DECIMAL(10, 2) NOT NULL,
+  concepto TEXT,
+  venta_id INT NULL,
+  pago_cuenta_corriente_id INT NULL,
+  usuario_id INT NULL,
+  usuario_email VARCHAR(255) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  INDEX idx_sucursal (sucursal),
+  INDEX idx_tipo_movimiento (tipo_movimiento),
+  INDEX idx_created_at (created_at),
+  INDEX idx_venta_id (venta_id),
+  INDEX idx_pago_cc_id (pago_cuenta_corriente_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+---
+
+### 🔄 INTEGRACIÓN AUTOMÁTICA CON VENTAS
+
+**Archivo**: `api/controllers/ventasController.ts`
+
+```typescript
+export const crearVenta = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    // 1. Crear la venta
+    const [ventaResult] = await connection.execute(
+      'INSERT INTO ventas (...) VALUES (...)',
+      [...]
+    );
+    
+    const ventaId = ventaResult.insertId;
+    
+    // 2. Si el pago es en EFECTIVO → Actualizar caja automáticamente
+    if (metodo_pago === 'efectivo') {
+      // Obtener monto actual de caja
+      const [cajaRows] = await connection.execute(
+        'SELECT monto_actual FROM caja WHERE sucursal = ?',
+        [sucursal]
+      );
+      
+      const montoAnterior = cajaRows[0]?.monto_actual || 0;
+      const montoNuevo = montoAnterior + total;
+      
+      // Actualizar caja
+      await connection.execute(
+        'UPDATE caja SET monto_actual = ? WHERE sucursal = ?',
+        [montoNuevo, sucursal]
+      );
+      
+      // Registrar movimiento
+      await connection.execute(`
+        INSERT INTO movimientos_caja 
+        (sucursal, tipo_movimiento, monto, monto_anterior, monto_nuevo, concepto, venta_id, usuario_email) 
+        VALUES (?, 'ingreso_venta', ?, ?, ?, ?, ?, ?)
+      `, [
+        sucursal,
+        total,
+        montoAnterior,
+        montoNuevo,
+        `Venta #${numero_venta}`,
+        ventaId,
+        (req as any).user?.email
+      ]);
+    }
+    
+    await connection.commit();
+    res.json({ success: true });
+    
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+```
+
+---
+
+### 💼 PÁGINA: GESTIÓN DE CAJA (`/finance/cash`)
+
+**Archivo**: `src/pages/finance/Cash.tsx`
+
+#### Funcionalidades:
+
+**Para USUARIOS NORMALES** (modo lectura):
+- ✅ Ver monto actual de SU sucursal
+- ✅ Ver historial de movimientos
+- ❌ NO pueden ajustar montos
+- ❌ NO pueden ver otras sucursales
+
+**Para ADMINISTRADORES**:
+- ✅ Ver monto de TODAS las sucursales
+- ✅ Ajustar monto manualmente de cualquier sucursal
+- ✅ Registrar envíos de dinero
+- ✅ Ver historial completo con filtros
+
+#### Código de Ejemplo:
+
+```typescript
+const Cash: React.FC = () => {
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.esAdmin;
+  const sucursalUsuario = obtenerSucursalDelUsuario(usuario?.email);
+  
+  const [cajas, setCajas] = useState<Caja[]>([]);
+  
+  // Cargar cajas según permisos
+  const cargarCajas = async () => {
+    try {
+      const data = await cajaService.obtenerTodasLasCajas();
+      
+      // Filtrar según permisos
+      if (esAdmin) {
+        setCajas(data); // Admin ve todas
+      } else {
+        // Usuario normal ve solo su sucursal
+        setCajas(data.filter(c => c.sucursal.toLowerCase() === sucursalUsuario));
+      }
+    } catch (error) {
+      message.error('Error al cargar cajas');
+    }
+  };
+  
+  // Ajustar monto (SOLO ADMIN)
+  const handleAjustarMonto = async (sucursal: string, nuevoMonto: number, concepto: string) => {
+    if (!esAdmin) {
+      message.error('No tienes permisos para ajustar el monto');
+      return;
+    }
+    
+    try {
+      await cajaService.ajustarCaja(sucursal, nuevoMonto, concepto);
+      message.success('Monto ajustado exitosamente');
+      cargarCajas();
+    } catch (error) {
+      message.error('Error al ajustar monto');
+    }
+  };
+  
+  // Registrar envío de dinero
+  const handleEnvio = async (sucursal: string, monto: number, concepto: string) => {
+    try {
+      await cajaService.registrarEnvio(sucursal, monto, concepto);
+      message.success('Envío registrado exitosamente');
+      cargarCajas();
+    } catch (error) {
+      message.error('Error al registrar envío');
+    }
+  };
+  
+  return (
+    <div>
+      {/* Mostrar cajas según tamaño (1 grande para usuario, grid para admin) */}
+      <Row gutter={[16, 16]}>
+        {cajas.map(caja => (
+          <Col 
+            key={caja.sucursal} 
+            xs={24} 
+            sm={esAdmin ? 12 : 24} 
+            md={esAdmin ? 8 : 24}
+          >
+            <Card>
+              <Statistic
+                title={caja.sucursal.toUpperCase()}
+                value={caja.monto_actual}
+                precision={2}
+                prefix="$"
+              />
+              
+              {esAdmin && (
+                <Space>
+                  <Button onClick={() => showAjustarModal(caja.sucursal)}>
+                    Ajustar Monto
+                  </Button>
+                  <Button onClick={() => showEnvioModal(caja.sucursal)}>
+                    Enviar Dinero
+                  </Button>
+                </Space>
+              )}
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      
+      {/* Historial de movimientos */}
+      <Button onClick={() => setHistorialVisible(true)}>
+        Ver Historial de Movimientos
+      </Button>
+    </div>
+  );
+};
+```
+
+---
+
+### 🔐 PERMISOS Y SEGURIDAD
+
+**Backend**: `api/routes/caja.ts`
+
+```typescript
+import express from 'express';
+import { verificarAutenticacion, verificarAdmin } from '../middleware/auth.js';
+import { 
+  obtenerCaja, 
+  obtenerTodasLasCajas, 
+  ajustarCaja, 
+  registrarEnvio,
+  obtenerMovimientos 
+} from '../controllers/cajaController.js';
+
+const router = express.Router();
+
+// Todas las rutas requieren autenticación
+router.use(verificarAutenticacion);
+
+// Obtener todas las cajas (admin ve todas, usuario normal solo la suya)
+router.get('/', obtenerTodasLasCajas);
+
+// Obtener caja específica
+router.get('/:sucursal', obtenerCaja);
+
+// Historial de movimientos (con filtros)
+router.get('/movimientos/historial', obtenerMovimientos);
+
+// Ajustar monto (SOLO ADMIN)
+router.put('/:sucursal/ajustar', verificarAdmin, ajustarCaja);
+
+// Registrar envío (todos pueden enviar dinero de su sucursal)
+router.post('/envio', registrarEnvio);
+
+export default router;
+```
+
+---
+
+### ⚠️ REGLAS DEL SISTEMA DE CAJA
+
+#### ❌ NUNCA HACER:
+1. **NO** permitir ajustes manuales a usuarios normales
+2. **NO** permitir montos negativos
+3. **NO** olvidar registrar CADA movimiento
+4. **NO** hacer actualizaciones sin transacciones
+
+#### ✅ SIEMPRE HACER:
+1. **SIEMPRE** usar transacciones para actualizaciones de caja
+2. **SIEMPRE** registrar en `movimientos_caja`
+3. **SIEMPRE** guardar `monto_anterior` y `monto_nuevo`
+4. **SIEMPRE** validar permisos (admin vs usuario normal)
+5. **SIEMPRE** incluir concepto descriptivo
+
+---
+
+### 📊 TIPOS DE MOVIMIENTOS
+
+| Tipo | Descripción | Quién puede hacer | Automático/Manual |
+|------|-------------|-------------------|-------------------|
+| `ingreso_venta` | Venta en efectivo | Sistema (POS) | ✅ Automático |
+| `ingreso_cuenta_corriente` | Pago de CC en efectivo | Sistema | ✅ Automático |
+| `envio` | Envío de dinero | Todos (su sucursal) | ⚙️ Manual |
+| `ajuste_manual` | Ajuste manual | SOLO Admin | ⚙️ Manual |
+
+---
+
+### 📈 HISTORIAL DE MOVIMIENTOS
+
+**Modal con Filtros**:
+- ✅ Filtrar por fecha (desde - hasta)
+- ✅ Filtrar por sucursal
+- ✅ Filtrar por tipo de movimiento
+- ✅ Ver detalles completos (usuario, concepto, montos)
+
+**Tabla de Historial**:
+```typescript
+<Table
+  columns={[
+    { title: 'Fecha', dataIndex: 'created_at' },
+    { title: 'Sucursal', dataIndex: 'sucursal' },
+    { title: 'Tipo', dataIndex: 'tipo_movimiento' },
+    { title: 'Monto', dataIndex: 'monto', render: (val) => `$${val}` },
+    { title: 'Monto Anterior', dataIndex: 'monto_anterior' },
+    { title: 'Monto Nuevo', dataIndex: 'monto_nuevo' },
+    { title: 'Concepto', dataIndex: 'concepto' },
+    { title: 'Usuario', dataIndex: 'usuario_email' }
+  ]}
+  dataSource={movimientos}
+/>
+```
+
+---
+
+## 📚 DOCUMENTACIÓN ADICIONAL ACTUALIZADA
+
+Archivos de documentación incluidos en el proyecto:
+
+- `CONTEXTO_AGENTE.md` → Contexto completo para el agente IA (OBSOLETO, usar `.cursorrules`)
+- `COMO_FUNCIONA_PRODUCTOS_EXPLICACION_VISUAL.md` → Cómo funciona el sistema de productos
+- `ANALISIS_ESTRUCTURA_PRODUCTOS_Y_STOCK.md` → Análisis de la base de datos
+- `README.md` → Documentación general del proyecto
+- **`SOLUCION_ENCODING_UTF8.md`** → ⭐ Solución completa de encoding UTF-8
+- **`AUDITORIA_ENCODING_COMPLETA.md`** → ⭐ Reporte de auditoría (32 tablas, 155 campos)
+- **`SOLUCION_PROBLEMAS_LOGIN.md`** → Troubleshooting de problemas de login y ports
+
+---
+
+## 📊 ESTRUCTURA COMPLETA DE BASE DE DATOS (ACTUALIZADA)
+
+### Tablas de Clientes (Dinámicas):
+```
+clientes_pando
+clientes_maldonado
+clientes_rivera
+clientes_melo
+clientes_paysandu
+clientes_salto
+clientes_tacuarembo
+clientes_rionegro
+clientes_sanisidro
+clientes_soriano
+... (se crean dinámicamente)
+```
+
+### Tablas de Productos:
+```
+productos                  # Catálogo maestro
+productos_sucursal         # Stock y precios por sucursal
+categorias_productos       # Tipos, marcas, calidades
+```
+
+### Tablas de Ventas:
+```
+ventas                     # Ventas principales
+ventas_detalle             # Líneas de productos vendidos
+ventas_diarias_resumen     # Resúmenes agregados por día
+```
+
+### Tablas de Caja (⭐ NUEVO):
+```
+caja                       # Saldo actual por sucursal
+movimientos_caja           # Historial de todos los movimientos
+```
+
+### Tablas de Cuenta Corriente:
+```
+cuenta_corriente_movimientos    # Movimientos de CC
+pagos_cuenta_corriente          # Pagos realizados
+resumen_cuenta_corriente        # Resumen por cliente
+```
+
+### Tablas de Comisiones:
+```
+comisiones_vendedores           # Comisiones generadas
+comisiones_por_vendedor         # Configuración por vendedor
+configuracion_comisiones        # Configuración global
+historial_cambios_comisiones    # Auditoría de cambios
+historial_pagos_comisiones      # Pagos de comisiones
+remanentes_comisiones           # Remanentes acumulados
+```
+
+### Tablas de Staff:
+```
+vendedores                      # Vendedores/usuarios
+configuracion_sucursales        # Configuración de sucursales
+```
+
+### Tablas de Transferencias:
+```
+transferencias                  # Transferencias entre sucursales
+transferencias_detalle          # Detalle de productos transferidos
+historial_transferencias        # Historial completo
+```
+
+### Tablas de Sistema:
+```
+secuencias                      # Secuencias para números de venta
+```
+
+**TOTAL**: 32+ tablas (dinámicas por sucursales)
+
+---
+
+## 🎯 RESUMEN DE REGLAS (ACTUALIZADO)
+
+1. ✅ **Base de Datos**: localhost:3307, zarparDataBase, NUNCA cambiar
+2. ✅ **Revisar Código**: SIEMPRE antes de cambiar, NO romper nada
+3. ✅ **Español**: Todo en español, comentarios, mensajes, UI
+4. ✅ **Enseñar**: Usuario principiante, explicar TODO con ejemplos
+5. ✅ **Sucursales**: Sistema dinámico, "Administrador" NO es sucursal
+6. ✅ **Optimizar BD**: Evitar tablas innecesarias, agregar columnas primero
+7. ✅ **Explicar**: Enseñar el "por qué" y "cómo" con analogías
+8. ✅ **Sin Bugs**: Revisar TODO, prevenir problemas, solucionar BIEN
+9. ✅ **UI Profesional**: 100% responsive, iconos, animaciones, hover
+10. ✅ **Seguridad**: Prepared statements, validación, sanitización
+11. ✅ **Eliminación Inteligente**: Hard delete con fallback a soft delete
+12. ✅ **Sistema Dinámico**: Sucursales 100% escalables
+13. ✅ **Encoding UTF-8**: Configuración correcta en TODA la cadena (⭐ CRÍTICO)
+14. ✅ **PDFs Profesionales**: Diseño elegante, datos ordenados, encoding correcto
+15. ✅ **Sistema de Caja**: Control total del efectivo, historial completo
+
+---
+
+## 🚀 TECNOLOGÍAS DEL PROYECTO (ACTUALIZADO)
+
+- **Frontend**: React 18 + TypeScript + Vite + Ant Design 5
+- **Backend**: Node.js + Express + TypeScript
+- **Base de Datos**: MySQL 8.0 (Docker) con **utf8mb4**
+- **PDFs**: jsPDF + jspdf-autotable
+- **Autenticación**: JWT + bcryptjs
+- **Puertos**: Frontend:5678, Backend:3456, MySQL:3307
+
+---
+
 ## 📄 CHANGELOG
+
+### **Versión 3.0.0 - 5 de Noviembre, 2025 (Actualización Crítica)**
+- ✅ **ENCODING UTF-8 COMPLETO Y AUDITADO** (⭐ CRÍTICO)
+  - Configuración obligatoria en pool MySQL
+  - Scripts de corrección para 32 tablas
+  - Auditoría completa de 155 campos VARCHAR/TEXT
+  - 70+ registros corruptos corregidos
+  - Documentación exhaustiva (2 archivos MD)
+- ✅ **SISTEMA DE GENERACIÓN DE PDFs PROFESIONALES**
+  - jsPDF + autoTable configurados
+  - Ordenamiento inteligente de datos
+  - Diseño profesional con header/footer
+  - Encoding UTF-8 correcto en PDFs
+  - Página `/products/prices` completamente funcional
+- ✅ **SISTEMA DE GESTIÓN DE CAJA**
+  - 2 nuevas tablas: `caja`, `movimientos_caja`
+  - Integración automática con ventas en efectivo
+  - Integración con pagos de cuenta corriente
+  - Historial completo de movimientos
+  - Permisos diferenciados (admin vs usuario)
+  - Página `/finance/cash` completamente funcional
+- ✅ **LIMPIEZA DE DATOS**
+  - Modal de limpieza selectiva por módulos
+  - Borrado seguro con transacciones
+  - Corrección de bugs en eliminación de ventas
+- ✅ **MIGRACIÓN DE REPORTES**
+  - Botón "VENTAS GLOBALES" migrado a `/inventory/log`
+  - Preparado para 4 reportes adicionales
+- ✅ **DOCUMENTACIÓN COMPLETA**
+  - `SOLUCION_ENCODING_UTF8.md`
+  - `AUDITORIA_ENCODING_COMPLETA.md`
+  - `SOLUCION_PROBLEMAS_LOGIN.md`
+  - Scripts de auditoría y corrección
 
 ### Versión 2.1.0 - 31 de Octubre, 2025 (Actualización Mayor)
 - ✅ **SISTEMA DINÁMICO Y ESCALABLE DE SUCURSALES**
@@ -2054,3 +3063,49 @@ database/
 - ✅ Docker MySQL configurado
 - ✅ Frontend React + TypeScript + Ant Design
 - ✅ Backend Express + TypeScript
+
+---
+
+**Última actualización**: 5 de Noviembre, 2025  
+**Versión**: 3.0.0  
+**Estado**: ACTIVO - LEER SIEMPRE
+
+---
+
+## 🎓 FILOSOFÍA GENERAL DEL PROYECTO
+
+Este proyecto está diseñado para ser:
+
+1. **📈 ESCALABLE**: Agregar sucursales, productos, usuarios sin tocar código
+2. **🛡️ ROBUSTO**: Manejo correcto de errores, transacciones, encoding
+3. **🎨 PROFESIONAL**: UI elegante, PDFs de calidad, feedback visual
+4. **🔒 SEGURO**: Prepared statements, validación, permisos por rol
+5. **📚 DOCUMENTADO**: Código comentado, archivos MD, changelog actualizado
+6. **🌍 INTERNACIONAL**: UTF-8 en toda la cadena, soporte para acentos
+7. **💡 EDUCATIVO**: Código claro, comentarios explicativos, documentación para principiantes
+
+---
+
+## ⚡ TIPS PARA MÁXIMA ESCALABILIDAD
+
+### ✅ HACER:
+1. **Carga dinámica** de sucursales, productos, usuarios desde BD
+2. **Validación robusta** en backend y frontend
+3. **Transacciones** para operaciones que modifican múltiples tablas
+4. **Prepared statements** para TODAS las queries
+5. **UTF-8** configurado en toda la cadena
+6. **Permisos** verificados en backend, no solo en frontend
+7. **Documentación** actualizada con cada cambio importante
+
+### ❌ NO HACER:
+1. **Hardcodear** listas de sucursales, tipos, marcas
+2. **Asumir** que los datos son correctos sin validar
+3. **Mezclar** operaciones de BD sin transacciones
+4. **Ignorar** warnings de encoding o linter
+5. **Copiar** código sin entender
+6. **Dejar** console.log en producción sin razón
+7. **Modificar** `.cursorrules` sin actualizar changelog
+
+---
+
+🎯 **OBJETIVO FINAL**: Sistema de gestión empresarial completo, escalable, robusto y profesional para múltiples sucursales de venta de repuestos de celulares.

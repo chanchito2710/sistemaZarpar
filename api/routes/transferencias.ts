@@ -10,6 +10,7 @@ import {
   obtenerTransferencias,
   obtenerDetalleTransferencia,
   confirmarRecepcion,
+  confirmarRecepcionDirecta,
   cancelarTransferencia,
   obtenerVentasPorRango,
   obtenerResumen
@@ -118,6 +119,22 @@ router.get('/:id', obtenerDetalleTransferencia);
 router.put('/:id/confirmar', confirmarRecepcion);
 
 /**
+ * @route   POST /api/transferencias/confirmar-recepcion
+ * @desc    Confirmar recepción directa de stock en tránsito (para sucursales simples)
+ * @access  Private (requiere autenticación)
+ * @body    {
+ *            producto_id: number,
+ *            sucursal: string,
+ *            cantidad: number
+ *          }
+ * @returns {
+ *            success: boolean,
+ *            data: { mensaje: string, stock_actualizado: number }
+ *          }
+ */
+router.post('/confirmar-recepcion', confirmarRecepcionDirecta);
+
+/**
  * @route   PUT /api/transferencias/:id/cancelar
  * @desc    Cancelar transferencia (devuelve stock a Maldonado si está en tránsito)
  * @access  Private (requiere autenticación)
@@ -130,6 +147,9 @@ router.put('/:id/confirmar', confirmarRecepcion);
 router.put('/:id/cancelar', cancelarTransferencia);
 
 export default router;
+
+
+
 
 
 

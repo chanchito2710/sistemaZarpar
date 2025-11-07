@@ -1,761 +1,575 @@
-import React, { useState, useMemo } from 'react';
+/**
+ * Página de Registro de Gastos
+ * Permite registrar gastos en efectivo que se descuentan de la caja
+ */
+
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Form,
   Input,
+  InputNumber,
   Select,
   Button,
-  Table,
+  message as antMessage,
+  Space,
   Typography,
   Row,
   Col,
-  Statistic,
-  Space,
-  message,
-  Modal,
-  InputNumber,
-  Divider,
+  Alert,
+  Table,
   Tag,
-  notification,
-  DatePicker
+  Statistic,
+  Divider,
+  Spin,
+  DatePicker,
 } from 'antd';
 import {
   DollarOutlined,
-  ShopOutlined,
   FileTextOutlined,
-  SendOutlined,
-  CheckCircleOutlined,
+  FileProtectOutlined,
+  TruckOutlined,
+  QuestionCircleOutlined,
+  PlusCircleOutlined,
   CalendarOutlined,
-  BarChartOutlined,
-  FilterOutlined,
-  ClearOutlined
+  ReloadOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import type { ColumnsType } from 'antd/es/table';
-import { BRANCHES } from '../../data/branches';
+import { useAuth } from '../../contexts/AuthContext';
+import dayjs, { Dayjs } from 'dayjs';
+import 'dayjs/locale/es';
+dayjs.locale('es');
 
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 const { Option } = Select;
+const { TextArea } = Input;
+const { RangePicker } = DatePicker;
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
 
 interface Gasto {
-  id: string;
+  id: number;
   sucursal: string;
   monto: number;
-  detalle: string;
-  categoria: string;
-  detalleOtro?: string;
-  fecha: string;
-  hora: string;
-}
-
-interface CajaSucursal {
-  sucursal: string;
-  saldo: number;
+  motivo: string;
+  notas?: string;
+  usuario_email: string;
+  created_at: string;
 }
 
 const Expenses: React.FC = () => {
+  const { usuario } = useAuth();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [mostrarTextareaOtro, setMostrarTextareaOtro] = useState(false);
+  const [gastosRecientes, setGastosRecientes] = useState<Gasto[]>([]);
+  const [loadingGastos, setLoadingGastos] = useState(false);
+  const [motivoSeleccionado, setMotivoSeleccionado] = useState<string>('');
+  const [saldoCaja, setSaldoCaja] = useState<number | null>(null);
+  const [loadingSaldo, setLoadingSaldo] = useState(false);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
   
-  // Estados para filtros
-  const [filtroFechas, setFiltroFechas] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
-  const [filtroSucursal, setFiltroSucursal] = useState<string | undefined>('Todos');
-  const [filtroCategoria, setFiltroCategoria] = useState<string | undefined>('Todos');
-  const [gastos, setGastos] = useState<Gasto[]>([
-    {
-      id: '1',
-      sucursal: 'Casa Central',
-      monto: 15000,
-      detalle: 'Compra de cemento y ladrillos',
-      categoria: 'Materiales de construcción',
-      fecha: '2024-01-15',
-      hora: '10:30'
-    },
-    {
-      id: '2',
-      sucursal: 'Paysandú',
-      monto: 8500,
-      detalle: 'Envío de productos a cliente',
-      categoria: 'Encomiendas',
-      fecha: '2024-01-15',
-      hora: '14:20'
-    },
-    {
-      id: '3',
-      sucursal: 'Salto',
-      monto: 12300,
-      detalle: 'Combustible para vehículos de reparto',
-      categoria: 'Nafta',
-      fecha: '2024-01-14',
-      hora: '09:15'
-    },
-    {
-      id: '4',
-      sucursal: 'Rivera',
-      monto: 4500,
-      detalle: 'Papelería y útiles de oficina',
-      categoria: 'Materiales de oficina',
-      fecha: '2024-01-13',
-      hora: '16:45'
-    },
-    {
-      id: '5',
-      sucursal: 'Tacuarembó',
-      monto: 25000,
-      detalle: 'Pago con tarjeta de crédito',
-      categoria: 'Tarjeta',
-      fecha: '2024-01-12',
-      hora: '11:30'
-    },
-    {
-      id: '6',
-      sucursal: 'Pando',
-      monto: 7800,
-      detalle: 'Reparación de equipos',
-      categoria: 'Otro',
-      detalleOtro: 'Arreglo de computadora y impresora de la oficina',
-      fecha: '2024-01-11',
-      hora: '14:00'
-    },
-    {
-      id: '7',
-      sucursal: 'Melo',
-      monto: 18500,
-      detalle: 'Arena y piedra para construcción',
-      categoria: 'Materiales de construcción',
-      fecha: '2024-01-10',
-      hora: '08:20'
-    },
-    {
-      id: '8',
-      sucursal: 'Casa Central',
-      monto: 6200,
-      detalle: 'Envío urgente a Montevideo',
-      categoria: 'Encomiendas',
-      fecha: '2024-01-09',
-      hora: '13:15'
-    },
-    {
-      id: '9',
-      sucursal: 'Paysandú',
-      monto: 9800,
-      detalle: 'Gasoil para camiones',
-      categoria: 'Nafta',
-      fecha: '2024-01-08',
-      hora: '07:45'
-    },
-    {
-      id: '10',
-      sucursal: 'Salto',
-      monto: 3400,
-      detalle: 'Limpieza y mantenimiento',
-      categoria: 'Otro',
-      detalleOtro: 'Productos de limpieza y servicio de mantenimiento mensual',
-      fecha: '2024-01-07',
-      hora: '15:30'
-    },
-    {
-      id: '11',
-      sucursal: 'Rivera',
-      monto: 22000,
-      detalle: 'Hierro y varillas de construcción',
-      categoria: 'Materiales de construcción',
-      fecha: '2024-01-06',
-      hora: '10:00'
-    },
-    {
-      id: '12',
-      sucursal: 'Tacuarembó',
-      monto: 5600,
-      detalle: 'Tóner y cartuchos para impresoras',
-      categoria: 'Materiales de oficina',
-      fecha: '2024-01-05',
-      hora: '12:20'
-    }
-  ]);
+  // Filtros de fecha para gastos
+  const [fechaDesdeGastos, setFechaDesdeGastos] = useState<Dayjs | null>(null);
+  const [fechaHastaGastos, setFechaHastaGastos] = useState<Dayjs | null>(null);
 
-  const [cajasSucursales, setCajasSucursales] = useState<CajaSucursal[]>([
-    { sucursal: 'Casa Central', saldo: 250000 },
-    { sucursal: 'Paysandú', saldo: 180000 },
-    { sucursal: 'Salto', saldo: 165000 },
-    { sucursal: 'Rivera', saldo: 142000 },
-    { sucursal: 'Tacuarembó', saldo: 198000 },
-    { sucursal: 'Pando', saldo: 175000 },
-    { sucursal: 'Melo', saldo: 156000 }
-  ]);
+  const esAdmin = usuario?.esAdmin || false;
+  const sucursalUsuario = obtenerSucursalDelUsuario();
 
-  const categorias = [
-    'Materiales de construcción',
-    'Encomiendas',
-    'Tarjeta',
-    'Nafta',
-    'Materiales de oficina',
-    'Otro'
-  ];
+  // Función para extraer sucursal del email
+  function obtenerSucursalDelUsuario(): string {
+    if (!usuario?.email) return 'pando';
 
-  const sucursales = BRANCHES.map(branch => branch.name);
+    const email = usuario.email.toLowerCase();
 
-  const handleCategoriaChange = (value: string) => {
-    setMostrarTextareaOtro(value === 'Otro');
-    if (value !== 'Otro') {
-      form.setFieldsValue({ detalleOtro: undefined });
-    }
-  };
+    if (email.startsWith('pando@')) return 'pando';
+    if (email.startsWith('maldonado@')) return 'maldonado';
+    if (email.startsWith('rivera@')) return 'rivera';
+    if (email.startsWith('melo@')) return 'melo';
+    if (email.startsWith('paysandu@')) return 'paysandu';
+    if (email.startsWith('salto@')) return 'salto';
+    if (email.startsWith('tacuarembo@')) return 'tacuarembo';
 
-  const mostrarNotificacionExito = () => {
-    notification.success({
-      message: 'Gasto Procesado',
-      description: 'El gasto ha sido registrado exitosamente y descontado de la caja.',
-      icon: <DollarOutlined style={{ color: '#52c41a' }} />,
-      placement: 'topRight',
-      duration: 4,
-      style: {
-        borderRadius: '12px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-        border: '1px solid #52c41a20'
-      }
-    });
-  };
+    return 'pando';
+  }
 
-  const onFinish = async (values: any) => {
-    setLoading(true);
+  useEffect(() => {
+    // Establecer sucursal por defecto
+    const sucursalInicial = esAdmin ? '' : sucursalUsuario;
     
+    if (!esAdmin) {
+      form.setFieldsValue({ sucursal: sucursalUsuario });
+      setSucursalSeleccionada(sucursalUsuario);
+      cargarSaldoCaja(sucursalUsuario);
+    }
+
+    cargarGastosRecientes();
+  }, []);
+
+  // Efecto para cargar saldo cuando cambia la sucursal seleccionada
+  useEffect(() => {
+    if (sucursalSeleccionada) {
+      cargarSaldoCaja(sucursalSeleccionada);
+    }
+  }, [sucursalSeleccionada]);
+
+  const cargarSaldoCaja = async (sucursal: string) => {
+    if (!sucursal) return;
+    
+    setLoadingSaldo(true);
     try {
-      // Simular procesamiento
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const token = localStorage.getItem('token');
       
-      const nuevoGasto: Gasto = {
-        id: Date.now().toString(),
-        sucursal: values.sucursal,
-        monto: values.monto,
-        detalle: values.detalle,
-        categoria: values.categoria,
-        detalleOtro: values.detalleOtro,
-        fecha: new Date().toISOString().split('T')[0],
-        hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-      };
+      const response = await fetch(`${API_URL}/caja/${sucursal}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
 
-      // Agregar gasto a la lista
-      setGastos(prev => [nuevoGasto, ...prev]);
-
-      // Descontar de la caja de la sucursal
-      setCajasSucursales(prev => 
-        prev.map(caja => 
-          caja.sucursal === values.sucursal 
-            ? { ...caja, saldo: caja.saldo - values.monto }
-            : caja
-        )
-      );
-
-      // Mostrar notificación de éxito
-      mostrarNotificacionExito();
-
-      // Resetear formulario
-      form.resetFields();
-      setMostrarTextareaOtro(false);
-      
+      if (data.success) {
+        setSaldoCaja(data.data.monto_actual);
+      }
     } catch (error) {
-      message.error('Error al procesar el gasto');
+      console.error('Error al cargar saldo de caja:', error);
+      setSaldoCaja(null);
+    } finally {
+      setLoadingSaldo(false);
+    }
+  };
+
+  const cargarGastosRecientes = async (desde?: Dayjs | null, hasta?: Dayjs | null) => {
+    setLoadingGastos(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Construir URL con parámetros de fecha si existen
+      let url = `${API_URL}/caja/movimientos/historial?tipo_movimiento=gasto&limite=50`;
+      
+      if (desde) {
+        url += `&fechaDesde=${desde.format('YYYY-MM-DD')}`;
+      }
+      
+      if (hasta) {
+        url += `&fechaHasta=${hasta.format('YYYY-MM-DD')}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setGastosRecientes(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error al cargar gastos recientes:', error);
+    } finally {
+      setLoadingGastos(false);
+    }
+  };
+  
+  const handleFiltrarGastos = () => {
+    cargarGastosRecientes(fechaDesdeGastos, fechaHastaGastos);
+  };
+  
+  const handleLimpiarFiltros = () => {
+    setFechaDesdeGastos(null);
+    setFechaHastaGastos(null);
+    cargarGastosRecientes(null, null);
+  };
+
+  const handleRegistrarGasto = async (values: any) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_URL}/caja/gasto`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sucursal: values.sucursal,
+          monto: values.monto,
+          motivo: values.motivo,
+          notas: values.notas || null,
+          usuario_id: usuario?.id || 0,
+          usuario_email: usuario?.email || '',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        antMessage.success(`💸 ${data.message}`);
+        
+        // Recargar saldo de caja
+        if (sucursalSeleccionada) {
+          cargarSaldoCaja(sucursalSeleccionada);
+        }
+        
+        form.resetFields();
+
+        // Restablecer sucursal si no es admin
+        if (!esAdmin) {
+          form.setFieldsValue({ sucursal: sucursalUsuario });
+          setSucursalSeleccionada(sucursalUsuario);
+        } else {
+          setSucursalSeleccionada('');
+          setSaldoCaja(null);
+        }
+
+        setMotivoSeleccionado('');
+        cargarGastosRecientes();
+      } else {
+        antMessage.error(data.message || 'Error al registrar gasto');
+      }
+    } catch (error: any) {
+      console.error('Error al registrar gasto:', error);
+      antMessage.error(error.message || 'Error al registrar gasto');
     } finally {
       setLoading(false);
     }
   };
 
-  const columns: ColumnsType<Gasto> = [
+  const motivos = [
+    { value: 'Gasolina', label: 'Gasolina', icon: <span style={{ fontSize: '16px' }}>⛽</span> },
+    { value: 'Papelería', label: 'Papelería', icon: <FileProtectOutlined /> },
+    { value: 'Flete', label: 'Flete', icon: <TruckOutlined /> },
+    { value: 'Otro', label: 'Otro', icon: <QuestionCircleOutlined /> },
+  ];
+
+  const columnas = [
     {
       title: 'Fecha',
-      dataIndex: 'fecha',
-      key: 'fecha',
-      width: 100,
-      render: (fecha: string, record: Gasto) => (
-        <div>
-          <div>{fecha}</div>
-          <Text type="secondary" style={{ fontSize: '12px' }}>{record.hora}</Text>
-        </div>
-      )
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (fecha: string) => (
+        <Text style={{ fontSize: 12 }}>
+          {dayjs(fecha).format('DD/MM/YYYY HH:mm')}
+        </Text>
+      ),
+      width: 130,
+      fixed: 'left' as const,
     },
     {
       title: 'Sucursal',
       dataIndex: 'sucursal',
       key: 'sucursal',
-      width: 120,
       render: (sucursal: string) => (
-        <Tag color="blue" icon={<ShopOutlined />}>
-          {sucursal}
+        <Tag color="blue" style={{ fontSize: 11 }}>
+          {sucursal.toUpperCase()}
         </Tag>
-      )
-    },
-    {
-      title: 'Categoría',
-      dataIndex: 'categoria',
-      key: 'categoria',
-      width: 150,
-      render: (categoria: string) => {
-        const colores: { [key: string]: string } = {
-          'Materiales de construcción': 'orange',
-          'Encomiendas': 'green',
-          'Tarjeta': 'purple',
-          'Nafta': 'red',
-          'Materiales de oficina': 'cyan',
-          'Otro': 'default'
-        };
-        return <Tag color={colores[categoria]}>{categoria}</Tag>;
-      }
-    },
-    {
-      title: 'Detalle',
-      dataIndex: 'detalle',
-      key: 'detalle',
-      ellipsis: true,
-      render: (detalle: string, record: Gasto) => (
-        <div>
-          <div>{detalle}</div>
-          {record.detalleOtro && (
-            <Text type="secondary" style={{ fontSize: '12px', fontStyle: 'italic' }}>
-              {record.detalleOtro}
-            </Text>
-          )}
-        </div>
-      )
+      ),
+      width: 100,
     },
     {
       title: 'Monto',
       dataIndex: 'monto',
       key: 'monto',
-      width: 120,
-      align: 'right',
       render: (monto: number) => (
-        <Text strong style={{ color: '#f5222d', fontSize: '16px' }}>
-          ${monto.toLocaleString()}
+        <Text strong style={{ color: '#ff4d4f', fontSize: 13 }}>
+          -${Math.abs(monto).toFixed(2)}
         </Text>
-      )
-    }
+      ),
+      width: 100,
+      align: 'right' as const,
+    },
+    {
+      title: 'Concepto',
+      dataIndex: 'concepto',
+      key: 'concepto',
+      ellipsis: true,
+      render: (concepto: string) => (
+        <Text ellipsis style={{ fontSize: 12 }}>
+          {concepto}
+        </Text>
+      ),
+    },
+    {
+      title: 'Usuario',
+      dataIndex: 'usuario_email',
+      key: 'usuario_email',
+      render: (email: string) => (
+        <Text type="secondary" style={{ fontSize: 11 }}>
+          {email}
+        </Text>
+      ),
+      width: 180,
+      ellipsis: true,
+    },
   ];
-
-  // Función para filtrar gastos
-  const gastosFiltrados = useMemo(() => {
-    return gastos.filter(gasto => {
-      // Filtro por fechas
-      if (filtroFechas && filtroFechas.length === 2) {
-        const fechaGasto = dayjs(gasto.fecha);
-        const fechaInicio = dayjs(filtroFechas[0]);
-        const fechaFin = dayjs(filtroFechas[1]);
-        
-        if (!fechaGasto.isBetween(fechaInicio, fechaFin, 'day', '[]')) {
-          return false;
-        }
-      }
-      
-      // Filtro por sucursal - "Todos" significa mostrar todas
-      if (filtroSucursal && filtroSucursal !== 'Todos' && gasto.sucursal !== filtroSucursal) {
-        return false;
-      }
-      
-      // Filtro por categoría - "Todos" significa mostrar todas
-      if (filtroCategoria && filtroCategoria !== 'Todos' && gasto.categoria !== filtroCategoria) {
-        return false;
-      }
-      
-      return true;
-    });
-  }, [gastos, filtroFechas, filtroSucursal, filtroCategoria]);
-
-  const calcularTotalPorCategoria = (gastosParaCalcular: Gasto[]) => {
-    const totales: { [key: string]: number } = {};
-    gastosParaCalcular.forEach(gasto => {
-      totales[gasto.categoria] = (totales[gasto.categoria] || 0) + gasto.monto;
-    });
-    return totales;
-  };
-
-  const totalesPorCategoria = calcularTotalPorCategoria(gastosFiltrados);
-  const totalGeneral = gastosFiltrados.reduce((sum, gasto) => sum + gasto.monto, 0);
-  const saldoTotalCajas = cajasSucursales.reduce((sum, caja) => sum + caja.saldo, 0);
-  
-  // Función para limpiar filtros
-  const limpiarFiltros = () => {
-    setFiltroFechas(null);
-    setFiltroSucursal('Todos');
-    setFiltroCategoria('Todos');
-  };
 
   return (
     <div style={{ padding: '24px' }}>
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <DollarOutlined style={{ color: '#1890ff' }} />
-          Control de Gastos
-        </Title>
-        <Text type="secondary">Registra y controla los gastos de cada sucursal</Text>
-      </div>
-
-      {/* Estadísticas */}
-      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title={filtroFechas || filtroSucursal || filtroCategoria ? "Total Filtrado" : "Total Gastado Hoy"}
-              value={totalGeneral}
-              prefix={<DollarOutlined />}
-              valueStyle={{ color: '#f5222d' }}
-              formatter={(value) => `$${value?.toLocaleString()}`}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Gastos Mostrados"
-              value={gastosFiltrados.length}
-              suffix={gastos.length !== gastosFiltrados.length ? `/ ${gastos.length}` : ''}
-              prefix={<FileTextOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Saldo Total Cajas"
-              value={saldoTotalCajas}
-              prefix={<BarChartOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-              formatter={(value) => `$${value?.toLocaleString()}`}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Sucursales Activas"
-              value={sucursales.length}
-              prefix={<ShopOutlined />}
-              valueStyle={{ color: '#722ed1' }}
-            />
-          </Card>
+      <Row align="middle" justify="space-between" style={{ marginBottom: '24px' }}>
+        <Col>
+          <Title level={2} style={{ margin: 0 }}>
+            💸 Registro de Gastos
+          </Title>
+          <Text type="secondary">Registra gastos en efectivo de tu sucursal</Text>
         </Col>
       </Row>
 
+      {/* Alert informativo */}
+      <Alert
+        message="💡 Información"
+        description="Los gastos registrados se descontarán automáticamente del efectivo disponible en la caja de tu sucursal."
+        type="info"
+        showIcon
+        style={{ marginBottom: '24px' }}
+      />
+
+      {/* Saldo disponible en caja */}
+      {sucursalSeleccionada && (
+        <Card
+          style={{
+            marginBottom: '24px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            border: 'none',
+          }}
+        >
+          <Row align="middle" justify="space-between">
+            <Col>
+              <Text style={{ color: 'white', fontSize: '16px', fontWeight: 500 }}>
+                💰 Efectivo Disponible en Caja ({sucursalSeleccionada.toUpperCase()})
+              </Text>
+            </Col>
+            <Col>
+              <Spin spinning={loadingSaldo}>
+                <Statistic
+                  value={saldoCaja !== null ? saldoCaja : 0}
+                  precision={2}
+                  prefix="$"
+                  valueStyle={{
+                    color: 'white',
+                    fontSize: '32px',
+                    fontWeight: 'bold',
+                  }}
+                />
+              </Spin>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
       <Row gutter={[24, 24]}>
-        {/* Formulario de Gastos */}
-        <Col xs={24} lg={10}>
-          <Card 
+        {/* Formulario de registro */}
+        <Col xs={24} lg={12}>
+          <Card
             title={
               <Space>
-                <SendOutlined />
-                Registrar Nuevo Gasto
+                <PlusCircleOutlined />
+                <Text strong>Registrar Nuevo Gasto</Text>
               </Space>
             }
-            style={{ height: 'fit-content' }}
           >
             <Form
               form={form}
               layout="vertical"
-              onFinish={onFinish}
-              requiredMark={false}
+              onFinish={handleRegistrarGasto}
+              initialValues={{
+                sucursal: esAdmin ? undefined : sucursalUsuario,
+              }}
             >
+              {/* Sucursal */}
               <Form.Item
-                name="sucursal"
                 label="Sucursal"
-                rules={[{ required: true, message: 'Selecciona una sucursal' }]}
+                name="sucursal"
+                rules={[{ required: true, message: 'Selecciona la sucursal' }]}
               >
                 <Select
                   placeholder="Selecciona la sucursal"
+                  disabled={!esAdmin}
                   size="large"
-                  suffixIcon={<ShopOutlined />}
+                  onChange={(value) => setSucursalSeleccionada(value)}
                 >
-                  {sucursales.map(sucursal => (
-                    <Option key={sucursal} value={sucursal}>
-                      {sucursal}
-                    </Option>
-                  ))}
+                  <Option value="pando">PANDO</Option>
+                  <Option value="maldonado">MALDONADO</Option>
+                  <Option value="rivera">RIVERA</Option>
+                  <Option value="melo">MELO</Option>
+                  <Option value="paysandu">PAYSANDÚ</Option>
+                  <Option value="salto">SALTO</Option>
+                  <Option value="tacuarembo">TACUAREMBÓ</Option>
                 </Select>
               </Form.Item>
 
+              {/* Monto */}
               <Form.Item
+                label="Monto ($)"
                 name="monto"
-                label="Monto del Gasto"
                 rules={[
                   { required: true, message: 'Ingresa el monto' },
-                  { type: 'number', min: 1, message: 'El monto debe ser mayor a 0' }
+                  { type: 'number', min: 0.01, message: 'El monto debe ser mayor a 0' },
                 ]}
               >
                 <InputNumber
-                  placeholder="Ingresa el monto"
-                  size="large"
-                  style={{ width: '100%' }}
                   prefix={<DollarOutlined />}
-                  formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="detalle"
-                label="Detalle del Gasto"
-                rules={[{ required: true, message: 'Describe el gasto' }]}
-              >
-                <Input
-                  placeholder="Describe en qué se gastó el dinero"
+                  placeholder="0.00"
+                  style={{ width: '100%' }}
+                  min={0}
+                  step={0.01}
+                  precision={2}
                   size="large"
-                  prefix={<FileTextOutlined />}
                 />
               </Form.Item>
 
+              {/* Motivo */}
               <Form.Item
-                name="categoria"
-                label="Categoría"
-                rules={[{ required: true, message: 'Selecciona una categoría' }]}
+                label="Motivo del Gasto"
+                name="motivo"
+                rules={[{ required: true, message: 'Selecciona el motivo' }]}
               >
                 <Select
-                  placeholder="Selecciona la categoría del gasto"
+                  placeholder="Selecciona el motivo"
                   size="large"
-                  onChange={handleCategoriaChange}
+                  onChange={(value) => setMotivoSeleccionado(value)}
                 >
-                  {categorias.map(categoria => (
-                    <Option key={categoria} value={categoria}>
-                      {categoria}
+                  {motivos.map((motivo) => (
+                    <Option key={motivo.value} value={motivo.value}>
+                      <Space>
+                        {motivo.icon}
+                        {motivo.label}
+                      </Space>
                     </Option>
                   ))}
                 </Select>
               </Form.Item>
 
-              {mostrarTextareaOtro && (
-                <Form.Item
-                  name="detalleOtro"
-                  label="Detalle Adicional"
-                  rules={[{ required: true, message: 'Especifica el detalle del gasto' }]}
-                  style={{
-                    animation: 'fadeIn 0.3s ease-in-out'
-                  }}
-                >
-                  <TextArea
-                    placeholder="Especifica en qué se gastó el dinero..."
-                    rows={3}
-                    size="large"
-                  />
-                </Form.Item>
+              {/* Notas */}
+              <Form.Item
+                label="Notas (Opcional)"
+                name="notas"
+                rules={[
+                  {
+                    required: motivoSeleccionado === 'Otro',
+                    message: 'Las notas son obligatorias si el motivo es "Otro"',
+                  },
+                ]}
+              >
+                <TextArea
+                  placeholder={
+                    motivoSeleccionado === 'Otro'
+                      ? 'Especifica el motivo del gasto...'
+                      : 'Agrega detalles adicionales (opcional)...'
+                  }
+                  rows={4}
+                  maxLength={500}
+                  showCount
+                />
+              </Form.Item>
+
+              {motivoSeleccionado === 'Otro' && (
+                <Alert
+                  message="⚠️ Atención"
+                  description="Has seleccionado 'Otro'. Debes especificar el motivo en las notas."
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: '16px' }}
+                />
               )}
 
-              <Form.Item style={{ marginTop: '24px', marginBottom: 0 }}>
+              {/* Botón */}
+              <Form.Item>
                 <Button
                   type="primary"
                   htmlType="submit"
-                  loading={loading}
                   size="large"
+                  loading={loading}
                   block
-                  icon={<SendOutlined />}
-                  style={{
-                    height: '48px',
-                    borderRadius: '8px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
-                    border: 'none',
-                    boxShadow: '0 4px 12px rgba(24, 144, 255, 0.3)'
-                  }}
+                  icon={<FileTextOutlined />}
                 >
-                  {loading ? 'Procesando...' : 'Registrar Gasto'}
+                  💸 Registrar Gasto
                 </Button>
               </Form.Item>
             </Form>
           </Card>
-
-          {/* Totales por Categoría */}
-          <Card 
-            title="Totales por Categoría" 
-            style={{ marginTop: '16px' }}
-            size="small"
-          >
-            <Space direction="vertical" style={{ width: '100%' }} size="small">
-              {Object.entries(totalesPorCategoria).map(([categoria, total]) => (
-                <div key={categoria} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text>{categoria}</Text>
-                  <Text strong style={{ color: '#f5222d' }}>
-                    ${total.toLocaleString()}
-                  </Text>
-                </div>
-              ))}
-            </Space>
-          </Card>
         </Col>
 
-        {/* Tabla de Gastos Recientes */}
-        <Col xs={24} lg={14}>
-          <Card 
+        {/* Gastos recientes */}
+        <Col xs={24} lg={12}>
+          <Card
             title={
               <Space>
-                <CalendarOutlined />
-                Gastos Recientes
+                <FileTextOutlined />
+                <Text strong>Gastos Recientes</Text>
               </Space>
             }
+            extra={
+              <Button 
+                onClick={handleLimpiarFiltros} 
+                size="small"
+                icon={<ReloadOutlined />}
+              >
+                Actualizar
+              </Button>
+            }
           >
+            {/* Filtros de fecha */}
+            <Space direction="vertical" size="middle" style={{ width: '100%', marginBottom: 16 }}>
+              <Row gutter={[8, 8]} align="middle">
+                <Col xs={24} sm={14}>
+                  <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Filtrar por rango de fechas:
+                    </Text>
+                    <RangePicker
+                      value={[fechaDesdeGastos, fechaHastaGastos]}
+                      onChange={(dates) => {
+                        setFechaDesdeGastos(dates ? dates[0] : null);
+                        setFechaHastaGastos(dates ? dates[1] : null);
+                      }}
+                      format="DD/MM/YYYY"
+                      placeholder={['Fecha desde', 'Fecha hasta']}
+                      style={{ width: '100%' }}
+                      size="small"
+                    />
+                  </Space>
+                </Col>
+                <Col xs={24} sm={10}>
+                  <Space size="small" style={{ marginTop: 16 }}>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CalendarOutlined />}
+                      onClick={handleFiltrarGastos}
+                      loading={loadingGastos}
+                    >
+                      Filtrar
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={handleLimpiarFiltros}
+                      disabled={!fechaDesdeGastos && !fechaHastaGastos}
+                    >
+                      Limpiar
+                    </Button>
+                  </Space>
+                </Col>
+              </Row>
+            </Space>
+            
             <Table
-              columns={columns}
-              dataSource={gastosFiltrados}
+              dataSource={gastosRecientes}
+              columns={columnas}
               rowKey="id"
-              pagination={{
-                pageSize: 8,
-                showSizeChanger: false,
-                showQuickJumper: true,
-                showTotal: (total, range) => 
-                  `${range[0]}-${range[1]} de ${total} gastos${gastos.length !== gastosFiltrados.length ? ` (${gastos.length} total)` : ''}`
+              loading={loadingGastos}
+              pagination={{ 
+                pageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total) => `Total: ${total} gastos`,
               }}
-              scroll={{ x: 800 }}
               size="small"
+              scroll={{ x: 800 }}
             />
           </Card>
         </Col>
       </Row>
-
-      {/* Filtros Avanzados - Nueva sección completa */}
-      <Row style={{ marginBottom: '24px' }}>
-        <Col span={24}>
-          <Card 
-            title={
-              <Space>
-                <FilterOutlined />
-                Filtros de Búsqueda
-              </Space>
-            }
-            size="small"
-          >
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={8} md={8}>
-                <Space direction="vertical" style={{ width: '100%' }} size="small">
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>Rango de Fechas:</span>
-                  <DatePicker.RangePicker
-                    value={filtroFechas}
-                    onChange={(dates) => setFiltroFechas(dates)}
-                    placeholder={['Fecha inicio', 'Fecha fin']}
-                    style={{ width: '100%' }}
-                    format="DD/MM/YYYY"
-                    allowClear
-                  />
-                </Space>
-              </Col>
-              
-              <Col xs={24} sm={8} md={8}>
-                <Space direction="vertical" style={{ width: '100%' }} size="small">
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>Sucursal:</span>
-                  <Select
-                    value={filtroSucursal}
-                    onChange={setFiltroSucursal}
-                    placeholder="Todos"
-                    defaultValue="Todos"
-                    style={{ width: '100%' }}
-                    allowClear
-                  >
-                    <Option key="todos" value="Todos">
-                      <Space>
-                        <ShopOutlined />
-                        Todos
-                      </Space>
-                    </Option>
-                    {sucursales.map(sucursal => (
-                      <Option key={sucursal} value={sucursal}>
-                        <Space>
-                          <ShopOutlined />
-                          {sucursal}
-                        </Space>
-                      </Option>
-                    ))}
-                  </Select>
-                </Space>
-              </Col>
-              
-              <Col xs={24} sm={8} md={8}>
-                <Space direction="vertical" style={{ width: '100%' }} size="small">
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>Categoría:</span>
-                  <Select
-                    value={filtroCategoria}
-                    onChange={setFiltroCategoria}
-                    placeholder="Todos"
-                    defaultValue="Todos"
-                    style={{ width: '100%' }}
-                    allowClear
-                  >
-                    <Option key="todos" value="Todos">
-                      <Tag color="blue" style={{ margin: 0 }}>
-                        Todos
-                      </Tag>
-                    </Option>
-                    {categorias.map(categoria => {
-                      const colores: { [key: string]: string } = {
-                        'Materiales de construcción': 'orange',
-                        'Encomiendas': 'green',
-                        'Tarjeta': 'purple',
-                        'Nafta': 'red',
-                        'Materiales de oficina': 'cyan',
-                        'Otro': 'default'
-                      };
-                      return (
-                        <Option key={categoria} value={categoria}>
-                          <Tag color={colores[categoria]} style={{ margin: 0 }}>
-                            {categoria}
-                          </Tag>
-                        </Option>
-                      );
-                    })}
-                  </Select>
-                </Space>
-              </Col>
-            </Row>
-            
-            <Row style={{ marginTop: '16px' }} justify="space-between" align="middle">
-              <Col>
-                <Space>
-                  <span style={{ fontSize: '13px', color: '#666' }}>
-                    Mostrando {gastosFiltrados.length} de {gastos.length} gastos
-                  </span>
-                  {(filtroFechas || (filtroSucursal && filtroSucursal !== 'Todos') || (filtroCategoria && filtroCategoria !== 'Todos')) && (
-                    <Tag color="blue" style={{ margin: 0 }}>
-                      Filtros activos
-                    </Tag>
-                  )}
-                </Space>
-              </Col>
-              <Col>
-                <Button
-                  icon={<ClearOutlined />}
-                  onClick={limpiarFiltros}
-                  disabled={!filtroFechas && (!filtroSucursal || filtroSucursal === 'Todos') && (!filtroCategoria || filtroCategoria === 'Todos')}
-                  size="small"
-                >
-                  Limpiar Filtros
-                </Button>
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-      </Row>
-
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .ant-card:hover {
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-          transition: box-shadow 0.3s ease;
-        }
-        
-        .ant-btn-primary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(24, 144, 255, 0.4);
-          transition: all 0.3s ease;
-        }
-      `}</style>
     </div>
   );
 };

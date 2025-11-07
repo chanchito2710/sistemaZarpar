@@ -9,11 +9,12 @@ import Dashboard from './pages/dashboard/Dashboard';
 import POS from './pages/pos/POS';
 import Cart from './pages/pos/Cart';
 import Products from './pages/products/Products';
-import PriceEditor from './pages/products/PriceEditor';
+import ProductPrices from './pages/products/ProductPrices';
 import Inventory from './pages/inventory/Inventory';
 import InventoryLog from './pages/inventory/InventoryLog';
 import Returns from './pages/sales/Returns';
 import Sales from './pages/sales/Sales';
+import Comprobante from './pages/sales/Comprobante';
 import GlobalSales from './pages/GlobalSales';
 import MoneyTransfer from './pages/finance/MoneyTransfer';
 import Expenses from './pages/finance/Expenses';
@@ -27,6 +28,7 @@ import CustomerAccounts from './pages/customers/Accounts';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import DatabaseManager from './pages/admin/DatabaseManager';
+import ProtectedDatabaseRoute from './components/ProtectedDatabaseRoute';
 import StaffSellers from './pages/staff/StaffSellers';
 import esES from 'antd/locale/es_ES';
 import 'dayjs/locale/es';
@@ -51,6 +53,7 @@ function App() {
                 <Route path="pos/cart" element={<Cart />} />
                 <Route path="sales" element={<Sales />} />
                 <Route path="sales/returns" element={<Returns />} />
+                <Route path="comprobante/:id" element={<Comprobante />} />
                 <Route path="global-sales" element={<GlobalSales />} />
                 
                 {/* Módulo de Inventario */}
@@ -61,7 +64,7 @@ function App() {
                 
                 {/* Módulo de Productos */}
                 <Route path="products" element={<Products />} />
-                <Route path="products/prices" element={<PriceEditor />} />
+                <Route path="products/prices" element={<ProductPrices />} />
                 
                 {/* Módulo de Clientes */}
                 <Route path="customers" element={<Customers />} />
@@ -75,7 +78,7 @@ function App() {
                 <Route path="finance/money-transfer" element={<MoneyTransfer />} />
                 
                 {/* Módulo de Administración */}
-                <Route path="admin/database" element={<DatabaseManager />} />
+                <Route path="admin/database" element={<ProtectedDatabaseRoute />} />
                 
                 {/* Módulo de Personal (Solo Admin) */}
                 <Route path="staff/sellers" element={<StaffSellers />} />

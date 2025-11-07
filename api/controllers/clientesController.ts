@@ -33,12 +33,12 @@ interface Cliente {
 interface ClienteInput {
   nombre: string;
   apellido: string;
+  telefono: string; // Campo requerido
   nombre_fantasia?: string;
   rut?: string;
   direccion?: string;
   email?: string;
   razon_social?: string;
-  telefono?: string;
   vendedor_id?: number;
 }
 
@@ -222,6 +222,24 @@ export const crearCliente = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    // Validar teléfono (ahora es requerido)
+    if (!clienteData.telefono || clienteData.telefono.trim() === '') {
+      res.status(400).json({
+        success: false,
+        message: 'El teléfono es un campo requerido'
+      });
+      return;
+    }
+
+    // Validar longitud del teléfono
+    if (clienteData.telefono.length < 8 || clienteData.telefono.length > 20) {
+      res.status(400).json({
+        success: false,
+        message: 'El teléfono debe tener entre 8 y 20 caracteres'
+      });
+      return;
+    }
+
     // Validar email si se proporciona
     if (clienteData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -249,7 +267,7 @@ export const crearCliente = async (req: Request, res: Response): Promise<void> =
       clienteData.direccion || null,
       clienteData.email || null,
       clienteData.razon_social || null,
-      clienteData.telefono || null,
+      clienteData.telefono, // Ahora es requerido, no puede ser null
       clienteData.vendedor_id || null
     ];
 

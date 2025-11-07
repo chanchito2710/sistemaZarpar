@@ -445,3 +445,67 @@ export const obtenerSucursales = async (req: Request, res: Response): Promise<vo
 };
 
 
+
+/**
+ * Actualizar estado de comisiones de un vendedor
+ * PUT /api/vendedores/:id/comisiones
+ */
+export const actualizarEstadoComisiones = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { cobra_comisiones } = req.body;
+    
+    // Validar que cobra_comisiones sea un booleano o número (0 o 1)
+    if (cobra_comisiones === undefined || cobra_comisiones === null) {
+      res.status(400).json({
+        success: false,
+        message: 'El campo cobra_comisiones es requerido'
+      });
+      return;
+    }
+    
+    const cobraComisionesValue = cobra_comisiones ? 1 : 0;
+    
+    // Verificar que el vendedor existe
+    const queryVendedor = 'SELECT id, nombre FROM vendedores WHERE id = ?';
+    const [vendedor] = await executeQuery<RowDataPacket[]>(queryVendedor, [id]);
+    
+    if (!vendedor) {
+      res.status(404).json({
+        success: false,
+        message: 'Vendedor no encontrado'
+      });
+      return;
+    }
+    
+    // Actualizar el campo cobra_comisiones
+    const queryUpdate = `
+      UPDATE vendedores 
+      SET cobra_comisiones = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `;
+    
+    await executeQuery<ResultSetHeader>(queryUpdate, [cobraComisionesValue, id]);
+    
+    res.status(200).json({
+      success: true,
+      message: cobraComisionesValue === 1 
+        ? `${vendedor.nombre} ahora cobra comisiones` 
+        : `${vendedor.nombre} ya NO cobra comisiones`,
+      data: {
+        id: Number(id),
+        cobra_comisiones: cobraComisionesValue
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error al actualizar estado de comisiones:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar estado de comisiones',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+

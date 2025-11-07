@@ -411,19 +411,42 @@ export const crearProducto = async (req: Request, res: Response): Promise<void> 
     const productoId = resultado.insertId;
 
     // 🆕 CREAR AUTOMÁTICAMENTE REGISTROS EN productos_sucursal PARA TODAS LAS SUCURSALES
-    const sucursales = ['maldonado', 'pando', 'rivera', 'melo', 'paysandu', 'salto', 'tacuarembo'];
+    // ⭐ DINÁMICO: Obtener TODAS las sucursales de la base de datos
+    const sucursalesResult = await executeQuery<{ sucursal: string }[]>(
+      'SELECT DISTINCT sucursal FROM productos_sucursal ORDER BY sucursal'
+    );
+    
+    const sucursales = sucursalesResult.map(s => s.sucursal);
+    
+    console.log(`📦 Agregando producto nuevo a ${sucursales.length} sucursales:`, sucursales);
     
     const querySucursal = `
       INSERT INTO productos_sucursal 
-      (producto_id, sucursal, stock, precio, stock_minimo, es_stock_principal)
-      VALUES (?, ?, 0, 0, 10, ?)
+      (producto_id, sucursal, stock, precio, stock_minimo, es_stock_principal, activo)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
-    // Insertar en cada sucursal
+    // Insertar en cada sucursal con stock inicial de 100 y precio de referencia de Pando
+    // Obtener precio de referencia de Pando (si existe algún producto)
+    const precioReferenciaResult = await executeQuery<{ precio: number }[]>(
+      `SELECT precio FROM productos_sucursal WHERE sucursal = 'pando' AND activo = 1 LIMIT 1`
+    );
+    const precioReferencia = precioReferenciaResult[0]?.precio || 0;
+    
     for (const sucursal of sucursales) {
       const esStockPrincipal = sucursal === 'maldonado'; // Maldonado es el stock principal
-      await executeQuery(querySucursal, [productoId, sucursal, esStockPrincipal]);
+      await executeQuery(querySucursal, [
+        productoId, 
+        sucursal, 
+        100, // Stock inicial de 100 unidades
+        precioReferencia, // Precio de referencia
+        10, // Stock mínimo
+        esStockPrincipal, 
+        1 // Activo
+      ]);
     }
+    
+    console.log(`✅ Producto creado y agregado a ${sucursales.length} sucursales con stock de 100 unidades cada una`);
 
     // Obtener el producto recién creado
     const productoNuevo = await executeQuery<Producto[]>(
@@ -1123,6 +1146,14 @@ export const prepararTransferencia = async (req: Request, res: Response): Promis
   try {
     const { producto_id, sucursal_destino, cantidad } = req.body;
     
+    console.log('🔴 [BACKEND] prepararTransferencia recibió:', {
+      producto_id,
+      sucursal_destino,
+      cantidad,
+      tipo_cantidad: typeof cantidad,
+      body_completo: req.body
+    });
+    
     // Validaciones
     if (!producto_id || !sucursal_destino || !cantidad || cantidad <= 0) {
       res.status(400).json({
@@ -1183,6 +1214,18 @@ export const prepararTransferencia = async (req: Request, res: Response): Promis
       [cantidad, producto_id, sucursal_destino]
     );
     
+    // 🔴 VERIFICAR QUÉ SE GUARDÓ REALMENTE EN LA BD
+    const [verificacion] = await connection.query<RowDataPacket[]>(
+      'SELECT stock_en_transito FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?',
+      [producto_id, sucursal_destino]
+    );
+    console.log('🔴 [BACKEND] Después de UPDATE, BD tiene:', {
+      producto_id,
+      sucursal_destino,
+      cantidad_enviada: cantidad,
+      stock_en_transito_BD: verificacion[0]?.stock_en_transito
+    });
+    
     await connection.commit();
     
     res.json({
@@ -1193,7 +1236,8 @@ export const prepararTransferencia = async (req: Request, res: Response): Promis
         sucursal_origen: sucursalPrincipal,
         sucursal_destino,
         cantidad,
-        stock_restante: stockDisponible - cantidad
+        stock_restante: stockDisponible - cantidad,
+        stock_en_transito_actualizado: verificacion[0]?.stock_en_transito
       }
     });
     
@@ -1310,6 +1354,14 @@ export const ajustarTransferencia = async (req: Request, res: Response): Promise
   try {
     const { producto_id, sucursal_destino, cantidad_anterior, cantidad_nueva } = req.body;
     
+    console.log('🟠 [BACKEND] ajustarTransferencia recibió:', {
+      producto_id,
+      sucursal_destino,
+      cantidad_anterior,
+      cantidad_nueva,
+      body_completo: req.body
+    });
+    
     if (!producto_id || !sucursal_destino || cantidad_anterior === undefined || cantidad_nueva === undefined) {
       res.status(400).json({
         success: false,
@@ -1319,6 +1371,7 @@ export const ajustarTransferencia = async (req: Request, res: Response): Promise
     }
     
     const diferencia = cantidad_nueva - cantidad_anterior;
+    console.log('🟠 [BACKEND] Diferencia calculada:', diferencia);
     
     if (diferencia === 0) {
       res.json({
@@ -1622,5 +1675,114 @@ export const obtenerFiltrosProductos = async (req: Request, res: Response): Prom
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   }
+};
+
+/**
+ * Eliminar producto(s) de forma permanente
+ * Elimina el producto de la tabla productos y todas sus relaciones en productos_sucursal
+ * 
+ * @route DELETE /api/productos/:id
+ * @route DELETE /api/productos/multiple (body: { ids: number[] })
+ */
+export const eliminarProducto = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
+  try {
+    // Determinar si es eliminación individual o múltiple
+    const ids: number[] = req.params.id 
+      ? [parseInt(req.params.id)] 
+      : (req.body.ids || []);
+
+    // Validar que hay IDs para eliminar
+    if (!ids || ids.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'No se proporcionaron IDs de productos para eliminar'
+      });
+      return;
+    }
+
+    // Validar que todos los IDs sean números válidos
+    const idsValidos = ids.filter(id => !isNaN(id) && id > 0);
+    if (idsValidos.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Los IDs proporcionados no son válidos'
+      });
+      return;
+    }
+
+    await connection.beginTransaction();
+
+    // Crear placeholders para la query (?, ?, ?)
+    const placeholders = idsValidos.map(() => '?').join(', ');
+
+    // PASO 1: Eliminar todas las relaciones en productos_sucursal
+    const queryEliminarSucursales = `
+      DELETE FROM productos_sucursal 
+      WHERE producto_id IN (${placeholders})
+    `;
+    const [resultSucursales] = await connection.query<ResultSetHeader>(
+      queryEliminarSucursales,
+      idsValidos
+    );
+
+    console.log(`🗑️ Eliminados ${resultSucursales.affectedRows} registros de productos_sucursal`);
+
+    // PASO 2: Eliminar los productos de la tabla principal
+    const queryEliminarProductos = `
+      DELETE FROM productos 
+      WHERE id IN (${placeholders})
+    `;
+    const [resultProductos] = await connection.query<ResultSetHeader>(
+      queryEliminarProductos,
+      idsValidos
+    );
+
+    console.log(`🗑️ Eliminados ${resultProductos.affectedRows} productos de la tabla productos`);
+
+    // Commit de la transacción
+    await connection.commit();
+
+    // Determinar mensaje según cantidad eliminada
+    const mensaje = idsValidos.length === 1
+      ? `Producto eliminado permanentemente de la base de datos`
+      : `${resultProductos.affectedRows} productos eliminados permanentemente de la base de datos`;
+
+    res.json({
+      success: true,
+      message: mensaje,
+      data: {
+        productosEliminados: resultProductos.affectedRows,
+        sucursalesEliminadas: resultSucursales.affectedRows,
+        ids: idsValidos
+      }
+    });
+
+  } catch (error) {
+    // Rollback en caso de error
+    await connection.rollback();
+    
+    console.error('❌ Error al eliminar producto(s):', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar producto(s)',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * Eliminar múltiples productos
+ * Ruta específica para eliminación masiva
+ * 
+ * @route DELETE /api/productos/eliminar-multiple
+ * @body { ids: number[] }
+ */
+export const eliminarProductosMultiple = async (req: Request, res: Response): Promise<void> => {
+  // Reutilizar la misma lógica que eliminarProducto
+  await eliminarProducto(req, res);
 };
 

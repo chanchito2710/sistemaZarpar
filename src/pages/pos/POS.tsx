@@ -275,7 +275,7 @@ const POS: React.FC = () => {
         apellido: values.lastName,
         email: values.email,
         direccion: values.address,
-        telefono: values.telefono || undefined,
+        telefono: values.telefono,
         razon_social: values.companyName || undefined,
         rut: values.rut || undefined,
         nombre_fantasia: values.fantasyName || undefined,
@@ -574,8 +574,13 @@ const POS: React.FC = () => {
               </Col>
               <Col span={12}>
                 <Form.Item
-                  label="Teléfono (Opcional)"
+                  label="Teléfono"
                   name="telefono"
+                  rules={[
+                    { required: true, message: 'Por favor ingresa el teléfono' },
+                    { min: 8, message: 'El teléfono debe tener al menos 8 dígitos' },
+                    { max: 20, message: 'El teléfono no puede tener más de 20 caracteres' }
+                  ]}
                 >
                   <Input placeholder="Ingresa el teléfono" />
                 </Form.Item>

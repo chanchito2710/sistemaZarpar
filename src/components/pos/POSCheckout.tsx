@@ -43,6 +43,7 @@ interface POSCheckoutProps {
   carrito: Array<{
     producto_id: number;
     nombre: string;
+    tipo?: string; // ⭐ NUEVO: Tipo de producto
     precio: number;
     cantidad: number;
     subtotal: number;

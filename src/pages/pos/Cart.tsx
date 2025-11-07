@@ -27,7 +27,7 @@ import {
   DollarOutlined
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { productosService, type ProductoCompleto, type Venta } from '../../services/api';
+import { productosService, descuentosService, type ProductoCompleto, type Venta } from '../../services/api';
 import POSCheckout from '../../components/pos/POSCheckout';
 import VentaExitosa from '../../components/pos/VentaExitosa';
 
@@ -38,6 +38,7 @@ const { Option } = Select;
 interface CarritoItem {
   producto_id: number;
   nombre: string;
+  tipo?: string; // ⭐ NUEVO: Tipo de producto (Display, Batería, etc.)
   precio: number;
   cantidad: number;
   subtotal: number;
@@ -68,10 +69,13 @@ const Cart: React.FC = () => {
   const [carrito, setCarrito] = useState<CarritoItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState<string>('todos'); // ⭐ Filtro por tipo de producto
+  const [filtroMarca, setFiltroMarca] = useState<string>('todas'); // ⭐ Filtro por marca
   
   // Estados de descuento
   const [tipoDescuento, setTipoDescuento] = useState<'monto' | 'porcentaje'>('porcentaje');
   const [valorDescuento, setValorDescuento] = useState<number>(0);
+  const [descuentoHabilitado, setDescuentoHabilitado] = useState<boolean>(false);
   
   // Estado del checkout
   const [checkoutVisible, setCheckoutVisible] = useState(false);
@@ -86,6 +90,14 @@ const Cart: React.FC = () => {
       return;
     }
     cargarProductos();
+    verificarDescuentoHabilitado();
+
+    // Auto-refresh cada 10 segundos para actualizar permisos de descuento
+    const interval = setInterval(() => {
+      verificarDescuentoHabilitado();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, []);
 
   /**
@@ -123,24 +135,98 @@ const Cart: React.FC = () => {
   };
 
   /**
-   * Filtrar productos por búsqueda
+   * Verificar si el descuento está habilitado para esta sucursal
+   */
+  const verificarDescuentoHabilitado = async () => {
+    if (!posData?.sucursal) return;
+
+    try {
+      const config = await descuentosService.obtenerConfiguracionPorSucursal(posData.sucursal);
+      setDescuentoHabilitado(config.descuento_habilitado === 1 || config.descuento_habilitado === true);
+    } catch (error) {
+      console.error('Error al verificar descuento:', error);
+      // Por defecto, deshabilitar descuento si hay error
+      setDescuentoHabilitado(false);
+    }
+  };
+
+  /**
+   * Orden de prioridad para tipos de producto
+   */
+  const obtenerOrdenTipo = (tipo: string): number => {
+    const orden: { [key: string]: number } = {
+      'Display': 1,
+      'Batería': 2,
+      'Flex': 3,
+      'Placa Carga': 4,
+      'Botón': 5,
+      'Antena': 6
+    };
+    return orden[tipo] || 999; // Cualquier otro tipo va al final
+  };
+
+  /**
+   * Obtener tipos únicos de productos (para el filtro)
+   */
+  const tiposUnicos = React.useMemo(() => {
+    const tipos = productos
+      .map(p => p.tipo)
+      .filter((tipo, index, self) => tipo && self.indexOf(tipo) === index)
+      .sort();
+    return tipos;
+  }, [productos]);
+
+  /**
+   * Obtener marcas únicas de productos (para el filtro)
+   */
+  const marcasUnicas = React.useMemo(() => {
+    const marcas = productos
+      .map(p => p.marca)
+      .filter((marca, index, self) => marca && self.indexOf(marca) === index)
+      .sort();
+    return marcas;
+  }, [productos]);
+
+  /**
+   * Filtrar productos por búsqueda, tipo, marca y ordenar
    */
   useEffect(() => {
-    if (!searchText.trim()) {
-      setProductosFiltrados(productos);
-      return;
+    let resultados = productos;
+
+    // ⭐ 1. Aplicar filtro de TIPO si no es "todos"
+    if (filtroTipo !== 'todos') {
+      resultados = resultados.filter(p => p.tipo === filtroTipo);
     }
 
-    const search = searchText.toLowerCase();
-    const filtrados = productos.filter(p =>
-      p.nombre.toLowerCase().includes(search) ||
-      p.marca?.toLowerCase().includes(search) ||
-      p.tipo?.toLowerCase().includes(search) ||
-      p.codigo_barras?.toLowerCase().includes(search)
-    );
+    // ⭐ 2. Aplicar filtro de MARCA si no es "todas"
+    if (filtroMarca !== 'todas') {
+      resultados = resultados.filter(p => p.marca === filtroMarca);
+    }
 
-    setProductosFiltrados(filtrados);
-  }, [searchText, productos]);
+    // 3. Aplicar filtro de BÚSQUEDA si hay texto
+    if (searchText.trim()) {
+      const search = searchText.toLowerCase();
+      resultados = resultados.filter(p =>
+        p.nombre.toLowerCase().includes(search) ||
+        p.marca?.toLowerCase().includes(search) ||
+        p.tipo?.toLowerCase().includes(search) ||
+        p.codigo_barras?.toLowerCase().includes(search)
+      );
+    }
+
+    // 4. Ordenar resultados: Display primero, Batería segundo, resto después
+    const resultadosOrdenados = [...resultados].sort((a, b) => {
+      const ordenA = obtenerOrdenTipo(a.tipo);
+      const ordenB = obtenerOrdenTipo(b.tipo);
+      if (ordenA !== ordenB) {
+        return ordenA - ordenB;
+      }
+      // Si son del mismo tipo, ordenar por nombre
+      return a.nombre.localeCompare(b.nombre);
+    });
+
+    setProductosFiltrados(resultadosOrdenados);
+  }, [searchText, filtroTipo, filtroMarca, productos]);
 
   /**
    * Agregar producto al carrito
@@ -180,6 +266,7 @@ const Cart: React.FC = () => {
                 ...item,
                 cantidad: item.cantidad + 1,
                 subtotal: (item.cantidad + 1) * item.precio,
+                tipo: item.tipo || producto.tipo || '', // ⭐ NUEVO
                 marca: item.marca || producto.marca || '',
                 codigo: item.codigo || producto.codigo_barras || ''
               }
@@ -192,6 +279,7 @@ const Cart: React.FC = () => {
         const nuevoItem: CarritoItem = {
           producto_id: producto.id,
           nombre: producto.nombre,
+          tipo: producto.tipo || '', // ⭐ NUEVO
           precio: producto.precio ?? 0,
           cantidad: 1,
           subtotal: producto.precio ?? 0,
@@ -200,6 +288,8 @@ const Cart: React.FC = () => {
           codigo: producto.codigo_barras || ''
         };
         console.log('✅ Nuevo item creado:', nuevoItem);
+        console.log('🔍 DEBUG Producto completo:', producto);
+        console.log('📦 DEBUG tipo del producto:', producto.tipo);
         setCarrito([...carrito, nuevoItem]);
         message.success(`✅ ${producto.nombre} agregado al carrito (1 / ${stockDisponible})`);
       }
@@ -293,9 +383,6 @@ const Cart: React.FC = () => {
 
   const total = subtotal - descuento;
 
-  // DEBUG: Log para verificar render
-  console.log('🔵 Cart render - Items en carrito:', carrito.length);
-
   /**
    * Columnas de la tabla de productos
    */
@@ -381,24 +468,46 @@ const Cart: React.FC = () => {
    */
   const columnasCarrito: any = [
     {
-      title: 'Producto',
+      title: 'PRODUCTO',
       dataIndex: 'nombre',
       key: 'nombre',
-      render: (nombre: string) => nombre || 'Sin nombre'
+      width: 200,
+      render: (nombre: string) => <Text strong>{nombre || 'Sin nombre'}</Text>
     },
     {
-      title: 'Precio Unit.',
-      dataIndex: 'precio',
-      key: 'precio',
+      title: 'TIPO',
+      dataIndex: 'tipo',
+      key: 'tipo',
       width: 100,
-      align: 'right' as const,
-      render: (precio: any) => {
-        const p = Number(precio) || 0;
-        return `$${p.toFixed(2)}`;
+      align: 'center' as const,
+      render: (tipo: string, record: CarritoItem) => {
+        console.log('🎨 DEBUG Columna TIPO - valor:', tipo);
+        console.log('🎨 DEBUG Record completo:', record);
+        
+        if (!tipo || tipo.trim() === '') {
+          return <Text type="secondary">-</Text>;
+        }
+        
+        return (
+          <Tag color="blue">
+            {tipo}
+          </Tag>
+        );
       }
     },
     {
-      title: 'Cantidad',
+      title: 'PRECIO UNIT.',
+      dataIndex: 'precio',
+      key: 'precio',
+      width: 120,
+      align: 'right' as const,
+      render: (precio: any) => {
+        const p = Number(precio) || 0;
+        return <Text style={{ color: '#1890ff' }}>${p.toFixed(2)}</Text>;
+      }
+    },
+    {
+      title: 'CANTIDAD',
       dataIndex: 'cantidad',
       key: 'cantidad',
       width: 150,
@@ -427,14 +536,14 @@ const Cart: React.FC = () => {
       )
     },
     {
-      title: 'Subtotal',
+      title: 'SUBTOTAL',
       dataIndex: 'subtotal',
       key: 'subtotal',
-      width: 100,
+      width: 120,
       align: 'right' as const,
       render: (subtotal: any) => {
         const s = Number(subtotal) || 0;
-        return <Text strong>${s.toFixed(2)}</Text>;
+        return <Text strong style={{ color: '#52c41a', fontSize: 14 }}>${s.toFixed(2)}</Text>;
       }
     },
     {
@@ -473,6 +582,7 @@ const Cart: React.FC = () => {
           venta={{
             ...ventaCompletada,
             cliente_nombre: posData.clienteNombre, // Asegurar que tenga el nombre real
+            sucursal: posData.sucursal, // ⭐ Sucursal real
           }}
           carrito={carritoVentaCompletada}
           onClose={() => {
@@ -519,14 +629,43 @@ const Cart: React.FC = () => {
               <Badge count={productosFiltrados.length} style={{ backgroundColor: '#1890ff' }} />
             }
           >
-            <Input
-              placeholder="Buscar por nombre, marca, tipo o código de barras..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              size="large"
-              style={{ marginBottom: 16 }}
-            />
+            <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
+              <Select
+                value={filtroTipo}
+                onChange={setFiltroTipo}
+                style={{ width: 180 }}
+                size="large"
+                placeholder="Tipos"
+              >
+                <Option value="todos">Tipos</Option>
+                {tiposUnicos.map(tipo => (
+                  <Option key={tipo} value={tipo}>
+                    {tipo}
+                  </Option>
+                ))}
+              </Select>
+              <Select
+                value={filtroMarca}
+                onChange={setFiltroMarca}
+                style={{ width: 180 }}
+                size="large"
+                placeholder="Marcas"
+              >
+                <Option value="todas">Marcas</Option>
+                {marcasUnicas.map(marca => (
+                  <Option key={marca} value={marca}>
+                    {marca}
+                  </Option>
+                ))}
+              </Select>
+              <Input
+                placeholder="Buscar por nombre o código..."
+                prefix={<SearchOutlined />}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                size="large"
+              />
+            </Space.Compact>
             
             <Spin spinning={loading}>
               <Table
@@ -561,35 +700,37 @@ const Cart: React.FC = () => {
                   rowKey="producto_id"
                   pagination={false}
                   size="small"
-                  scroll={{ x: 500 }}
+                  scroll={{ x: 700 }}
                 />
 
                 <Divider />
 
                 {/* Sección de descuento */}
-                <Card size="small" style={{ marginBottom: 16, background: '#fafafa' }}>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text strong>Aplicar Descuento:</Text>
-                    <Space.Compact style={{ width: '100%' }}>
-                      <Select
-                        value={tipoDescuento}
-                        onChange={setTipoDescuento}
-                        style={{ width: 140 }}
-                      >
-                        <Option value="porcentaje">Porcentaje %</Option>
-                        <Option value="monto">Monto $</Option>
-                      </Select>
-                      <InputNumber
-                        min={0}
-                        max={tipoDescuento === 'porcentaje' ? 100 : subtotal}
-                        value={valorDescuento}
-                        onChange={(value) => setValorDescuento(value ?? 0)}
-                        style={{ width: '100%' }}
-                        prefix={tipoDescuento === 'porcentaje' ? '%' : '$'}
-                      />
-                    </Space.Compact>
-                  </Space>
-                </Card>
+                {descuentoHabilitado && (
+                  <Card size="small" style={{ marginBottom: 16, background: '#fafafa' }}>
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <Text strong>Aplicar Descuento:</Text>
+                      <Space.Compact style={{ width: '100%' }}>
+                        <Select
+                          value={tipoDescuento}
+                          onChange={setTipoDescuento}
+                          style={{ width: 140 }}
+                        >
+                          <Option value="porcentaje">Porcentaje %</Option>
+                          <Option value="monto">Monto $</Option>
+                        </Select>
+                        <InputNumber
+                          min={0}
+                          max={tipoDescuento === 'porcentaje' ? 100 : subtotal}
+                          value={valorDescuento}
+                          onChange={(value) => setValorDescuento(value ?? 0)}
+                          style={{ width: '100%' }}
+                          prefix={tipoDescuento === 'porcentaje' ? '%' : '$'}
+                        />
+                      </Space.Compact>
+                    </Space>
+                  </Card>
+                )}
 
                 {/* Resumen de totales */}
                 <Card size="small" style={{ background: '#e6f7ff' }}>

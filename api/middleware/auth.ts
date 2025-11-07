@@ -41,10 +41,13 @@ export const verificarAutenticacion = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('🔐 Verificando autenticación para:', req.method, req.path);
+    
     // Obtener token del header Authorization
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Token no proporcionado');
       res.status(401).json({
         error: 'Token no proporcionado. Por favor, inicia sesión.'
       });
@@ -52,9 +55,11 @@ export const verificarAutenticacion = async (
     }
 
     const token = authHeader.substring(7); // Remover "Bearer "
+    console.log('🔑 Token recibido (primeros 20 chars):', token.substring(0, 20) + '...');
 
     // Verificar y decodificar el token
     const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    console.log('✅ Token válido para usuario:', decoded.email);
 
     // Opcional: Verificar que el usuario sigue activo en la base de datos
     const [usuarios] = await pool.execute<RowDataPacket[]>(
@@ -63,11 +68,14 @@ export const verificarAutenticacion = async (
     );
 
     if (usuarios.length === 0 || !usuarios[0].activo) {
+      console.log('❌ Usuario no encontrado o inactivo:', decoded.id);
       res.status(401).json({
         error: 'Usuario no encontrado o inactivo'
       });
       return;
     }
+
+    console.log('✅ Usuario activo:', decoded.email);
 
     // Agregar información del usuario al objeto request
     req.usuario = decoded;

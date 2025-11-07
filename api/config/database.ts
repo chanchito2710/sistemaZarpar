@@ -31,6 +31,12 @@ export const pool = mysql.createPool({
   queueLimit: 0, // Sin límite de cola
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+  // Configuración de encoding UTF-8 para soportar acentos y caracteres especiales
+  charset: 'utf8mb4',
+  // Asegurar que la conexión use UTF-8
+  connectAttributes: {
+    charset: 'utf8mb4'
+  }
 });
 
 /**
@@ -40,8 +46,13 @@ export const pool = mysql.createPool({
 export async function testConnection(): Promise<boolean> {
   try {
     const connection = await pool.getConnection();
+    // Asegurar que la conexión use UTF-8
+    await connection.query("SET NAMES 'utf8mb4'");
+    await connection.query("SET CHARACTER SET utf8mb4");
+    await connection.query("SET character_set_connection=utf8mb4");
     console.log('✅ Conexión exitosa a MySQL - Base de datos: zarparDataBase');
     console.log('📦 Contenedor Docker: zarpar-mysql (Puerto 3307)');
+    console.log('🔤 Charset: utf8mb4 (soporta acentos y emojis)');
     connection.release();
     return true;
   } catch (error) {

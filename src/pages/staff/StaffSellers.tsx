@@ -44,12 +44,18 @@ import {
   CheckCircleOutlined,
   WarningOutlined,
   HomeFilled,
-  HomeOutlined
+  HomeOutlined,
+  DollarOutlined,
+  HistoryOutlined,
+  SyncOutlined,
+  StopOutlined,
+  PercentageOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { comisionesService, vendedoresService, descuentosService } from '../../services/api';
 
 const { Option } = Select;
 const { Title, Text, Paragraph } = Typography;
@@ -67,6 +73,7 @@ interface Vendedor {
   telefono?: string;
   email: string;
   activo: boolean;
+  cobra_comisiones: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -167,6 +174,24 @@ const StaffSellers: React.FC = () => {
   const [selectedSucursalFilter, setSelectedSucursalFilter] = useState<string | undefined>(undefined);
   const [selectedCargoFilter, setSelectedCargoFilter] = useState<string | undefined>(undefined);
 
+  // Estados para comisiones
+  const [configuracionComisiones, setConfiguracionComisiones] = useState<any[]>([]);
+  const [comisionesLoading, setComisionesLoading] = useState(false);
+  const [editandoComision, setEditandoComision] = useState<any>(null);
+  const [modalComisionVisible, setModalComisionVisible] = useState(false);
+  const [comisionForm] = Form.useForm();
+  
+  // Estados para comisiones por vendedor
+  const [vendedorSeleccionado, setVendedorSeleccionado] = useState<number | null>(null);
+  const [comisionesVendedor, setComisionesVendedor] = useState<any[]>([]);
+  const [modalComisionVendedor, setModalComisionVendedor] = useState(false);
+  const [comisionVendedorEditando, setComisionVendedorEditando] = useState<any>(null);
+  const [comisionVendedorForm] = Form.useForm();
+
+  // Estados para descuentos
+  const [configuracionDescuentos, setConfiguracionDescuentos] = useState<any[]>([]);
+  const [descuentosLoading, setDescuentosLoading] = useState(false);
+
   /**
    * Verificar que el usuario sea administrador
    */
@@ -188,7 +213,126 @@ const StaffSellers: React.FC = () => {
   useEffect(() => {
     cargarVendedores();
     cargarSucursales();
+    cargarComisiones();
+    cargarDescuentos();
   }, []);
+
+  /**
+   * Cargar configuración de comisiones
+   */
+  const cargarComisiones = async () => {
+    try {
+      setComisionesLoading(true);
+      const config = await comisionesService.obtenerConfiguracion();
+      setConfiguracionComisiones(config);
+    } catch (error) {
+      console.error('Error al cargar comisiones:', error);
+      messageApi.error('Error al cargar configuración de comisiones');
+    } finally {
+      setComisionesLoading(false);
+    }
+  };
+
+  /**
+   * Cargar comisiones de un vendedor específico
+   */
+  const cargarComisionesVendedor = async (vendedor_id: number) => {
+    try {
+      setComisionesLoading(true);
+      const comisiones = await comisionesService.obtenerComisionesVendedor(vendedor_id);
+      setComisionesVendedor(comisiones);
+    } catch (error) {
+      console.error('Error al cargar comisiones del vendedor:', error);
+      messageApi.error('Error al cargar comisiones del vendedor');
+    } finally {
+      setComisionesLoading(false);
+    }
+  };
+
+  /**
+   * Cargar configuración de descuentos
+   */
+  const cargarDescuentos = async () => {
+    try {
+      setDescuentosLoading(true);
+      const config = await descuentosService.obtenerConfiguracion();
+      setConfiguracionDescuentos(config);
+    } catch (error) {
+      console.error('Error al cargar descuentos:', error);
+      messageApi.error('Error al cargar configuración de descuentos');
+    } finally {
+      setDescuentosLoading(false);
+    }
+  };
+
+  /**
+   * Alternar estado de descuento de una sucursal
+   */
+  const handleToggleDescuento = async (sucursal: string, habilitado: boolean) => {
+    try {
+      await descuentosService.actualizarConfiguracion(sucursal, habilitado);
+      messageApi.success(`Descuento ${habilitado ? 'habilitado' : 'deshabilitado'} para ${sucursal.toUpperCase()}`);
+      // Recargar configuración
+      await cargarDescuentos();
+    } catch (error) {
+      console.error('Error al actualizar descuento:', error);
+      messageApi.error('Error al actualizar configuración de descuento');
+    }
+  };
+
+  /**
+   * Manejar selección de vendedor
+   */
+  const handleSeleccionarVendedor = async (vendedor_id: number | null) => {
+    setVendedorSeleccionado(vendedor_id);
+    if (vendedor_id) {
+      await cargarComisionesVendedor(vendedor_id);
+    } else {
+      setComisionesVendedor([]);
+    }
+  };
+
+  /**
+   * Guardar comisión personalizada de un vendedor
+   */
+  const handleGuardarComisionVendedor = async () => {
+    if (!vendedorSeleccionado) return;
+
+    try {
+      const values = await comisionVendedorForm.validateFields();
+      await comisionesService.establecerComisionPersonalizada(
+        vendedorSeleccionado,
+        values.tipo_producto,
+        values.monto_comision
+      );
+      
+      messageApi.success('Comisión personalizada guardada correctamente');
+      setModalComisionVendedor(false);
+      comisionVendedorForm.resetFields();
+      
+      // Recargar comisiones del vendedor
+      await cargarComisionesVendedor(vendedorSeleccionado);
+    } catch (error) {
+      messageApi.error('Error al guardar comisión personalizada');
+    }
+  };
+
+  /**
+   * Eliminar comisión personalizada (volver a usar global)
+   */
+  const handleEliminarComisionVendedor = async (tipo_producto: string) => {
+    if (!vendedorSeleccionado) return;
+
+    try {
+      await comisionesService.eliminarComisionPersonalizada(vendedorSeleccionado, tipo_producto);
+      messageApi.success('Comisión personalizada eliminada. Ahora usará la comisión global.');
+      
+      // Recargar comisiones del vendedor
+      await cargarComisionesVendedor(vendedorSeleccionado);
+    } catch (error) {
+      messageApi.error('Error al eliminar comisión personalizada');
+    }
+  };
 
   /**
    * Cargar todos los vendedores
@@ -656,6 +800,44 @@ const StaffSellers: React.FC = () => {
       ),
     },
     {
+      title: 'Comisiones',
+      dataIndex: 'cobra_comisiones',
+      key: 'cobra_comisiones',
+      render: (cobra_comisiones: boolean, record: Vendedor) => (
+        <Popconfirm
+          title={cobra_comisiones ? '¿Desactivar comisiones?' : '¿Activar comisiones?'}
+          description={
+            cobra_comisiones 
+              ? `${record.nombre} dejará de cobrar comisiones por ventas`
+              : `${record.nombre} comenzará a cobrar comisiones por ventas`
+          }
+          onConfirm={async () => {
+            try {
+              await vendedoresService.actualizarEstadoComisiones(record.id, !cobra_comisiones);
+              messageApi.success(
+                cobra_comisiones 
+                  ? 'Comisiones desactivadas correctamente'
+                  : 'Comisiones activadas correctamente'
+              );
+              await cargarVendedores();
+            } catch (error) {
+              messageApi.error('Error al actualizar estado de comisiones');
+            }
+          }}
+          okText="Sí"
+          cancelText="Cancelar"
+        >
+          <Tag 
+            color={cobra_comisiones ? 'green' : 'default'} 
+            style={{ cursor: 'pointer', fontSize: 12 }}
+            icon={<DollarOutlined />}
+          >
+            {cobra_comisiones ? '✅ Cobra' : '❌ No cobra'}
+          </Tag>
+        </Popconfirm>
+      ),
+    },
+    {
       title: 'Acciones',
       key: 'acciones',
       render: (_, record) => (
@@ -719,48 +901,23 @@ const StaffSellers: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
-      {/* Header */}
-      <Card style={{ marginBottom: 24, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-        <Row align="middle" justify="space-between">
-          <Col>
-            <Space direction="vertical" size={0}>
-              <Title level={2} style={{ color: 'white', margin: 0 }}>
-                <CrownOutlined /> Gestión de Personal - ADMINISTRADOR
-              </Title>
-              <Paragraph style={{ color: 'rgba(255,255,255,0.9)', margin: 0 }}>
-                Administra vendedores, gerentes, administradores y sucursales del sistema
-              </Paragraph>
-            </Space>
-          </Col>
-          <Col>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => {
-                cargarVendedores();
-                cargarSucursales();
-              }}
-              size="large"
-              style={{ background: 'rgba(255,255,255,0.2)', borderColor: 'white', color: 'white' }}
-            >
-              Actualizar
-            </Button>
-          </Col>
-        </Row>
-      </Card>
-
-      {/* Alerta de seguridad */}
-      <Alert
-        message="⚠️ Área Restringida - Solo Administradores"
-        description="Esta página solo es accesible para usuarios con rol de Administrador. Los cambios aquí realizados afectan todo el sistema."
-        type="warning"
-        showIcon
-        style={{ marginBottom: 24 }}
-      />
+      {/* Título Simple */}
+      <Paragraph 
+        style={{
+          marginBottom: 24,
+          textAlign: 'center',
+          fontSize: '18px',
+          color: '#000',
+          fontWeight: 'normal'
+        }}
+      >
+        Gestión de personal y sucursales
+      </Paragraph>
 
       {/* Estadísticas */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} lg={6}>
-          <Card>
+          <Card styles={{ body: { padding: '16px' } }}>
             <Statistic
               title="Total Vendedores"
               value={totalVendedores}
@@ -770,7 +927,7 @@ const StaffSellers: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card>
+          <Card styles={{ body: { padding: '16px' } }}>
             <Statistic
               title="Administradores"
               value={totalAdministradores}
@@ -780,7 +937,7 @@ const StaffSellers: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card>
+          <Card styles={{ body: { padding: '16px' } }}>
             <Statistic
               title="Gerentes"
               value={totalGerentes}
@@ -790,7 +947,7 @@ const StaffSellers: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card>
+          <Card styles={{ body: { padding: '16px' } }}>
             <Statistic
               title="Sucursales"
               value={totalSucursales}
@@ -800,6 +957,107 @@ const StaffSellers: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Estilos para separadores y tabs elegantes */}
+      <style>
+        {`
+          /* Ocultar la franja azul predeterminada de Ant Design */
+          .ant-tabs-ink-bar {
+            display: none !important;
+          }
+
+          /* Separador elegante con efecto hundido entre tabs */
+          .ant-tabs-nav-list .ant-tabs-tab:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 24px;
+            background: linear-gradient(
+              to bottom,
+              transparent,
+              rgba(0, 0, 0, 0.08) 10%,
+              rgba(0, 0, 0, 0.12) 50%,
+              rgba(0, 0, 0, 0.08) 90%,
+              transparent
+            );
+            box-shadow: 
+              1px 0 0 rgba(255, 255, 255, 0.5),
+              -1px 0 0 rgba(0, 0, 0, 0.05);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+          }
+
+          /* Efecto hover en el separador */
+          .ant-tabs-nav-list .ant-tabs-tab:not(:last-child):hover::after {
+            background: linear-gradient(
+              to bottom,
+              transparent,
+              rgba(102, 126, 234, 0.2) 10%,
+              rgba(102, 126, 234, 0.3) 50%,
+              rgba(102, 126, 234, 0.2) 90%,
+              transparent
+            );
+            box-shadow: 
+              1px 0 0 rgba(102, 126, 234, 0.3),
+              -1px 0 0 rgba(102, 126, 234, 0.1);
+          }
+
+          /* Espaciado extra para los tabs */
+          .ant-tabs-nav-list .ant-tabs-tab {
+            padding: 0 24px !important;
+            border-radius: 8px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+
+          /* Tab Activo: Sombra elegante y profesional en todo el botón */
+          .ant-tabs-nav-list .ant-tabs-tab-active {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%) !important;
+            box-shadow: 
+              0 4px 12px rgba(102, 126, 234, 0.15),
+              0 2px 6px rgba(102, 126, 234, 0.1),
+              inset 0 1px 0 rgba(255, 255, 255, 0.8),
+              inset 0 -1px 0 rgba(102, 126, 234, 0.05) !important;
+            transform: translateY(-1px);
+            border: 1px solid rgba(102, 126, 234, 0.1);
+          }
+
+          /* Color del texto del tab activo */
+          .ant-tabs-nav-list .ant-tabs-tab-active .ant-tabs-tab-btn {
+            color: #667eea !important;
+            font-weight: 600 !important;
+          }
+
+          /* Hover en tab no activo */
+          .ant-tabs-nav-list .ant-tabs-tab:not(.ant-tabs-tab-active):hover {
+            background: rgba(102, 126, 234, 0.04);
+            box-shadow: 
+              0 2px 8px rgba(102, 126, 234, 0.08),
+              0 1px 4px rgba(0, 0, 0, 0.04);
+            transform: translateY(-0.5px);
+          }
+
+          /* Animación del separador en tab activo */
+          .ant-tabs-nav-list .ant-tabs-tab-active::after {
+            background: linear-gradient(
+              to bottom,
+              transparent,
+              rgba(102, 126, 234, 0.3) 10%,
+              rgba(102, 126, 234, 0.4) 50%,
+              rgba(102, 126, 234, 0.3) 90%,
+              transparent
+            );
+          }
+
+          /* Badge dentro del tab activo */
+          .ant-tabs-tab-active .ant-badge .ant-badge-count {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+          }
+        `}
+      </style>
 
       {/* Tabs */}
       <Tabs 
@@ -818,8 +1076,8 @@ const StaffSellers: React.FC = () => {
             children: (
               <>
                 {/* Filtros y búsqueda */}
-                <Card style={{ marginBottom: 16 }}>
-                  <Row gutter={[16, 16]}>
+                <Card style={{ marginBottom: 12 }} styles={{ body: { padding: '16px' } }}>
+                  <Row gutter={[12, 12]}>
                     <Col xs={24} md={8}>
                       <Input
                         placeholder="Buscar por nombre o email..."
@@ -875,14 +1133,15 @@ const StaffSellers: React.FC = () => {
                 </Card>
 
                 {/* Tabla */}
-                <Card>
+                <Card styles={{ body: { padding: '16px' } }}>
                   <Spin spinning={vendedoresLoading}>
                     <Table
                       columns={columnasVendedores}
                       dataSource={vendedoresFiltrados}
                       rowKey="id"
+                      size="small"
                       pagination={{
-                        pageSize: 10,
+                        pageSize: 8,
                         showSizeChanger: true,
                         showQuickJumper: true,
                         showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} vendedores`,
@@ -905,16 +1164,8 @@ const StaffSellers: React.FC = () => {
             ),
             children: (
               <>
-                <Card style={{ marginBottom: 16 }}>
-                  <Row gutter={16} align="middle">
-                    <Col flex="auto">
-                      <Alert
-                        message="📌 Información Importante"
-                        description="Al crear una nueva sucursal, se creará automáticamente una tabla 'clientes_[nombre_sucursal]' en la base de datos."
-                        type="info"
-                        showIcon
-                      />
-                    </Col>
+                <Card style={{ marginBottom: 12 }} styles={{ body: { padding: '16px' } }}>
+                  <Row gutter={12} justify="end">
                     <Col>
                       <Button
                         type="primary"
@@ -929,13 +1180,14 @@ const StaffSellers: React.FC = () => {
                 </Card>
 
                 {/* TABLA DE SUCURSALES - COMPLETAMENTE REDISEÑADA */}
-                      <Card>
+                      <Card styles={{ body: { padding: '16px' } }}>
                   <Spin spinning={sucursalesLoading}>
                     <Table
                       dataSource={sucursales}
                       rowKey="sucursal"
+                      size="small"
                       pagination={{
-                        pageSize: 10,
+                        pageSize: 8,
                         showSizeChanger: true,
                         showTotal: (total) => `Total: ${total} sucursales`,
                       }}
@@ -1106,8 +1358,537 @@ const StaffSellers: React.FC = () => {
               </>
             ),
           },
+          {
+            key: 'comisiones',
+            label: (
+              <Space>
+                <DollarOutlined />
+                <span>Comisiones</span>
+              </Space>
+            ),
+            children: (
+              <>
+                {/* Selector de Vendedor */}
+                <Card style={{ marginBottom: 12 }} styles={{ body: { padding: '16px' } }}>
+                    <Row gutter={[12, 12]}>
+                      <Col xs={24} sm={16} md={18}>
+                        <Select
+                          placeholder="Selecciona un vendedor"
+                          style={{ width: '100%' }}
+                          size="large"
+                          allowClear
+                          value={vendedorSeleccionado}
+                          onChange={handleSeleccionarVendedor}
+                          showSearch
+                          filterOption={(input, option) => {
+                            const label = option?.children?.toString() || '';
+                            return label.toLowerCase().includes(input.toLowerCase());
+                          }}
+                        >
+                          {vendedores.map(v => (
+                            <Option key={v.id} value={v.id}>
+                              <Space>
+                                <UserOutlined />
+                                {v.nombre} - {v.sucursal.toUpperCase()}
+                              </Space>
+                            </Option>
+                          ))}
+                        </Select>
+                      </Col>
+                      <Col xs={24} sm={8} md={6}>
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            if (!vendedorSeleccionado) {
+                              messageApi.warning('Selecciona un vendedor primero');
+                              return;
+                            }
+                            setComisionVendedorEditando(null);
+                            comisionVendedorForm.resetFields();
+                            setModalComisionVendedor(true);
+                          }}
+                          disabled={!vendedorSeleccionado}
+                          block
+                          size="large"
+                        >
+                          Nueva Comisión
+                        </Button>
+                      </Col>
+                    </Row>
+                </Card>
+
+                {/* Tabla de Comisiones del Vendedor */}
+                {vendedorSeleccionado && (
+                  <Card
+                    title={
+                      <Space>
+                        <DollarOutlined />
+                        <span>Comisiones del Vendedor</span>
+                        <Tag color="blue">
+                          {vendedores.find(v => v.id === vendedorSeleccionado)?.nombre}
+                        </Tag>
+                      </Space>
+                    }
+                    extra={
+                      <Space>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          🟢 = Personalizada | ⚪ = Global
+                        </Text>
+                        <Divider type="vertical" />
+                        <Popconfirm
+                          title={
+                            vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones
+                              ? "⚠️ Desactivar Comisiones"
+                              : "✅ Activar Comisiones"
+                          }
+                          description={
+                            vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones
+                              ? "Este vendedor dejará de cobrar comisiones en TODAS sus ventas."
+                              : "Este vendedor volverá a cobrar comisiones según la configuración."
+                          }
+                          onConfirm={async () => {
+                            const vendedor = vendedores.find(v => v.id === vendedorSeleccionado);
+                            if (!vendedor) return;
+                            
+                            try {
+                              await vendedoresService.actualizarEstadoComisiones(
+                                vendedor.id, 
+                                !vendedor.cobra_comisiones
+                              );
+                              messageApi.success(
+                                vendedor.cobra_comisiones 
+                                  ? '❌ Comisiones desactivadas' 
+                                  : '✅ Comisiones activadas'
+                              );
+                              cargarVendedores();
+                            } catch (error) {
+                              messageApi.error('Error al actualizar estado de comisiones');
+                            }
+                          }}
+                          okText={
+                            vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones
+                              ? "Sí, desactivar"
+                              : "Sí, activar"
+                          }
+                          cancelText="Cancelar"
+                          okButtonProps={{
+                            danger: vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones,
+                          }}
+                        >
+                          <Button
+                            type={
+                              vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones
+                                ? "primary"
+                                : "default"
+                            }
+                            danger={!vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones}
+                            icon={
+                              vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones
+                                ? <CheckCircleOutlined />
+                                : <StopOutlined />
+                            }
+                            size="small"
+                          >
+                            {vendedores.find(v => v.id === vendedorSeleccionado)?.cobra_comisiones
+                              ? "✅ Con Comisión"
+                              : "❌ Sin Comisión"}
+                          </Button>
+                        </Popconfirm>
+                      </Space>
+                    }
+                    styles={{ body: { padding: '16px' } }}
+                  >
+                    <Spin spinning={comisionesLoading}>
+                      <Table
+                        dataSource={comisionesVendedor}
+                        rowKey="tipo"
+                        size="small"
+                        pagination={false}
+                        columns={[
+                          {
+                            title: 'TIPO',
+                            dataIndex: 'tipo',
+                            key: 'tipo',
+                            render: (tipo: string, record: any) => (
+                              <Space>
+                                {record.tiene_personalizada ? (
+                                  <Tag color="green" style={{ fontSize: 12 }}>🟢 {tipo}</Tag>
+                                ) : (
+                                  <Tag color="default" style={{ fontSize: 12 }}>⚪ {tipo}</Tag>
+                                )}
+                              </Space>
+                            ),
+                          },
+                          {
+                            title: 'COMISIÓN GLOBAL',
+                            dataIndex: 'monto_global',
+                            key: 'monto_global',
+                            render: (monto: number) => (
+                              <Text type="secondary" style={{ fontSize: 13 }}>
+                                ${Number(monto).toFixed(2)}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: 'COMISIÓN PERSONALIZADA',
+                            dataIndex: 'monto_personalizado',
+                            key: 'monto_personalizado',
+                            render: (monto: number | null) => (
+                              monto ? (
+                                <Text strong style={{ fontSize: 14, color: '#52c41a' }}>
+                                  ${Number(monto).toFixed(2)}
+                                </Text>
+                              ) : (
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  No configurada
+                                </Text>
+                              )
+                            ),
+                          },
+                          {
+                            title: 'COMISIÓN ACTIVA',
+                            dataIndex: 'monto_activo',
+                            key: 'monto_activo',
+                            render: (monto: number, record: any) => (
+                              <Tag color={record.tiene_personalizada ? 'green' : 'default'} style={{ fontSize: 14, padding: '4px 12px' }}>
+                                ${Number(monto).toFixed(2)}
+                              </Tag>
+                            ),
+                          },
+                          {
+                            title: 'ACCIONES',
+                            key: 'acciones',
+                            render: (_: any, record: any) => (
+                              <Space>
+                                {record.tiene_personalizada ? (
+                                  <>
+                                    <Button
+                                      type="primary"
+                                      icon={<EditOutlined />}
+                                      size="small"
+                                      onClick={() => {
+                                        setComisionVendedorEditando(record);
+                                        comisionVendedorForm.setFieldsValue({
+                                          tipo_producto: record.tipo,
+                                          monto_comision: record.monto_personalizado,
+                                        });
+                                        setModalComisionVendedor(true);
+                                      }}
+                                    >
+                                      Editar
+                                    </Button>
+                                    <Popconfirm
+                                      title="Eliminar Comisión Personalizada"
+                                      description="¿Volver a usar la comisión global?"
+                                      onConfirm={() => handleEliminarComisionVendedor(record.tipo)}
+                                      okText="Sí, volver a global"
+                                      cancelText="Cancelar"
+                                    >
+                                      <Button
+                                        danger
+                                        icon={<DeleteOutlined />}
+                                        size="small"
+                                      >
+                                        Eliminar
+                                      </Button>
+                                    </Popconfirm>
+                                  </>
+                                ) : (
+                                  <Button
+                                    type="dashed"
+                                    icon={<PlusOutlined />}
+                                    size="small"
+                                    onClick={() => {
+                                      setComisionVendedorEditando(null);
+                                      comisionVendedorForm.setFieldsValue({
+                                        tipo_producto: record.tipo,
+                                        monto_comision: record.monto_global,
+                                      });
+                                      setModalComisionVendedor(true);
+                                    }}
+                                  >
+                                    Personalizar
+                                  </Button>
+                                )}
+                              </Space>
+                            ),
+                          },
+                        ]}
+                      />
+                    </Spin>
+                  </Card>
+                )}
+
+                {/* Mensaje cuando no hay vendedor seleccionado */}
+                {!vendedorSeleccionado && (
+                  <Card styles={{ body: { padding: '60px 20px', textAlign: 'center' } }}>
+                    <Space direction="vertical" size="large">
+                      <UserOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
+                      <div>
+                        <Title level={4} style={{ margin: 0, color: '#8c8c8c' }}>
+                          Selecciona un vendedor
+                        </Title>
+                        <Text type="secondary">
+                          Elige un vendedor del selector de arriba para ver y editar sus comisiones
+                        </Text>
+                      </div>
+                    </Space>
+                  </Card>
+                )}
+              </>
+            ),
+          },
+          {
+            key: 'descuentos',
+            label: (
+              <Space>
+                <PercentageOutlined />
+                <span>Descuentos</span>
+              </Space>
+            ),
+            children: (
+              <>
+                <Alert
+                  message="💡 Control de Descuentos por Sucursal"
+                  description="Habilita o deshabilita la posibilidad de aplicar descuentos en el POS para cada sucursal. Los cambios se actualizan en tiempo real."
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+
+                <Card>
+                  <Spin spinning={descuentosLoading}>
+                    <Table
+                      dataSource={configuracionDescuentos}
+                      rowKey="id"
+                      size="middle"
+                      pagination={false}
+                      columns={[
+                        {
+                          title: 'SUCURSAL',
+                          dataIndex: 'sucursal',
+                          key: 'sucursal',
+                          render: (text: string) => (
+                            <Space>
+                              <ShopOutlined />
+                              <Text strong>{text.toUpperCase()}</Text>
+                            </Space>
+                          ),
+                        },
+                        {
+                          title: 'ESTADO',
+                          dataIndex: 'descuento_habilitado',
+                          key: 'estado',
+                          align: 'center',
+                          render: (habilitado: number) => (
+                            <Tag
+                              color={habilitado ? 'success' : 'default'}
+                              icon={habilitado ? <CheckCircleOutlined /> : <StopOutlined />}
+                            >
+                              {habilitado ? 'HABILITADO' : 'DESHABILITADO'}
+                            </Tag>
+                          ),
+                        },
+                        {
+                          title: 'ÚLTIMA ACTUALIZACIÓN',
+                          dataIndex: 'updated_at',
+                          key: 'updated_at',
+                          render: (text: string) => {
+                            const fecha = new Date(text);
+                            return (
+                              <Text type="secondary">
+                                {fecha.toLocaleDateString('es-UY')} {fecha.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
+                              </Text>
+                            );
+                          },
+                        },
+                        {
+                          title: 'ACTUALIZADO POR',
+                          dataIndex: 'updated_by',
+                          key: 'updated_by',
+                          render: (text: string) => (
+                            <Text type="secondary">{text || '-'}</Text>
+                          ),
+                        },
+                        {
+                          title: 'ACCIÓN',
+                          key: 'accion',
+                          align: 'center',
+                          render: (_: any, record: any) => (
+                            <Popconfirm
+                              title={record.descuento_habilitado ? '¿Deshabilitar descuento?' : '¿Habilitar descuento?'}
+                              description={
+                                record.descuento_habilitado
+                                  ? `Los usuarios de ${record.sucursal.toUpperCase()} ya NO podrán aplicar descuentos`
+                                  : `Los usuarios de ${record.sucursal.toUpperCase()} podrán aplicar descuentos`
+                              }
+                              onConfirm={() => handleToggleDescuento(record.sucursal, !record.descuento_habilitado)}
+                              okText="Sí, confirmar"
+                              cancelText="Cancelar"
+                            >
+                              <Button
+                                type={record.descuento_habilitado ? 'default' : 'primary'}
+                                size="small"
+                                icon={record.descuento_habilitado ? <StopOutlined /> : <CheckCircleOutlined />}
+                              >
+                                {record.descuento_habilitado ? 'Deshabilitar' : 'Habilitar'}
+                              </Button>
+                            </Popconfirm>
+                          ),
+                        },
+                      ]}
+                    />
+                  </Spin>
+                </Card>
+              </>
+            ),
+          },
         ]}
       />
+
+      {/* Modal: Editar Comisión */}
+      <Modal
+        title={
+          <Space>
+            <EditOutlined />
+            Editar Comisión - {editandoComision?.tipo}
+          </Space>
+        }
+        open={modalComisionVisible}
+        onOk={async () => {
+          try {
+            const values = await comisionForm.validateFields();
+            await comisionesService.actualizarComision(
+              editandoComision.id,
+              values.monto_comision
+            );
+            messageApi.success('Comisión actualizada correctamente');
+            setModalComisionVisible(false);
+            comisionForm.resetFields();
+            // Recargar configuración
+            const config = await comisionesService.obtenerConfiguracion();
+            setConfiguracionComisiones(config);
+          } catch (error) {
+            messageApi.error('Error al actualizar comisión');
+          }
+        }}
+        onCancel={() => {
+          setModalComisionVisible(false);
+          comisionForm.resetFields();
+        }}
+        okText="Guardar"
+        cancelText="Cancelar"
+      >
+        <Divider />
+        <Form form={comisionForm} layout="vertical">
+          <Form.Item
+            name="monto_comision"
+            label="Monto de Comisión"
+            rules={[
+              { required: true, message: 'Por favor ingresa el monto' },
+              {
+                type: 'number',
+                min: 0,
+                message: 'El monto debe ser mayor o igual a 0',
+              },
+            ]}
+          >
+            <Input
+              prefix={<DollarOutlined />}
+              type="number"
+              placeholder="Ej: 150.00"
+              size="large"
+              step="0.01"
+              min="0"
+            />
+          </Form.Item>
+          <Alert
+            message="Este cambio se aplicará a todas las ventas futuras"
+            type="warning"
+            showIcon
+          />
+        </Form>
+      </Modal>
+
+      {/* Modal: Editar Comisión de Vendedor */}
+      <Modal
+        title={
+          <Space>
+            {comisionVendedorEditando ? <EditOutlined /> : <PlusOutlined />}
+            {comisionVendedorEditando ? 'Editar Comisión Personalizada' : 'Nueva Comisión Personalizada'}
+          </Space>
+        }
+        open={modalComisionVendedor}
+        onOk={handleGuardarComisionVendedor}
+        onCancel={() => {
+          setModalComisionVendedor(false);
+          comisionVendedorForm.resetFields();
+        }}
+        okText="Guardar"
+        cancelText="Cancelar"
+        width={600}
+      >
+        <Divider />
+        <Alert
+          message="💡 Comisión Personalizada"
+          description="Esta comisión solo aplicará a este vendedor. Si la eliminas, el vendedor volverá a usar la comisión global."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={comisionVendedorForm} layout="vertical">
+          <Form.Item
+            name="tipo_producto"
+            label="Tipo de Producto"
+            rules={[{ required: true, message: 'Por favor selecciona el tipo' }]}
+          >
+            <Select
+              placeholder="Selecciona el tipo de producto"
+              size="large"
+              disabled={comisionVendedorEditando !== null}
+            >
+              {configuracionComisiones.map(c => (
+                <Option key={c.tipo} value={c.tipo}>
+                  <Space>
+                    <Tag color="blue">{c.tipo}</Tag>
+                    <Text type="secondary">Global: ${Number(c.monto_comision).toFixed(2)}</Text>
+                  </Space>
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="monto_comision"
+            label="Monto de Comisión Personalizada"
+            rules={[
+              { required: true, message: 'Por favor ingresa el monto' },
+              {
+                type: 'number',
+                min: 0,
+                message: 'El monto debe ser mayor o igual a 0',
+              },
+            ]}
+          >
+            <Input
+              prefix={<DollarOutlined />}
+              type="number"
+              placeholder="Ej: 200.00"
+              size="large"
+              step="0.01"
+              min="0"
+            />
+          </Form.Item>
+
+          <Alert
+            message="⚠️ Esta comisión solo aplica a este vendedor"
+            description="El vendedor ganará este monto en lugar de la comisión global cuando venda este tipo de producto."
+            type="warning"
+            showIcon
+          />
+        </Form>
+      </Modal>
 
       {/* Modal: Crear/Editar Vendedor */}
       <Modal

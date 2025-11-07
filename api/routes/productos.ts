@@ -24,7 +24,9 @@ import {
   ajustarTransferencia,
   obtenerHistorialTransferencias,
   obtenerInventario,
-  obtenerFiltrosProductos
+  obtenerFiltrosProductos,
+  eliminarProducto,
+  eliminarProductosMultiple
 } from '../controllers/productosController.js';
 import { verificarAutenticacion } from '../middleware/auth.js';
 
@@ -244,6 +246,45 @@ router.put(
   '/:id/sucursal/:sucursal',
   verificarAutenticacion,
   actualizarProductoSucursal
+);
+
+/**
+ * ===================================
+ * RUTAS PARA ELIMINACIÓN DE PRODUCTOS
+ * ===================================
+ */
+
+/**
+ * @route   DELETE /api/productos/eliminar-multiple
+ * @desc    Eliminar múltiples productos de forma permanente
+ * @access  Private (requiere autenticación)
+ * @body    { ids: number[] } - Array de IDs de productos a eliminar
+ * @returns Confirmación de productos eliminados
+ * 
+ * IMPORTANTE: Esta ruta DEBE ir ANTES de DELETE /:id para evitar conflictos
+ */
+router.delete(
+  '/eliminar-multiple',
+  verificarAutenticacion,
+  eliminarProductosMultiple
+);
+
+/**
+ * @route   DELETE /api/productos/:id
+ * @desc    Eliminar un producto de forma permanente
+ * @access  Private (requiere autenticación)
+ * @param   id - ID del producto a eliminar
+ * @returns Confirmación de producto eliminado
+ * 
+ * ELIMINA:
+ * - El producto de la tabla 'productos'
+ * - Todos los registros relacionados en 'productos_sucursal'
+ * - Sin posibilidad de recuperación (eliminación permanente)
+ */
+router.delete(
+  '/:id',
+  verificarAutenticacion,
+  eliminarProducto
 );
 
 /**

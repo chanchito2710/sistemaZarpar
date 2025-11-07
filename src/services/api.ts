@@ -248,6 +248,18 @@ export const vendedoresService = {
       throw error;
     }
   },
+
+  /**
+   * Activar/desactivar comisiones de un vendedor
+   */
+  actualizarEstadoComisiones: async (id: number, cobra_comisiones: boolean): Promise<void> => {
+    try {
+      await apiClient.put(`/vendedores/${id}/comisiones`, { cobra_comisiones });
+    } catch (error) {
+      console.error('Error al actualizar estado de comisiones:', error);
+      throw error;
+    }
+  },
 };
 
 /**
@@ -859,6 +871,56 @@ export const productosService = {
       throw error;
     }
   },
+
+  /**
+   * ===================================
+   * ELIMINACIÓN DE PRODUCTOS
+   * ===================================
+   */
+
+  /**
+   * Eliminar un producto de forma permanente
+   * @param id - ID del producto a eliminar
+   * @returns Confirmación de eliminación
+   * 
+   * ADVERTENCIA: Esta acción elimina el producto de forma PERMANENTE
+   * de la base de datos, incluyendo todas sus relaciones con sucursales.
+   */
+  eliminar: async (id: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/productos/${id}`);
+    } catch (error) {
+      console.error('Error al eliminar producto:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Eliminar múltiples productos de forma permanente
+   * @param ids - Array de IDs de productos a eliminar
+   * @returns Confirmación de eliminación con número de productos eliminados
+   * 
+   * ADVERTENCIA: Esta acción elimina los productos de forma PERMANENTE
+   * de la base de datos, incluyendo todas sus relaciones con sucursales.
+   */
+  eliminarMultiple: async (ids: number[]): Promise<{ productosEliminados: number; sucursalesEliminadas: number }> => {
+    try {
+      const response: AxiosResponse<ApiResponse<{
+        productosEliminados: number;
+        sucursalesEliminadas: number;
+        ids: number[];
+      }>> = await apiClient.delete('/productos/eliminar-multiple', {
+        data: { ids }
+      });
+      return {
+        productosEliminados: response.data.data?.productosEliminados || 0,
+        sucursalesEliminadas: response.data.data?.sucursalesEliminadas || 0
+      };
+    } catch (error) {
+      console.error('Error al eliminar productos múltiples:', error);
+      throw error;
+    }
+  },
 };
 
 /**
@@ -1421,10 +1483,14 @@ export const transferenciasService = {
   /**
    * Confirmar recepción de transferencia
    */
-  confirmarRecepcion: async (id: number, data: ConfirmarRecepcionInput): Promise<Transferencia> => {
+  confirmarRecepcion: async (productoId: number, sucursal: string, cantidad: number): Promise<any> => {
     try {
-      const response: AxiosResponse<ApiResponse<Transferencia>> = 
-        await apiClient.put(`/transferencias/${id}/confirmar`, data);
+      const response: AxiosResponse<ApiResponse<any>> = 
+        await apiClient.post(`/transferencias/confirmar-recepcion`, {
+          producto_id: productoId,
+          sucursal,
+          cantidad
+        });
       return response.data.data!;
     } catch (error) {
       console.error('Error al confirmar recepción:', error);
@@ -1481,6 +1547,650 @@ export const transferenciasService = {
       return response.data.data!;
     } catch (error) {
       console.error('Error al obtener resumen:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * Servicios de Comisiones
+ */
+export const comisionesService = {
+  /**
+   * Obtener configuración de comisiones por tipo
+   */
+  obtenerConfiguracion: async (): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/comisiones/configuracion');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener configuración de comisiones:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Actualizar monto de comisión
+   */
+  actualizarComision: async (id: number, monto_comision: number): Promise<void> => {
+    try {
+      await apiClient.put(`/comisiones/configuracion/${id}`, { monto_comision });
+    } catch (error) {
+      console.error('Error al actualizar comisión:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Sincronizar tipos de productos
+   */
+  sincronizarTipos: async (): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/comisiones/sincronizar-tipos');
+      return response.data;
+    } catch (error) {
+      console.error('Error al sincronizar tipos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener resumen de comisiones por vendedor
+   */
+  obtenerResumenVendedores: async (filtros?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    sucursal?: string;
+    vendedor_id?: number;
+  }): Promise<any[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros) {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const url = `/comisiones/resumen-vendedores${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener resumen de comisiones:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ⭐ Obtener detalle de comisiones por venta individual (NO agrupadas)
+   * Retorna cada venta con su comisión total
+   */
+  obtenerDetallePorVentas: async (filtros?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    sucursal?: string;
+    vendedor_id?: number;
+  }): Promise<any[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros) {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const url = `/comisiones/detalle-por-ventas${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener detalle de comisiones por ventas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ⭐ Obtener resumen de comisiones agrupadas por TIPO de producto
+   * Retorna: Display: 3 productos, Comisión: $450.00
+   */
+  obtenerResumenPorTipo: async (filtros?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    sucursal?: string;
+    vendedor_id?: number;
+  }): Promise<any[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros) {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const url = `/comisiones/resumen-por-tipo${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener resumen de comisiones por tipo:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener remanentes de comisiones
+   */
+  obtenerRemanentes: async (filtros?: {
+    sucursal?: string;
+    vendedor_id?: number;
+  }): Promise<any> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros) {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const url = `/comisiones/remanentes${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.get(url);
+      return response.data.data || { remanentes: [], total: 0, count: 0 };
+    } catch (error) {
+      console.error('Error al obtener remanentes:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener detalle de comisiones de un vendedor
+   */
+  obtenerDetalleVendedor: async (
+    vendedor_id: number,
+    filtros?: {
+      fecha_desde?: string;
+      fecha_hasta?: string;
+      sucursal?: string;
+    }
+  ): Promise<any[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros) {
+        Object.entries(filtros).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const url = `/comisiones/detalle-vendedor/${vendedor_id}${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener detalle de comisiones:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener historial de cambios en configuración
+   */
+  obtenerHistorialCambios: async (): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/comisiones/historial-cambios');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener historial de cambios:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener historial de pagos de una comisión
+   */
+  obtenerHistorialPagos: async (comision_id: number): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(`/comisiones/historial-pagos/${comision_id}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener historial de pagos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * ========================================
+   * COMISIONES PERSONALIZADAS POR VENDEDOR
+   * ========================================
+   */
+
+  /**
+   * Obtener comisiones de un vendedor (personalizadas + globales)
+   */
+  obtenerComisionesVendedor: async (vendedor_id: number): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(`/comisiones/vendedor/${vendedor_id}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener comisiones del vendedor:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Establecer comisión personalizada para un vendedor
+   */
+  establecerComisionPersonalizada: async (vendedor_id: number, tipo_producto: string, monto_comision: number): Promise<void> => {
+    try {
+      await apiClient.post(`/comisiones/vendedor/${vendedor_id}`, { tipo_producto, monto_comision });
+    } catch (error) {
+      console.error('Error al establecer comisión personalizada:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Eliminar comisión personalizada (volver a usar global)
+   */
+  eliminarComisionPersonalizada: async (vendedor_id: number, tipo_producto: string): Promise<void> => {
+    try {
+      await apiClient.delete(`/comisiones/vendedor/${vendedor_id}/${tipo_producto}`);
+    } catch (error) {
+      console.error('Error al eliminar comisión personalizada:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * Servicio de Gestión de Caja
+ */
+export const cajaService = {
+  /**
+   * Obtener saldo de una sucursal
+   */
+  obtenerCaja: async (sucursal: string): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.get(`/caja/${sucursal}`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al obtener caja:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener todas las cajas
+   */
+  obtenerTodasLasCajas: async (): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/caja');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener cajas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener historial de movimientos
+   */
+  obtenerMovimientos: async (filtros?: {
+    sucursal?: string;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    tipo_movimiento?: string;
+  }): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/caja/movimientos/historial', {
+        params: filtros
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener movimientos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Registrar envío de dinero
+   */
+  registrarEnvio: async (data: {
+    sucursal: string;
+    monto: number;
+    concepto: string;
+    usuario_id: number;
+    usuario_email: string;
+  }): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/caja/envio', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al registrar envío:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Ajustar caja manualmente (solo admin)
+   */
+  ajustarCaja: async (sucursal: string, data: {
+    monto_nuevo: number;
+    concepto: string;
+    usuario_id: number;
+    usuario_email: string;
+  }): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.put(`/caja/${sucursal}/ajustar`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al ajustar caja:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * ===================================
+ * CARRITO DE TRANSFERENCIAS SERVICE
+ * ===================================
+ */
+export const carritoTransferenciasService = {
+  /**
+   * Obtener todo el carrito del usuario
+   */
+  obtenerCarrito: async (): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/carrito-transferencias');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener carrito:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Agregar o actualizar item en el carrito
+   */
+  agregarAlCarrito: async (data: {
+    producto_id: number;
+    sucursal_destino: string;
+    cantidad: number;
+  }): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/carrito-transferencias', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al agregar al carrito:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Eliminar item específico del carrito
+   */
+  eliminarDelCarrito: async (producto_id: number, sucursal: string): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.delete(`/carrito-transferencias/${producto_id}/${sucursal}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error al eliminar del carrito:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Vaciar completamente el carrito (después de confirmar envío)
+   */
+  vaciarCarrito: async (): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.delete('/carrito-transferencias');
+      return response.data;
+    } catch (error) {
+      console.error('Error al vaciar carrito:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener resumen del carrito (total de items y unidades)
+   */
+  obtenerResumen: async (): Promise<{
+    total_productos: number;
+    total_sucursales: number;
+    total_unidades: number;
+  }> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.get('/carrito-transferencias/resumen');
+      return response.data.data || { total_productos: 0, total_sucursales: 0, total_unidades: 0 };
+    } catch (error) {
+      console.error('Error al obtener resumen del carrito:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * ===================================
+ * SUELDOS SERVICE
+ * ===================================
+ */
+export const sueldosService = {
+  /**
+   * Obtener todos los sueldos con filtros
+   */
+  obtenerSueldos: async (filtros?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    sucursal?: string;
+    vendedor_id?: number;
+  }): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/sueldos', {
+        params: filtros
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener sueldos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Crear nuevo registro de sueldo
+   */
+  crearSueldo: async (data: {
+    vendedor_id: number;
+    monto: number;
+    fecha: string;
+    notas?: string;
+  }): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/sueldos', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al crear sueldo:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Actualizar registro de sueldo
+   */
+  actualizarSueldo: async (id: number, data: {
+    monto?: number;
+    fecha?: string;
+    notas?: string;
+  }): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.put(`/sueldos/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al actualizar sueldo:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Eliminar registro de sueldo
+   */
+  eliminarSueldo: async (id: number): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.delete(`/sueldos/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error al eliminar sueldo:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener resumen de sueldos
+   */
+  obtenerResumen: async (filtros?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    sucursal?: string;
+  }): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/sueldos/resumen', {
+        params: filtros
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener resumen de sueldos:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * Servicio de Devoluciones y Reemplazos
+ */
+export const devolucionesService = {
+  /**
+   * Obtener productos vendidos con garantía
+   */
+  obtenerProductosVendidos: async (filtros?: {
+    sucursal?: string;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+  }): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/devoluciones/productos-vendidos', {
+        params: filtros
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener productos vendidos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Procesar devolución
+   */
+  procesarDevolucion: async (data: any): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/devoluciones/devolver', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al procesar devolución:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Procesar reemplazo
+   */
+  procesarReemplazo: async (data: any): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post('/devoluciones/reemplazar', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al procesar reemplazo:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener stock de fallas
+   */
+  obtenerStockFallas: async (sucursal?: string): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/devoluciones/stock-fallas', {
+        params: { sucursal }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener stock de fallas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener saldos a favor de clientes
+   */
+  obtenerSaldosFavor: async (sucursal?: string): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/devoluciones/saldos-favor', {
+        params: { sucursal }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener saldos a favor:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * =====================================
+ * SERVICIO DE DESCUENTOS
+ * =====================================
+ */
+export const descuentosService = {
+  /**
+   * Obtener configuración de descuentos de todas las sucursales
+   */
+  obtenerConfiguracion: async (): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/descuentos');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener configuración de descuentos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener configuración de descuento de una sucursal específica
+   */
+  obtenerConfiguracionPorSucursal: async (sucursal: string): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.get(`/descuentos/${sucursal}`);
+      return response.data.data || {};
+    } catch (error) {
+      console.error('Error al obtener configuración de descuento:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Actualizar configuración de descuento de una sucursal
+   */
+  actualizarConfiguracion: async (sucursal: string, descuento_habilitado: boolean): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.put(`/descuentos/${sucursal}`, {
+        descuento_habilitado
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error al actualizar configuración de descuento:', error);
       throw error;
     }
   },

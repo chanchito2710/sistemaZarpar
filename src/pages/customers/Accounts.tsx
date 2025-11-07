@@ -30,6 +30,7 @@ import {
   ReloadOutlined,
   EyeOutlined,
   PrinterOutlined,
+  FilePdfOutlined,
   ShopOutlined,
   CalendarOutlined,
   UserOutlined,
@@ -39,7 +40,10 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { cuentaCorrienteService, vendedoresService } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import './Accounts.css';
 
 const { Title, Text } = Typography;
@@ -60,6 +64,16 @@ interface ClienteCuentaCorriente {
   ultimo_movimiento: string;
 }
 
+interface ProductoVenta {
+  producto_id: number;
+  producto_nombre: string;
+  producto_marca: string;
+  producto_tipo: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
 interface MovimientoCuentaCorriente {
   id: number;
   tipo: 'venta' | 'pago';
@@ -71,6 +85,10 @@ interface MovimientoCuentaCorriente {
   venta_id?: number;
   pago_id?: number;
   comprobante?: string;
+  productos?: ProductoVenta[];
+  subtotal_venta?: number;
+  descuento_venta?: number;
+  total_venta?: number;
 }
 
 // Tipo de sucursal como string simple
@@ -80,6 +98,11 @@ type Sucursal = string;
  * Componente Principal
  */
 const Accounts: React.FC = () => {
+  // Autenticación
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.esAdmin || false;
+  const sucursalUsuario = usuario?.sucursal?.toLowerCase() || '';
+  
   // Estados principales
   const [clientes, setClientes] = useState<ClienteCuentaCorriente[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -87,7 +110,9 @@ const Accounts: React.FC = () => {
   const [loadingSucursales, setLoadingSucursales] = useState<boolean>(false);
   
   // Filtros
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('todas');
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>(
+    esAdmin ? 'todas' : sucursalUsuario
+  );
   const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(null);
   const [fechaHasta, setFechaHasta] = useState<Dayjs | null>(null);
   
@@ -110,7 +135,9 @@ const Accounts: React.FC = () => {
   const [historialPagos, setHistorialPagos] = useState<any[]>([]);
   const [estadisticasPagos, setEstadisticasPagos] = useState<any>(null);
   const [loadingHistorialPagos, setLoadingHistorialPagos] = useState<boolean>(false);
-  const [filtroSucursalHistorial, setFiltroSucursalHistorial] = useState<string>('todas');
+  const [filtroSucursalHistorial, setFiltroSucursalHistorial] = useState<string>(
+    esAdmin ? 'todas' : sucursalUsuario
+  );
   const [filtroFechaDesdeHistorial, setFiltroFechaDesdeHistorial] = useState<Dayjs | null>(null);
   const [filtroFechaHastaHistorial, setFiltroFechaHastaHistorial] = useState<Dayjs | null>(null);
 
@@ -141,8 +168,14 @@ const Accounts: React.FC = () => {
       const data = await vendedoresService.obtenerSucursales();
       setSucursales(data);
       
-      // Auto-seleccionar "todas" por defecto
-      setSucursalSeleccionada('todas');
+      // Auto-seleccionar según permisos
+      if (esAdmin) {
+        // Admin puede ver todas
+        setSucursalSeleccionada('todas');
+      } else {
+        // Usuario normal solo su sucursal
+        setSucursalSeleccionada(sucursalUsuario);
+      }
     } catch (error) {
       console.error('Error al cargar sucursales:', error);
       message.error('Error al cargar las sucursales');
@@ -349,7 +382,7 @@ const Accounts: React.FC = () => {
     
     setProcesandoPago(true);
     try {
-      await cuentaCorrienteService.registrarPago({
+      const response = await cuentaCorrienteService.registrarPago({
         sucursal: clienteSeleccionado.sucursal,
         cliente_id: clienteSeleccionado.cliente_id,
         cliente_nombre: clienteSeleccionado.cliente_nombre,
@@ -359,15 +392,96 @@ const Accounts: React.FC = () => {
         observaciones: observacionesPago || undefined
       });
       
+      // Mostrar mensaje de éxito con detalles
       message.success('✅ Pago registrado exitosamente');
-      setModalPagoVisible(false);
       
-      // Recargar datos
-      if (sucursalSeleccionada === 'todas') {
-        cargarTodosLosClientes();
-      } else {
-        cargarClientes();
+      // Mostrar información sobre comisiones si las hay
+      if (response && response.comisiones) {
+        const { cobradas, remanente } = response.comisiones;
+        
+        if (cobradas && cobradas.length > 0) {
+          Modal.success({
+            title: '💰 Comisiones Cobradas',
+            content: (
+              <div>
+                <p><strong>Se cobraron las siguientes comisiones:</strong></p>
+                <ul>
+                  {cobradas.map((c: any, i: number) => (
+                    <li key={i}>
+                      {c.tipo} - {c.producto} (x{c.cantidad}): <strong>${c.monto.toFixed(2)}</strong>
+                    </li>
+                  ))}
+                </ul>
+                {remanente > 0 && (
+                  <div style={{ marginTop: 16, padding: 12, background: '#fff7e6', borderRadius: 4 }}>
+                    <p style={{ margin: 0 }}>
+                      💾 <strong>Remanente guardado:</strong> ${remanente.toFixed(2)}
+                      <br />
+                      <small>Este monto se aplicará automáticamente en el próximo pago</small>
+                    </p>
+                  </div>
+                )}
+              </div>
+            ),
+            width: 600
+          });
+        } else if (remanente > 0) {
+          message.info(`💾 Remanente de $${remanente.toFixed(2)} guardado para el próximo pago`);
+        }
       }
+      
+      // Cerrar modal y limpiar datos
+      setModalPagoVisible(false);
+      setMontoPago(0);
+      setMetodoPago('efectivo');
+      setComprobantePago('');
+      setObservacionesPago('');
+      
+      // Recargar datos SIEMPRE
+      console.log('🔄 Recargando clientes después del pago...');
+      if (sucursalSeleccionada === 'todas') {
+        await cargarTodosLosClientes();
+      } else {
+        await cargarClientes();
+      }
+      
+      // Si el modal de detalle está abierto, recargar también el detalle del cliente
+      if (modalDetalleVisible && clienteSeleccionado) {
+        console.log('🔄 Actualizando detalle del cliente...');
+        try {
+          const data = await cuentaCorrienteService.obtenerEstadoCuenta(
+            clienteSeleccionado.sucursal,
+            clienteSeleccionado.cliente_id
+          );
+          
+          const movimientosOrdenados = data.movimientos.sort(
+            (a: any, b: any) => {
+              return dayjs(a.fecha_movimiento).valueOf() - dayjs(b.fecha_movimiento).valueOf();
+            }
+          );
+          
+          setMovimientos(movimientosOrdenados);
+          
+          // Actualizar también el cliente seleccionado con los nuevos datos
+          const clientesActualizados = await cuentaCorrienteService.obtenerClientesConSaldo(
+            clienteSeleccionado.sucursal
+          );
+          const clienteActualizado = clientesActualizados.find(
+            (c: any) => c.cliente_id === clienteSeleccionado.cliente_id
+          );
+          
+          if (clienteActualizado) {
+            setClienteSeleccionado(clienteActualizado);
+          }
+          
+          console.log('✅ Detalle del cliente actualizado');
+        } catch (error) {
+          console.error('Error al actualizar detalle:', error);
+        }
+      }
+      
+      console.log('✅ Clientes recargados exitosamente');
+      
     } catch (error) {
       console.error('Error al registrar pago:', error);
       message.error('Error al registrar el pago');
@@ -415,177 +529,365 @@ const Accounts: React.FC = () => {
       return;
     }
     
-    // Generar HTML para impresión
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Estado de Cuenta - ${cliente.cliente_nombre}</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 40px;
-            color: #333;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #1890ff;
-            padding-bottom: 20px;
-          }
-          .header h1 {
-            margin: 0;
-            color: #1890ff;
-            font-size: 28px;
-          }
-          .header p {
-            margin: 5px 0;
-            color: #666;
-          }
-          .info {
-            margin: 20px 0;
-            display: flex;
-            justify-content: space-between;
-          }
-          .info-section {
-            flex: 1;
-          }
-          .info-label {
-            font-weight: bold;
-            color: #666;
-            font-size: 12px;
-            text-transform: uppercase;
-          }
-          .info-value {
-            font-size: 16px;
-            color: #333;
-            margin: 5px 0;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-          }
-          th {
-            background-color: #1890ff;
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-size: 12px;
-            text-transform: uppercase;
-          }
-          td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #eee;
-            font-size: 14px;
-          }
-          tr:hover {
-            background-color: #f5f5f5;
-          }
-          .total {
-            margin-top: 30px;
-            text-align: right;
-            padding: 20px;
-            background-color: #f0f2f5;
-            border-radius: 8px;
-          }
-          .total-label {
-            font-size: 18px;
-            color: #666;
-            margin-right: 20px;
-          }
-          .total-value {
-            font-size: 28px;
-            font-weight: bold;
-            color: ${cliente.saldo_actual > 0 ? '#f5222d' : '#52c41a'};
-          }
-          .footer {
-            margin-top: 50px;
-            text-align: center;
-            color: #999;
-            font-size: 12px;
-            border-top: 2px solid #eee;
-            padding-top: 20px;
-          }
-          .debe { color: #f5222d; font-weight: bold; }
-          .haber { color: #52c41a; font-weight: bold; }
-          .saldo { color: #1890ff; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>ESTADO DE CUENTA CORRIENTE</h1>
-          <p>Sistema ZARPAR - Gestión Comercial</p>
-        </div>
-        
-        <div class="info">
-          <div class="info-section">
-            <div class="info-label">Cliente</div>
-            <div class="info-value">${cliente.cliente_nombre}</div>
-          </div>
-          <div class="info-section">
-            <div class="info-label">Sucursal</div>
-            <div class="info-value">${cliente.sucursal ? cliente.sucursal.toUpperCase() : 'N/A'}</div>
-          </div>
-          <div class="info-section">
-            <div class="info-label">Fecha de Emisión</div>
-            <div class="info-value">${dayjs().format('DD/MM/YYYY HH:mm')}</div>
-          </div>
-        </div>
-        
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Descripción</th>
-              <th style="text-align: right;">Debe</th>
-              <th style="text-align: right;">Haber</th>
-              <th style="text-align: right;">Saldo</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${movimientos.map(mov => `
-              <tr>
-                <td>${dayjs(mov.fecha_movimiento).format('DD/MM/YYYY HH:mm')}</td>
-                <td>${mov.descripcion}</td>
-                <td class="debe" style="text-align: right;">
-                  ${parseFloat(mov.debe || 0) > 0 ? `$${parseFloat(mov.debe || 0).toFixed(2)}` : '-'}
-                </td>
-                <td class="haber" style="text-align: right;">
-                  ${parseFloat(mov.haber || 0) > 0 ? `$${parseFloat(mov.haber || 0).toFixed(2)}` : '-'}
-                </td>
-                <td class="saldo" style="text-align: right;">
-                  $${parseFloat(mov.saldo || 0).toFixed(2)}
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        
-        <div class="total">
-          <span class="total-label">SALDO ACTUAL:</span>
-          <span class="total-value">$${parseFloat(cliente.saldo_actual || 0).toFixed(2)}</span>
-        </div>
-        
-        <div class="footer">
-          <p>Documento generado automáticamente por Sistema ZARPAR</p>
-          <p>Fecha: ${dayjs().format('DD/MM/YYYY HH:mm:ss')}</p>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    // Abrir ventana de impresión
-    const ventana = window.open('', '_blank');
-    if (ventana) {
-      ventana.document.write(html);
-      ventana.document.close();
-      ventana.focus();
+    try {
+      // Crear documento PDF
+      const doc = new jsPDF();
+      const fechaActual = dayjs().format('DD/MM/YYYY HH:mm');
+      let yPos = 20;
       
-      // Esperar a que se cargue el contenido
-      setTimeout(() => {
-        ventana.print();
-      }, 500);
+      // ========================================
+      // 1. HEADER ELEGANTE CON DISEÑO CORPORATIVO
+      // ========================================
+      
+      // Fondo azul para el header
+      doc.setFillColor(24, 144, 255);
+      doc.rect(0, 0, 210, 45, 'F');
+      
+      // Logo conceptual (círculo con iniciales)
+      doc.setFillColor(255, 255, 255);
+      doc.circle(20, 22, 8, 'F');
+      doc.setTextColor(24, 144, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Z', 17, 25);
+      
+      // Título principal
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ZARPAR', 32, 20);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Repuestos de Celulares', 32, 27);
+      
+      // Información de contacto
+      doc.setFontSize(8);
+      doc.text('www.zarparuy.com | contacto@zarparuy.com', 32, 32);
+      
+      // Título del documento (derecha)
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ESTADO DE CUENTA', 210, 20, { align: 'right' });
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Fecha: ${fechaActual}`, 210, 27, { align: 'right' });
+      
+      // Resetear color de texto
+      doc.setTextColor(0, 0, 0);
+      yPos = 55;
+      
+      // ========================================
+      // 2. INFORMACIÓN DEL CLIENTE (CAJA CON BORDE)
+      // ========================================
+      
+      // Caja de información
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(14, yPos, 182, 28, 2, 2, 'S');
+      
+      // Título de la sección
+      doc.setFillColor(245, 247, 250);
+      doc.roundedRect(14, yPos, 182, 8, 2, 2, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 100, 100);
+      doc.text('INFORMACIÓN DEL CLIENTE', 18, yPos + 5);
+      
+      doc.setTextColor(0, 0, 0);
+      yPos += 13;
+      
+      // Datos del cliente en columnas
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Cliente:', 18, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(cliente.cliente_nombre, 42, yPos);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Sucursal:', 120, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(cliente.sucursal ? cliente.sucursal.toUpperCase() : 'N/A', 142, yPos);
+      
+      yPos += 8;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Cliente ID:', 18, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`#${cliente.cliente_id}`, 42, yPos);
+      
+      // Último movimiento
+      doc.setFont('helvetica', 'bold');
+      doc.text('Último movimiento:', 120, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(dayjs(cliente.ultimo_movimiento).format('DD/MM/YYYY'), 162, yPos);
+      
+      yPos += 15;
+      
+      // ========================================
+      // 3. DETALLE DE MOVIMIENTOS
+      // ========================================
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Detalle de Movimientos', 14, yPos);
+      yPos += 8;
+      
+      // Procesar cada movimiento
+      for (let i = 0; i < movimientos.length; i++) {
+        const mov = movimientos[i];
+        
+        // Verificar si necesitamos nueva página
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        // ========================================
+        // 3.1 MOVIMIENTO DE VENTA CON DETALLE
+        // ========================================
+        if (mov.tipo === 'venta' && mov.productos && mov.productos.length > 0) {
+          // Encabezado del movimiento
+          doc.setFillColor(245, 247, 250);
+          doc.roundedRect(14, yPos, 182, 8, 1, 1, 'F');
+          
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(59, 130, 246);
+          doc.text(`📄 ${mov.descripcion}`, 18, yPos + 5);
+          
+          doc.setTextColor(100, 100, 100);
+          doc.setFont('helvetica', 'normal');
+          doc.text(dayjs(mov.fecha_movimiento).format('DD/MM/YYYY HH:mm'), 150, yPos + 5);
+          
+          doc.setTextColor(0, 0, 0);
+          yPos += 12;
+          
+          // Tabla de productos
+          const productosData = mov.productos.map((prod: ProductoVenta) => [
+            prod.cantidad.toString(),
+            `${prod.producto_nombre}\n${prod.producto_marca} | ${prod.producto_tipo}`,
+            `$${parseFloat(String(prod.precio_unitario || 0)).toFixed(2)}`,
+            `$${parseFloat(String(prod.subtotal || 0)).toFixed(2)}`
+          ]);
+          
+          autoTable(doc, {
+            startY: yPos,
+            head: [['Cant.', 'Producto', 'P. Unit.', 'Subtotal']],
+            body: productosData,
+            theme: 'plain',
+            headStyles: {
+              fillColor: [255, 255, 255],
+              textColor: [100, 100, 100],
+              fontSize: 8,
+              fontStyle: 'bold',
+              lineWidth: 0.1,
+              lineColor: [200, 200, 200]
+            },
+            bodyStyles: {
+              fontSize: 8,
+              cellPadding: 2
+            },
+            columnStyles: {
+              0: { cellWidth: 15, halign: 'center' },
+              1: { cellWidth: 110 },
+              2: { cellWidth: 27, halign: 'right' },
+              3: { cellWidth: 27, halign: 'right', fontStyle: 'bold' }
+            },
+            margin: { left: 18, right: 18 },
+            styles: {
+              overflow: 'linebreak',
+              cellWidth: 'wrap'
+            }
+          });
+          
+          yPos = (doc as any).lastAutoTable.finalY + 3;
+          
+          // Subtotal, descuento y total de la venta
+          const subtotalVenta = parseFloat(String(mov.subtotal_venta || 0));
+          const descuentoVenta = parseFloat(String(mov.descuento_venta || 0));
+          const totalVenta = parseFloat(String(mov.total_venta || 0));
+          
+          // Línea separadora
+          doc.setDrawColor(230, 230, 230);
+          doc.line(18, yPos, 192, yPos);
+          yPos += 5;
+          
+          // Resumen financiero
+          doc.setFontSize(9);
+          
+          // Subtotal
+          doc.setFont('helvetica', 'normal');
+          doc.text('Subtotal:', 140, yPos);
+          doc.text(`$${subtotalVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
+          yPos += 5;
+          
+          // Descuento (si existe)
+          if (descuentoVenta > 0) {
+            doc.setTextColor(245, 34, 45);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Descuento:', 140, yPos);
+            doc.text(`-$${descuentoVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
+            doc.setTextColor(0, 0, 0);
+            yPos += 5;
+          }
+          
+          // Total
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.text('TOTAL:', 140, yPos);
+          doc.setTextColor(59, 130, 246);
+          doc.text(`$${totalVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
+          doc.setTextColor(0, 0, 0);
+          yPos += 5;
+          
+          // Saldo acumulado
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(100, 100, 100);
+          doc.text('Saldo:', 140, yPos);
+          const saldoVenta = parseFloat(String(mov.saldo || 0));
+          const colorSaldo = saldoVenta > 0 ? [245, 34, 45] : [82, 196, 26];
+          doc.setTextColor(colorSaldo[0], colorSaldo[1], colorSaldo[2]);
+          doc.text(`$${saldoVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
+          doc.setTextColor(0, 0, 0);
+          
+          yPos += 12;
+          
+        } else if (mov.tipo === 'pago') {
+          // ========================================
+          // 3.2 MOVIMIENTO DE PAGO
+          // ========================================
+          
+          doc.setFillColor(240, 255, 244);
+          doc.roundedRect(14, yPos, 182, 12, 1, 1, 'F');
+          
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(82, 196, 26);
+          doc.text('💰 PAGO RECIBIDO', 18, yPos + 5);
+          
+          doc.setTextColor(100, 100, 100);
+          doc.setFont('helvetica', 'normal');
+          doc.text(dayjs(mov.fecha_movimiento).format('DD/MM/YYYY HH:mm'), 150, yPos + 5);
+          
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(9);
+          const montoPago = parseFloat(String(mov.haber || 0));
+          doc.text(`Monto: $${montoPago.toFixed(2)}`, 18, yPos + 10);
+          
+          if (mov.comprobante) {
+            doc.text(`Comprobante: ${mov.comprobante}`, 80, yPos + 10);
+          }
+          
+          doc.setFont('helvetica', 'bold');
+          doc.text('Saldo:', 150, yPos + 10);
+          const saldoPago = parseFloat(String(mov.saldo || 0));
+          const colorSaldoPago = saldoPago > 0 ? [245, 34, 45] : [82, 196, 26];
+          doc.setTextColor(colorSaldoPago[0], colorSaldoPago[1], colorSaldoPago[2]);
+          doc.text(`$${saldoPago.toFixed(2)}`, 192, yPos + 10, { align: 'right' });
+          doc.setTextColor(0, 0, 0);
+          
+          yPos += 18;
+        }
+        
+        // Línea separadora entre movimientos
+        if (i < movimientos.length - 1) {
+          doc.setDrawColor(220, 220, 220);
+          doc.setLineDash([2, 2]);
+          doc.line(14, yPos, 196, yPos);
+          doc.setLineDash([]);
+          yPos += 8;
+        }
+      }
+      
+      // ========================================
+      // 4. RESUMEN FINAL
+      // ========================================
+      
+      // Verificar espacio para el resumen
+      if (yPos > 230) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      yPos += 10;
+      
+      // Caja de resumen final
+      doc.setFillColor(24, 144, 255);
+      doc.roundedRect(14, yPos, 182, 35, 2, 2, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RESUMEN DE CUENTA', 105, yPos + 10, { align: 'center' });
+      
+      // Total debe
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Total Debe:', 30, yPos + 20);
+      const totalDebe = parseFloat(String(cliente.total_debe || 0));
+      doc.text(`$${totalDebe.toFixed(2)}`, 80, yPos + 20, { align: 'right' });
+      
+      // Total haber
+      doc.text('Total Haber:', 110, yPos + 20);
+      const totalHaber = parseFloat(String(cliente.total_haber || 0));
+      doc.text(`$${totalHaber.toFixed(2)}`, 160, yPos + 20, { align: 'right' });
+      
+      // Saldo final
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SALDO ACTUAL:', 30, yPos + 30);
+      
+      const saldoActual = parseFloat(cliente.saldo_actual || 0);
+      const textoSaldo = saldoActual > 0 ? `$${saldoActual.toFixed(2)} (DEBE)` : saldoActual < 0 ? `$${Math.abs(saldoActual).toFixed(2)} (A FAVOR)` : '$0.00';
+      doc.text(textoSaldo, 185, yPos + 30, { align: 'right' });
+      
+      // ========================================
+      // 5. FOOTER PROFESIONAL
+      // ========================================
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        
+        // Línea superior del footer
+        doc.setDrawColor(24, 144, 255);
+        doc.setLineWidth(0.5);
+        doc.line(14, 280, 196, 280);
+        
+        // Texto del footer
+        doc.setFontSize(8);
+        doc.setTextColor(120, 120, 120);
+        doc.setFont('helvetica', 'normal');
+        doc.text(
+          'Este documento es un estado de cuenta generado automáticamente por Sistema ZARPAR.',
+          105,
+          285,
+          { align: 'center' }
+        );
+        doc.text(
+          `Página ${i} de ${pageCount} | Generado el ${fechaActual}`,
+          105,
+          290,
+          { align: 'center' }
+        );
+      }
+      
+      // ========================================
+      // 6. GUARDAR PDF CON NOMBRE PERSONALIZADO
+      // ========================================
+      const nombreCliente = cliente.cliente_nombre.replace(/\s+/g, '_');
+      const fechaDescarga = dayjs().format('DD-MM-YYYY');
+      const nombreArchivo = `Estado_Cuenta_${nombreCliente}_${fechaDescarga}.pdf`;
+      
+      doc.save(nombreArchivo);
+      
+      message.success('✅ PDF generado correctamente con todos los detalles');
+      
+    } catch (error) {
+      console.error('Error al generar PDF:', error);
+      message.error('❌ Error al generar el PDF');
     }
   };
 
@@ -716,7 +1018,7 @@ const Accounts: React.FC = () => {
   /**
    * Columnas de movimientos para el modal de detalle
    */
-  const columnasMovimientos: ColumnsType<MovimientoCuentaCorriente> = [
+  const columnasMovimientos: ColumnsType<any> = [
     {
       title: 'Fecha',
       dataIndex: 'fecha_movimiento',
@@ -737,10 +1039,93 @@ const Accounts: React.FC = () => {
       ),
     },
     {
-      title: 'Descripción',
-      dataIndex: 'descripcion',
-      key: 'descripcion',
-      ellipsis: true,
+      title: 'Detalle',
+      dataIndex: 'productos',
+      key: 'productos',
+      render: (_: any, record: any) => {
+        console.log('🔍 Renderizando detalle:', {
+          tipo: record.tipo,
+          productos: record.productos,
+          descripcion: record.descripcion,
+          descuento_venta: record.descuento_venta
+        });
+        
+        // Si es un pago, mostrar la descripción
+        if (record.tipo === 'pago') {
+          return <Text>{record.descripcion}</Text>;
+        }
+        
+        // Si es una venta, mostrar productos
+        if (record.productos && Array.isArray(record.productos) && record.productos.length > 0) {
+          return (
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              {record.productos.map((producto: any, index: number) => (
+                <div
+                  key={index}
+                  style={{
+                    padding: '6px 10px',
+                    background: '#f5f5f5',
+                    borderRadius: '6px',
+                    border: '1px solid #e0e0e0',
+                  }}
+                >
+                  <Row justify="space-between">
+                    <Col span={18}>
+                      <Text strong style={{ fontSize: '12px', display: 'block' }}>
+                        {producto.producto_nombre}
+                      </Text>
+                      {producto.producto_tipo && (
+                        <Text style={{ fontSize: '10px', color: '#1890ff', display: 'block' }}>
+                          {producto.producto_tipo}
+                        </Text>
+                      )}
+                      {producto.producto_marca && (
+                        <Text type="secondary" style={{ fontSize: '10px', display: 'block' }}>
+                          {producto.producto_marca}
+                        </Text>
+                      )}
+                      <Text type="secondary" style={{ fontSize: '10px' }}>
+                        {producto.cantidad} x ${parseFloat(producto.precio_unitario || 0).toFixed(2)}
+                      </Text>
+                    </Col>
+                    <Col span={6} style={{ textAlign: 'right' }}>
+                      <Text strong style={{ fontSize: '12px', color: '#52c41a' }}>
+                        ${parseFloat(producto.subtotal || 0).toFixed(2)}
+                      </Text>
+                    </Col>
+                  </Row>
+                </div>
+              ))}
+              {/* Mostrar descuento si existe */}
+              {record.descuento_venta && parseFloat(record.descuento_venta) > 0 && (
+                <div
+                  style={{
+                    padding: '4px 10px',
+                    background: '#fff1f0',
+                    borderRadius: '6px',
+                    border: '1px solid #ffa39e',
+                  }}
+                >
+                  <Row justify="space-between">
+                    <Col>
+                      <Text style={{ fontSize: '11px', color: '#cf1322' }}>
+                        💰 Descuento aplicado
+                      </Text>
+                    </Col>
+                    <Col>
+                      <Text strong style={{ fontSize: '11px', color: '#cf1322' }}>
+                        -${parseFloat(record.descuento_venta).toFixed(2)}
+                      </Text>
+                    </Col>
+                  </Row>
+                </div>
+              )}
+            </Space>
+          );
+        }
+        
+        return <Text type="secondary">{record.descripcion}</Text>;
+      },
     },
     {
       title: 'Debe',
@@ -875,15 +1260,23 @@ const Accounts: React.FC = () => {
         <Row gutter={[16, 16]} align="middle">
           <Col xs={24} sm={8}>
             <Space direction="vertical" size={0} style={{ width: '100%' }}>
-              <Text strong>Sucursal</Text>
+              <Text strong>
+                Sucursal
+                {!esAdmin && (
+                  <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
+                    (Solo tu sucursal)
+                  </Text>
+                )}
+              </Text>
               <Select
                 value={sucursalSeleccionada}
                 onChange={setSucursalSeleccionada}
                 style={{ width: '100%' }}
                 loading={loadingSucursales}
                 placeholder="Seleccionar sucursal"
+                disabled={!esAdmin}
               >
-                <Option key="todas" value="todas">Todas las Sucursales</Option>
+                {esAdmin && <Option key="todas" value="todas">Todas las Sucursales</Option>}
                 {sucursales.map((sucursal, index) => (
                   <Option key={sucursal || `suc-${index}`} value={sucursal}>
                     {sucursal ? sucursal.toUpperCase() : 'N/A'}
@@ -1136,16 +1529,16 @@ const Accounts: React.FC = () => {
             Cerrar
           </Button>,
           <Button
-            key="imprimir"
+            key="descargar"
             type="primary"
-            icon={<PrinterOutlined />}
+            icon={<FilePdfOutlined />}
             onClick={() => clienteSeleccionado && handleImprimirEstado(clienteSeleccionado)}
             loading={loadingMovimientos}
           >
-            Imprimir Estado
+            Descargar PDF
           </Button>,
         ]}
-        width={900}
+        width={1100}
       >
         {clienteSeleccionado && (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -1192,7 +1585,7 @@ const Accounts: React.FC = () => {
                 loading={loadingMovimientos}
                 rowKey="id"
                 size="small"
-                scroll={{ x: 800 }}
+                scroll={{ x: 1200 }}
                 pagination={{
                   defaultPageSize: 10,
                   showTotal: (total) => `Total: ${total} movimientos`,
@@ -1252,13 +1645,21 @@ const Accounts: React.FC = () => {
             <Row gutter={16}>
               <Col xs={24} sm={8}>
                 <div>
-                  <Text strong>Sucursal</Text>
+                  <Text strong>
+                    Sucursal
+                    {!esAdmin && (
+                      <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
+                        (Solo tu sucursal)
+                      </Text>
+                    )}
+                  </Text>
                   <Select
                     value={filtroSucursalHistorial}
                     onChange={setFiltroSucursalHistorial}
                     style={{ width: '100%', marginTop: 8 }}
+                    disabled={!esAdmin}
                   >
-                    <Option value="todas">Todas las Sucursales</Option>
+                    {esAdmin && <Option value="todas">Todas las Sucursales</Option>}
                     {sucursales.map((suc) => (
                       <Option key={suc} value={suc}>
                         {suc.toUpperCase()}

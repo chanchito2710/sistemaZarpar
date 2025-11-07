@@ -47,6 +47,7 @@ import {
   type ProductoCompleto,
   type VentasPorProducto
 } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import './Transfer.css';
 
 const { Title, Text } = Typography;
@@ -106,6 +107,11 @@ const formatearNombreSucursal = (nombre: string): string => {
  * ===================================
  */
 const Transfer: React.FC = () => {
+  // ⭐ AUTENTICACIÓN
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.esAdmin || false;
+  const sucursalUsuario = usuario?.sucursal?.toLowerCase() || '';
+  
   // Estados principales
   const [productos, setProductos] = useState<ProductoTransfer[]>([]);
   const [sucursales, setSucursales] = useState<string[]>([]);
@@ -220,9 +226,13 @@ const Transfer: React.FC = () => {
                 stock_en_transito: stockEnTransito
               };
               
-              // Log para debugging si hay stock en tránsito
+              // 🐛 LOG DEBUG DETALLADO para stock en tránsito
               if (stockEnTransito > 0) {
-                console.log(`📦 ${producto.nombre} tiene ${stockEnTransito} unidades en tránsito hacia ${suc.sucursal}`);
+                console.log(`🚚 [CARGAR PRODUCTOS] ${producto.nombre} -> ${suc.sucursal}:`, {
+                  stock_en_transito_BD: stockEnTransito,
+                  stock_actual: suc.stock,
+                  datos_crudos: suc
+                });
               }
             }
           });
@@ -417,7 +427,8 @@ const Transfer: React.FC = () => {
     productoId: number; 
     sucursal: string; 
     stockPrincipal: number;
-  }> = ({ productoId, sucursal, stockPrincipal }) => {
+    stockEnTransito?: number;
+  }> = ({ productoId, sucursal, stockPrincipal, stockEnTransito = 0 }) => {
     const [inputValue, setInputValue] = useState<number | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     
@@ -427,6 +438,9 @@ const Transfer: React.FC = () => {
     
     // Sugerir cantidad basada en ventas
     const cantidadSugerida = ventas > 0 ? ventas : null;
+    
+    // 🚨 BUG FIX: Si hay stock en tránsito, deshabilitar el input
+    const tieneStockEnTransito = stockEnTransito > 0;
     
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsEditing(true);
@@ -487,22 +501,32 @@ const Transfer: React.FC = () => {
         }
         
         try {
+          console.log(`🔄 [DEBUG] Preparando transferencia:`, {
+            productoId,
+            sucursal,
+            cantidad: finalValue,
+            valorAnterior,
+            accion: valorAnterior === 0 ? 'Nueva' : 'Ajuste'
+          });
+          
           if (valorAnterior === 0) {
             // Nueva transferencia
-            await productosService.prepararTransferencia(
+            const resultado = await productosService.prepararTransferencia(
               productoId,
               sucursal,
               finalValue
             );
+            console.log(`✅ [DEBUG] Respuesta prepararTransferencia:`, resultado);
             message.success(`${finalValue} unidades preparadas para ${formatearNombreSucursal(sucursal)}`);
           } else {
             // Ajustar transferencia existente
-            await productosService.ajustarTransferencia(
+            const resultado = await productosService.ajustarTransferencia(
               productoId,
               sucursal,
               valorAnterior,
               finalValue
             );
+            console.log(`✅ [DEBUG] Respuesta ajustarTransferencia:`, resultado);
             const diferencia = finalValue - valorAnterior;
             if (diferencia > 0) {
               message.success(`+${diferencia} unidades agregadas`);
@@ -520,8 +544,10 @@ const Transfer: React.FC = () => {
             }
           }));
           
+          console.log(`🔄 [DEBUG] Recargando productos...`);
           // Recargar productos para ver cambios en stock principal y en_transito
           await cargarProductos();
+          console.log(`✅ [DEBUG] Productos recargados. Verificar console para datos`);
           
         } catch (error: any) {
           console.error('Error al preparar/ajustar transferencia:', error);
@@ -536,32 +562,54 @@ const Transfer: React.FC = () => {
       setInputValue(value);
     };
 
-    const displayValue = isEditing || inputValue !== null 
-      ? inputValue 
-      : (pendingAmount > 0 ? pendingAmount : null);
+    // 🚨 BUG FIX: Si hay stock en tránsito, forzar valor a 0
+    const displayValue = tieneStockEnTransito 
+      ? 0 
+      : (isEditing || inputValue !== null 
+          ? inputValue 
+          : (pendingAmount > 0 ? pendingAmount : null));
     
     const hasPending = pendingAmount > 0;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-        <InputNumber
-          size="small"
-          min={0}
-          max={stockPrincipal}
-          value={displayValue}
-          onChange={handleChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          onPressEnter={handleBlur}
-          placeholder={cantidadSugerida ? `${cantidadSugerida}` : '0'}
-          style={{
-            width: '70px',
-            textAlign: 'center',
-            color: hasPending ? '#fa8c16' : undefined,
-            fontWeight: hasPending ? 'bold' : undefined
-          }}
-          disabled={stockPrincipal === 0}
-        />
+        {tieneStockEnTransito ? (
+          <Tooltip title="No puedes enviar más stock hasta que se confirme la recepción del stock en tránsito">
+            <InputNumber
+              size="small"
+              min={0}
+              max={stockPrincipal}
+              value={0}
+              placeholder="Bloqueado"
+              style={{
+                width: '70px',
+                textAlign: 'center',
+                backgroundColor: '#f5f5f5',
+                cursor: 'not-allowed'
+              }}
+              disabled={true}
+            />
+          </Tooltip>
+        ) : (
+          <InputNumber
+            size="small"
+            min={0}
+            max={stockPrincipal}
+            value={displayValue}
+            onChange={handleChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onPressEnter={handleBlur}
+            placeholder={cantidadSugerida ? `${cantidadSugerida}` : '0'}
+            style={{
+              width: '70px',
+              textAlign: 'center',
+              color: hasPending ? '#fa8c16' : undefined,
+              fontWeight: hasPending ? 'bold' : undefined
+            }}
+            disabled={stockPrincipal === 0}
+          />
+        )}
       </div>
     );
   };
@@ -762,14 +810,110 @@ const Transfer: React.FC = () => {
 
   /**
    * ===================================
-   * FILTRAR PRODUCTOS
+   * CONFIRMAR RECEPCIÓN (SUCURSALES SIMPLES)
    * ===================================
    */
-  const filteredProducts = productos.filter(producto =>
-    producto.nombre.toLowerCase().includes(searchText.toLowerCase()) ||
-    producto.marca?.toLowerCase().includes(searchText.toLowerCase()) ||
-    producto.tipo?.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const handleConfirmarRecepcion = async (productoId: number, sucursal: string, cantidad: number) => {
+    try {
+      const producto = productos.find(p => p.id === productoId);
+      
+      Modal.confirm({
+        title: '✅ Confirmar Recepción',
+        content: (
+          <div>
+            <p>¿Confirmas que recibiste el siguiente stock?</p>
+            <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f0f0f0', borderRadius: 4 }}>
+              <p><strong>Producto:</strong> {producto?.nombre}</p>
+              <p><strong>Cantidad:</strong> {cantidad} unidades</p>
+              <p style={{ marginBottom: 0 }}><strong>Sucursal:</strong> {sucursal.toUpperCase()}</p>
+            </div>
+            <p style={{ marginTop: 16, color: '#52c41a' }}>
+              ✓ El stock se sumará a tu inventario
+            </p>
+            <p style={{ color: '#999' }}>
+              ✓ El indicador "En camino" desaparecerá
+            </p>
+          </div>
+        ),
+        okText: 'Confirmar Recepción',
+        cancelText: 'Cancelar',
+        okButtonProps: { style: { backgroundColor: '#52c41a', borderColor: '#52c41a' } },
+        onOk: async () => {
+          try {
+            // Llamar al endpoint para confirmar recepción
+            await transferenciasService.confirmarRecepcion(productoId, sucursal, cantidad);
+            
+            message.success(`✅ Recepción confirmada: ${cantidad} unidades de ${producto?.nombre}`);
+            
+            // Recargar productos para actualizar la tabla
+            await cargarProductos();
+            
+          } catch (error: any) {
+            console.error('Error al confirmar recepción:', error);
+            message.error(error.response?.data?.message || 'Error al confirmar la recepción');
+          }
+        }
+      });
+      
+    } catch (error: any) {
+      console.error('Error al mostrar modal de confirmación:', error);
+      message.error('Error al procesar la confirmación');
+    }
+  };
+
+  /**
+   * ===================================
+   * FILTRAR Y ORDENAR PRODUCTOS
+   * ===================================
+   */
+  const filteredProducts = useMemo(() => {
+    // Primero filtrar
+    const filtered = productos.filter(producto =>
+      producto.nombre.toLowerCase().includes(searchText.toLowerCase()) ||
+      producto.marca?.toLowerCase().includes(searchText.toLowerCase()) ||
+      producto.tipo?.toLowerCase().includes(searchText.toLowerCase())
+    );
+    
+    // Luego ordenar: PRIORIDAD a productos con stock en tránsito
+    return filtered.sort((a, b) => {
+      // Obtener stock en tránsito de la sucursal del usuario (si es sucursal simple) o cualquier sucursal (si es admin)
+      const getStockEnTransito = (producto: ProductoTransfer): number => {
+        if (!producto.sucursales) return 0;
+        
+        // Si es sucursal simple, solo buscar en su sucursal
+        if (!esAdmin && sucursalUsuario) {
+          return producto.sucursales[sucursalUsuario]?.stock_en_transito || 0;
+        }
+        
+        // Si es admin, buscar en todas las sucursales
+        let totalEnTransito = 0;
+        Object.values(producto.sucursales).forEach(sucursal => {
+          totalEnTransito += sucursal.stock_en_transito || 0;
+        });
+        return totalEnTransito;
+      };
+      
+      const stockEnTransitoA = getStockEnTransito(a);
+      const stockEnTransitoB = getStockEnTransito(b);
+      
+      // 1. PRIORIDAD: Productos con stock en tránsito van primero (descendente)
+      if (stockEnTransitoA !== stockEnTransitoB) {
+        return stockEnTransitoB - stockEnTransitoA; // Mayor stock en tránsito primero
+      }
+      
+      // 2. SEGUNDO ORDEN: Por tipo (alfabético)
+      const tipoA = (a.tipo || '').toLowerCase();
+      const tipoB = (b.tipo || '').toLowerCase();
+      if (tipoA !== tipoB) {
+        return tipoA.localeCompare(tipoB, 'es');
+      }
+      
+      // 3. TERCER ORDEN: Por nombre (alfabético)
+      const nombreA = (a.nombre || '').toLowerCase();
+      const nombreB = (b.nombre || '').toLowerCase();
+      return nombreA.localeCompare(nombreB, 'es');
+    });
+  }, [productos, searchText, esAdmin, sucursalUsuario]);
 
   /**
    * ===================================
@@ -782,7 +926,7 @@ const Transfer: React.FC = () => {
       dataIndex: 'nombre',
       key: 'nombre',
       fixed: 'left' as const,
-      width: 200,
+      width: 100,
       render: (nombre: string, record: ProductoTransfer) => (
         <div>
           <div style={{ fontWeight: 'bold' }}>{nombre}</div>
@@ -799,11 +943,18 @@ const Transfer: React.FC = () => {
       dataIndex: 'tipo',
       key: 'tipo',
       fixed: 'left' as const,
-      width: 120,
+      width: 60,
+      filters: Array.from(new Set(productos.map(p => p.tipo).filter(Boolean))).map(tipo => ({
+        text: tipo,
+        value: tipo
+      })),
+      onFilter: (value: string | number | boolean, record: ProductoTransfer) => {
+        return record.tipo === value;
+      },
       render: (tipo: string) => tipo ? <Tag color="blue">{tipo}</Tag> : '-'
     },
-    // Columna Sucursal Principal (Casa Central) - Siempre primero (DINÁMICO) - FIJA AL HACER SCROLL
-    {
+    // Columna Sucursal Principal (Casa Central) - SOLO VISIBLE PARA ADMIN
+    ...(esAdmin ? [{
       title: () => (
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 'bold' }}>{formatearNombreSucursal(sucursalPrincipal)}</div>
@@ -812,7 +963,7 @@ const Transfer: React.FC = () => {
       ),
       key: sucursalPrincipal || 'principal',
       fixed: 'left' as const,
-      width: 150,
+      width: 75,
       render: (record: ProductoTransfer) => {
         const stockPrincipal = record.sucursales?.[sucursalPrincipal]?.stock || 0;
         return (
@@ -820,46 +971,62 @@ const Transfer: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '4px'
+            gap: '6px',
+            padding: '4px 0'
           }}>
             <Tooltip title="Stock disponible en Casa Central">
               <div style={{ 
-                fontSize: '12px', 
+                fontSize: '10px', 
                 fontWeight: 'bold',
                 color: stockPrincipal < 10 ? '#ff4d4f' : '#52c41a',
                 backgroundColor: stockPrincipal < 10 ? '#fff1f0' : '#f6ffed',
-                padding: '4px 8px',
-                borderRadius: '4px',
+                padding: '2px 6px',
+                borderRadius: '3px',
                 border: `1px solid ${stockPrincipal < 10 ? '#ffccc7' : '#b7eb8f'}`,
                 whiteSpace: 'nowrap',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '3px'
               }}>
-                <span style={{ fontSize: '14px' }}>📦</span>
+                <span style={{ fontSize: '11px' }}>📦</span>
                 <span>Stock: {stockPrincipal}</span>
               </div>
             </Tooltip>
           </div>
         );
       }
-    },
+    }] : []),
     // Columnas dinámicas para cada sucursal (excepto principal)
+    // ⭐ FILTRADO: Si es admin, muestra todas; si es sucursal simple, solo la suya
     ...sucursales
-      .filter(suc => suc && typeof suc === 'string' && sucursalPrincipal && suc.toLowerCase() !== sucursalPrincipal.toLowerCase())
+      .filter(suc => {
+        if (!suc || typeof suc !== 'string' || !sucursalPrincipal) return false;
+        if (suc.toLowerCase() === sucursalPrincipal.toLowerCase()) return false;
+        
+        // Si es admin, mostrar todas las sucursales
+        if (esAdmin) return true;
+        
+        // Si es sucursal simple, solo mostrar su propia sucursal
+        return suc.toLowerCase() === sucursalUsuario;
+      })
       .map(suc => ({
         title: formatearNombreSucursal(suc),
         key: suc,
-        width: 140,
+        width: 70,
         render: (record: ProductoTransfer) => {
           const stockActual = record.sucursales?.[suc]?.stock || 0;
           const ventas = record.sucursales?.[suc]?.ventas || 0;
           const stockEnTransito = record.sucursales?.[suc]?.stock_en_transito || 0;
           const stockPrincipal = record.sucursales?.[sucursalPrincipal]?.stock || 0;
           
-          // Log de debugging para stock en tránsito
+          // 🐛 DEBUG DETALLADO para stock en tránsito
           if (stockEnTransito > 0) {
-            console.log(`🚚 RENDER: ${record.nombre} -> ${suc} tiene ${stockEnTransito} en tránsito`);
+            console.log(`🚚 RENDER [${record.nombre}] -> Sucursal: ${suc}`, {
+              stockEnTransito: stockEnTransito,
+              stockActual: stockActual,
+              datosCompletos: record.sucursales?.[suc],
+              productoId: record.id
+            });
           }
           
           return (
@@ -867,25 +1034,26 @@ const Transfer: React.FC = () => {
               display: 'flex', 
               flexDirection: 'column', 
               alignItems: 'center', 
-              gap: '4px',
-              width: '100%'
+              gap: '6px',
+              width: '100%',
+              padding: '4px 0'
             }}>
               {/* Stock actual */}
               <Tooltip title="Stock disponible en esta sucursal">
                 <div style={{ 
-                  fontSize: '12px', 
+                  fontSize: '10px', 
                   fontWeight: 'bold',
                   color: '#1890ff',
                   backgroundColor: '#e6f7ff',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
+                  padding: '2px 6px',
+                  borderRadius: '3px',
                   border: '1px solid #91d5ff',
                   whiteSpace: 'nowrap',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '3px'
                 }}>
-                  <span style={{ fontSize: '14px' }}>📦</span>
+                  <span style={{ fontSize: '11px' }}>📦</span>
                   <span>Stock: {stockActual}</span>
                 </div>
               </Tooltip>
@@ -894,42 +1062,97 @@ const Transfer: React.FC = () => {
               <Tooltip title={ventas > 0 ? "Vendidas en el período seleccionado" : "No hay ventas en el período seleccionado"}>
                 <div style={{ 
                   color: ventas > 0 ? '#ff4d4f' : '#999', 
-                  fontSize: '11px', 
+                  fontSize: '9px', 
                   fontWeight: 'bold',
                   backgroundColor: ventas > 0 ? '#fff1f0' : '#fafafa',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
+                  padding: '2px 4px',
+                  borderRadius: '3px',
                   border: ventas > 0 ? '1px solid #ffccc7' : '1px solid #d9d9d9',
                   whiteSpace: 'nowrap',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '3px'
                 }}>
-                  <span style={{ fontSize: '13px' }}>{ventas > 0 ? '📉' : '📊'}</span>
+                  <span style={{ fontSize: '10px' }}>{ventas > 0 ? '📉' : '📊'}</span>
                   <span>{ventas > 0 ? `Vendido: ${ventas}` : 'Sin ventas'}</span>
                 </div>
               </Tooltip>
               
               {/* Stock en tránsito */}
               {stockEnTransito > 0 && (
-                <Tooltip title="Stock en tránsito (pendiente de confirmar)">
-                  <div style={{
-                    fontSize: '11px',
-                    color: '#8B4513',
-                    fontWeight: 'bold',
-                    backgroundColor: '#FFF8DC',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    border: '1px solid #D2691E',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    <span style={{ fontSize: '13px' }}>🚚</span>
-                    <span>En camino: {stockEnTransito}</span>
-                  </div>
-                </Tooltip>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                  <Tooltip title="Stock en tránsito (pendiente de confirmar)">
+                    <div style={{
+                      fontSize: '9px',
+                      color: '#8B4513',
+                      fontWeight: 'bold',
+                      backgroundColor: '#FFF8DC',
+                      padding: '2px 4px',
+                      borderRadius: '3px',
+                      border: '1px solid #D2691E',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}>
+                      <span style={{ fontSize: '10px' }}>🚚</span>
+                      <span>En camino: {stockEnTransito}</span>
+                    </div>
+                  </Tooltip>
+                  
+                  {/* Botón confirmar recepción (solo para sucursales simples) */}
+                  {!esAdmin && (
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={() => handleConfirmarRecepcion(record.id, suc, stockEnTransito)}
+                      style={{ 
+                        fontSize: '9px', 
+                        height: '20px',
+                        padding: '0 6px',
+                        backgroundColor: '#52c41a',
+                        borderColor: '#52c41a'
+                      }}
+                    >
+                      Confirmar
+                    </Button>
+                  )}
+                  
+                  {/* Botón cancelar transferencia (solo para admin) */}
+                  {esAdmin && (
+                    <Button
+                      type="primary"
+                      danger
+                      size="small"
+                      icon={<MinusOutlined />}
+                      onClick={async () => {
+                        try {
+                          // Ajustar a 0 para devolver a casa central
+                          await productosService.ajustarTransferencia(
+                            record.id,
+                            suc,
+                            stockEnTransito,
+                            0
+                          );
+                          
+                          message.success(`Transferencia cancelada. ${stockEnTransito} unidades devueltas a Casa Central`);
+                          await cargarProductos();
+                        } catch (error: any) {
+                          console.error('Error al cancelar transferencia:', error);
+                          message.error(error.response?.data?.message || 'Error al cancelar transferencia');
+                        }
+                      }}
+                      style={{ 
+                        fontSize: '9px', 
+                        height: '20px',
+                        padding: '0 6px'
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
               )}
               
               {/* Input de transferencia */}
@@ -937,12 +1160,13 @@ const Transfer: React.FC = () => {
                 productoId={record.id}
                 sucursal={suc}
                 stockPrincipal={stockPrincipal}
+                stockEnTransito={stockEnTransito}
               />
             </div>
           );
         }
       }))
-  ], [sucursales, sucursalPrincipal, pendingTransfers]);
+  ], [sucursales, sucursalPrincipal, pendingTransfers, esAdmin, sucursalUsuario, productos]);
 
   /**
    * ===================================
@@ -954,7 +1178,7 @@ const Transfer: React.FC = () => {
       title: 'Fecha',
       dataIndex: 'fecha_envio',
       key: 'fecha_envio',
-      width: 180,
+      width: 90,
       render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm'),
       sorter: (a: any, b: any) => dayjs(a.fecha_envio).valueOf() - dayjs(b.fecha_envio).valueOf(),
     },
@@ -962,13 +1186,13 @@ const Transfer: React.FC = () => {
       title: 'Producto',
       dataIndex: 'producto_nombre',
       key: 'producto_nombre',
-      width: 250,
+      width: 125,
     },
     {
       title: 'Origen',
       dataIndex: 'sucursal_origen',
       key: 'sucursal_origen',
-      width: 150,
+      width: 75,
       render: (sucursal: string) => (
         <Tag color="blue">{sucursal.toUpperCase()}</Tag>
       ),
@@ -977,7 +1201,7 @@ const Transfer: React.FC = () => {
       title: 'Destino',
       dataIndex: 'sucursal_destino',
       key: 'sucursal_destino',
-      width: 150,
+      width: 75,
       render: (sucursal: string) => (
         <Tag color="green">{sucursal.toUpperCase()}</Tag>
       ),
@@ -986,7 +1210,7 @@ const Transfer: React.FC = () => {
       title: 'Cantidad',
       dataIndex: 'cantidad',
       key: 'cantidad',
-      width: 120,
+      width: 60,
       align: 'center' as const,
       render: (cantidad: number) => (
         <Badge count={cantidad} showZero color="#52c41a" />
@@ -996,7 +1220,7 @@ const Transfer: React.FC = () => {
       title: 'Usuario',
       dataIndex: 'usuario_email',
       key: 'usuario_email',
-      width: 200,
+      width: 100,
     },
   ];
 
@@ -1273,7 +1497,8 @@ const Transfer: React.FC = () => {
             columns={columns}
             dataSource={filteredProducts}
             rowKey="id"
-            scroll={{ x: 1400 }}
+            scroll={{ x: 875, y: 600 }}
+            sticky={{ offsetHeader: 0 }}
             pagination={{
               pageSize: 20,
               showSizeChanger: true,
@@ -1402,7 +1627,8 @@ const Transfer: React.FC = () => {
                     dataSource={historial}
                     rowKey="id"
                     loading={loadingHistorial}
-                    scroll={{ x: 1200 }}
+                    scroll={{ x: 750, y: 600 }}
+                    sticky={{ offsetHeader: 0 }}
                     pagination={{
                       pageSize: 20,
                       showSizeChanger: true,

@@ -660,6 +660,114 @@ export const cancelarTransferencia = async (req: Request, res: Response): Promis
 
 /**
  * ===================================
+ * CONFIRMAR RECEPCIÓN DIRECTA (SUCURSALES SIMPLES)
+ * ===================================
+ * Confirma la recepción de stock en tránsito y lo suma al inventario
+ */
+export const confirmarRecepcionDirecta = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    const { producto_id, sucursal, cantidad } = req.body;
+    
+    // Validar datos
+    if (!producto_id || !sucursal || !cantidad) {
+      await connection.rollback();
+      res.status(400).json({
+        success: false,
+        message: 'Faltan datos requeridos: producto_id, sucursal, cantidad'
+      });
+      return;
+    }
+    
+    if (cantidad <= 0) {
+      await connection.rollback();
+      res.status(400).json({
+        success: false,
+        message: 'La cantidad debe ser mayor a cero'
+      });
+      return;
+    }
+    
+    const sucursalNorm = sucursal.toLowerCase();
+    
+    // Verificar que existe stock en tránsito
+    const [productosEnTransito] = await connection.execute<RowDataPacket[]>(
+      `SELECT stock_en_transito
+       FROM productos_sucursal
+       WHERE producto_id = ? AND sucursal = ?`,
+      [producto_id, sucursalNorm]
+    );
+    
+    if (productosEnTransito.length === 0 || productosEnTransito[0].stock_en_transito === 0) {
+      await connection.rollback();
+      res.status(400).json({
+        success: false,
+        message: 'No hay stock en tránsito para este producto en esta sucursal'
+      });
+      return;
+    }
+    
+    const stockEnTransito = productosEnTransito[0].stock_en_transito;
+    
+    if (cantidad > stockEnTransito) {
+      await connection.rollback();
+      res.status(400).json({
+        success: false,
+        message: `La cantidad a confirmar (${cantidad}) es mayor al stock en tránsito (${stockEnTransito})`
+      });
+      return;
+    }
+    
+    // Actualizar stock: sumar a stock actual y restar de stock_en_transito
+    await connection.execute(
+      `UPDATE productos_sucursal
+       SET stock = stock + ?,
+           stock_en_transito = stock_en_transito - ?,
+           updated_at = NOW()
+       WHERE producto_id = ? AND sucursal = ?`,
+      [cantidad, cantidad, producto_id, sucursalNorm]
+    );
+    
+    // Obtener el nuevo stock actualizado
+    const [stockActualizado] = await connection.execute<RowDataPacket[]>(
+      `SELECT stock, stock_en_transito
+       FROM productos_sucursal
+       WHERE producto_id = ? AND sucursal = ?`,
+      [producto_id, sucursalNorm]
+    );
+    
+    await connection.commit();
+    
+    res.status(200).json({
+      success: true,
+      message: `✅ Recepción confirmada: ${cantidad} unidades`,
+      data: {
+        producto_id,
+        sucursal: sucursalNorm,
+        cantidad_confirmada: cantidad,
+        stock_nuevo: stockActualizado[0].stock,
+        stock_en_transito_restante: stockActualizado[0].stock_en_transito
+      }
+    });
+    
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('❌ Error al confirmar recepción directa:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al confirmar la recepción',
+      error: error.message
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * ===================================
  * 6. OBTENER VENTAS POR RANGO
  * ===================================
  */

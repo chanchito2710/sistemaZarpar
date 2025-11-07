@@ -1,0 +1,38 @@
+/**
+ * Estilos para la página de Devoluciones y Reemplazos
+ */
+
+.returns-container {
+  padding: 24px;
+}
+
+.returns-statistics {
+  margin-bottom: 24px;
+}
+
+.returns-card-clickable {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.returns-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.row-with-fallas {
+  background-color: #fff1f0 !important;
+}
+
+.row-with-fallas:hover {
+  background-color: #ffe7e5 !important;
+}
+
+.returns-alert {
+  margin-bottom: 16px;
+}
+
+.returns-modal-alert {
+  margin-bottom: 16px;
+}
+

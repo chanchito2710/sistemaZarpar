@@ -51,13 +51,22 @@
 }
 
 .transfer-table .ant-table-thead > tr > th {
-  background: #fafafa;
+  background: #fafafa !important;
   font-weight: 600;
   text-align: center;
+  padding: 8px 4px !important; /* Reducido 50%: de 16px 8px a 8px 4px */
+  z-index: 10 !important; /* Para que el sticky funcione correctamente */
+}
+
+/* Estilos para header sticky */
+.transfer-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.transfer-table .ant-table-thead > tr > th.ant-table-cell-fix-right {
+  z-index: 11 !important; /* Mayor z-index para columnas fijas */
 }
 
 .transfer-table .ant-table-tbody > tr > td {
   text-align: center;
+  padding: 12px 4px !important; /* Más espacio vertical para evitar amontonamiento */
 }
 
 .transfer-btn {

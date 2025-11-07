@@ -35,6 +35,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import { CreateTableModal, AddColumnModal } from './TableSchemaManager';
+import DataCleanupModal from './DataCleanupModal';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -82,6 +83,7 @@ const DatabaseManager: React.FC = () => {
   const [isStructureDrawerVisible, setIsStructureDrawerVisible] = useState(false);
   const [isCreateTableModalVisible, setIsCreateTableModalVisible] = useState(false);
   const [isAddColumnModalVisible, setIsAddColumnModalVisible] = useState(false);
+  const [isCleanupModalVisible, setIsCleanupModalVisible] = useState(false);
   const [currentRecord, setCurrentRecord] = useState<any>(null);
   
   const [form] = Form.useForm();
@@ -521,6 +523,15 @@ const DatabaseManager: React.FC = () => {
             <Col span={24}>
               <Space wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
                 <Button
+                  icon={<DeleteOutlined />}
+                  onClick={() => setIsCleanupModalVisible(true)}
+                  danger
+                  type="primary"
+                  style={{ marginRight: 'auto' }}
+                >
+                  🗑️ Borrar Historiales
+                </Button>
+                <Button
                   icon={<ColumnHeightOutlined />}
                   onClick={() => setIsAddColumnModalVisible(true)}
                   type="dashed"
@@ -702,6 +713,17 @@ const DatabaseManager: React.FC = () => {
         }}
         tableName={selectedTable}
         existingColumns={tableStructure?.columns.map(col => col.Field) || []}
+      />
+
+      {/* Modal para Limpieza de Datos */}
+      <DataCleanupModal
+        visible={isCleanupModalVisible}
+        onCancel={() => setIsCleanupModalVisible(false)}
+        onSuccess={() => {
+          loadTables();
+          loadTableData();
+          setIsCleanupModalVisible(false);
+        }}
       />
     </div>
   );
