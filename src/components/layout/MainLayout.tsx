@@ -69,7 +69,21 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       try {
         setLoadingVentas(true);
         const ventas = await ventasService.obtenerUltimas(3);
-        setUltimasVentas(ventas);
+        
+        // Filtrar ventas según rol del usuario
+        if (usuario) {
+          if (usuario.esAdmin) {
+            // Admin ve todas las ventas
+            setUltimasVentas(ventas);
+          } else {
+            // Usuario normal solo ve ventas de su sucursal
+            const sucursalUsuario = usuario.sucursal?.toLowerCase() || '';
+            const ventasFiltradas = ventas.filter(
+              (venta: any) => venta.sucursal.toLowerCase() === sucursalUsuario
+            );
+            setUltimasVentas(ventasFiltradas);
+          }
+        }
       } catch (error) {
         console.error('Error al cargar últimas ventas:', error);
       } finally {
@@ -77,18 +91,34 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       }
     };
 
-    cargarUltimasVentas();
-    // Actualizar cada 1 minuto
-    const interval = setInterval(cargarUltimasVentas, 1 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (usuario) {
+      cargarUltimasVentas();
+      // Actualizar cada 1 minuto
+      const interval = setInterval(cargarUltimasVentas, 1 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [usuario]);
 
   // Función para refrescar ventas manualmente
   const handleRefreshVentas = async () => {
     try {
       setLoadingVentas(true);
       const ventas = await ventasService.obtenerUltimas(3);
-      setUltimasVentas(ventas);
+      
+      // Filtrar ventas según rol del usuario
+      if (usuario) {
+        if (usuario.esAdmin) {
+          // Admin ve todas las ventas
+          setUltimasVentas(ventas);
+        } else {
+          // Usuario normal solo ve ventas de su sucursal
+          const sucursalUsuario = usuario.sucursal?.toLowerCase() || '';
+          const ventasFiltradas = ventas.filter(
+            (venta: any) => venta.sucursal.toLowerCase() === sucursalUsuario
+          );
+          setUltimasVentas(ventasFiltradas);
+        }
+      }
     } catch (error) {
       console.error('Error al refrescar ventas:', error);
     } finally {

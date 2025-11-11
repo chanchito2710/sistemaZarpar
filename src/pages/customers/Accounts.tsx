@@ -171,7 +171,7 @@ const Accounts: React.FC = () => {
       // Auto-seleccionar según permisos
       if (esAdmin) {
         // Admin puede ver todas
-        setSucursalSeleccionada('todas');
+      setSucursalSeleccionada('todas');
       } else {
         // Usuario normal solo su sucursal
         setSucursalSeleccionada(sucursalUsuario);

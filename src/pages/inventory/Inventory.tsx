@@ -32,6 +32,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BRANCHES } from '../../data/branches';
 import { productosService } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import './Inventory.css';
 
 // Extender el tipo jsPDF para incluir autoTable
@@ -49,6 +50,7 @@ interface InventoryItem {
   sucursal: string;
   marca: string;
   modelo: string;
+  tipo: string;
   producto: string;
   stock: number;
   recibidos: number;
@@ -56,10 +58,14 @@ interface InventoryItem {
 }
 
 const Inventory: React.FC = () => {
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.esAdmin || false;
+  const sucursalUsuario = usuario?.sucursal?.toLowerCase() || 'pando';
+
   const [searchText, setSearchText] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedSucursal, setSelectedSucursal] = useState<string>('pando'); // Por defecto Pando
+  const [selectedSucursal, setSelectedSucursal] = useState<string>(esAdmin ? 'all' : sucursalUsuario);
   const [sucursales, setSucursales] = useState<string[]>([]);
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -71,9 +77,10 @@ const Inventory: React.FC = () => {
   // Datos de inventario desde la BD
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
   
-  // Estados para marcas y modelos dinámicos
+  // Estados para marcas, modelos y tipos dinámicos
   const [marcasDisponibles, setMarcasDisponibles] = useState<string[]>([]);
   const [modelosDisponibles, setModelosDisponibles] = useState<string[]>([]);
+  const [tiposDisponibles, setTiposDisponibles] = useState<string[]>([]);
 
   // Cargar sucursales disponibles
   const cargarSucursales = async () => {
@@ -110,6 +117,7 @@ const Inventory: React.FC = () => {
       if (data.success && data.data) {
         setMarcasDisponibles(data.data.marcas || []);
         setModelosDisponibles(data.data.modelos || []);
+        setTiposDisponibles(data.data.tipos || data.data.modelos || []);
       }
     } catch (error) {
       console.error('Error al cargar filtros:', error);
@@ -134,6 +142,7 @@ const Inventory: React.FC = () => {
         sucursal: item.sucursal,
         marca: item.marca || 'Sin marca',
         modelo: item.modelo || 'Sin modelo',
+        tipo: item.tipo || 'Sin tipo',
         producto: item.producto,
         stock: item.stock || 0,
         recibidos: item.recibidos || 0,
@@ -153,6 +162,17 @@ const Inventory: React.FC = () => {
   useEffect(() => {
     cargarSucursales();
   }, []);
+
+  // Establecer sucursal según rol del usuario
+  useEffect(() => {
+    if (usuario) {
+      if (esAdmin) {
+        setSelectedSucursal('all');
+      } else {
+        setSelectedSucursal(sucursalUsuario);
+      }
+    }
+  }, [usuario, esAdmin, sucursalUsuario]);
 
   // Recargar inventario y filtros cuando cambia la sucursal seleccionada
   useEffect(() => {
@@ -320,9 +340,31 @@ const Inventory: React.FC = () => {
         <Tag color="blue" icon={<ShopOutlined />}>
           {sucursal}
         </Tag>
-      ),
-      filters: BRANCHES.map(branch => ({ text: branch.name, value: branch.name })),
-      onFilter: (value: any, record: InventoryItem) => record.sucursal === value
+      )
+    },
+    {
+      title: 'Tipo',
+      dataIndex: 'tipo',
+      key: 'tipo',
+      width: 100,
+      render: (tipo: string) => {
+        const tipoColors: Record<string, string> = {
+          'Display': '#1890ff',
+          'Batería': '#52c41a',
+          'Flex': '#722ed1',
+          'Placa Carga': '#fa8c16',
+          'Botón': '#eb2f96',
+          'Antena': '#13c2c2'
+        };
+        return (
+          <Tag color={tipoColors[tipo] || 'default'}>
+            {tipo}
+          </Tag>
+        );
+      },
+      filters: tiposDisponibles.map(tipo => ({ text: tipo, value: tipo })),
+      onFilter: (value: any, record: InventoryItem) => record.tipo === value,
+      sorter: (a: InventoryItem, b: InventoryItem) => (a.tipo || '').localeCompare(b.tipo || '')
     },
     {
       title: 'Marca',
@@ -344,16 +386,9 @@ const Inventory: React.FC = () => {
           </Tag>
         );
       },
+      filters: marcasDisponibles.map(marca => ({ text: marca, value: marca })),
+      onFilter: (value: any, record: InventoryItem) => record.marca === value,
       sorter: (a: InventoryItem, b: InventoryItem) => a.marca.localeCompare(b.marca)
-    },
-    {
-      title: 'Modelo',
-      dataIndex: 'modelo',
-      key: 'modelo',
-      width: 120,
-      render: (modelo: string) => (
-        <Text strong style={{ color: '#1f2937' }}>{modelo}</Text>
-      )
     },
     {
       title: 'Producto',
@@ -462,15 +497,6 @@ const Inventory: React.FC = () => {
         </Row>
       </div>
 
-      {/* Párrafo explicativo */}
-      <Card className="hover-lift" style={{ marginBottom: 16, backgroundColor: '#f8f9fa' }}>
-        <Text style={{ fontSize: '14px', color: '#6c757d', lineHeight: '1.6' }}>
-          <strong>Gestión de Inventario:</strong> Esta sección permite controlar el stock y los productos recibidos en todas las sucursales. 
-          Los <strong>productos recibidos</strong> son mercaderías enviadas a cada sucursal que requieren confirmación antes de ser agregadas al stock oficial. 
-          Utilice los filtros para localizar productos específicos por marca o categoría, y transfiera los productos recibidos al stock una vez verificados.
-        </Text>
-      </Card>
-
       {/* Filtros y búsqueda */}
       <Card 
         className="hover-lift" 
@@ -498,59 +524,40 @@ const Inventory: React.FC = () => {
                     Sucursal
                   </Text>
                 </div>
-                <Select
-                  value={selectedSucursal}
-                  onChange={setSelectedSucursal}
-                  style={{ width: '100%' }}
-                  size="large"
-                  onWheel={(e) => e.stopPropagation()}
-                  showSearch
-                  optionFilterProp="children"
-                  placeholder="Seleccionar sucursal"
-                  dropdownStyle={{
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  }}
-                  suffixIcon={
-                    <div style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: '6px',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontSize: 12,
-                      fontWeight: 600
-                    }}>
-                      🏢
-                    </div>
-                  }
-                  style={{
-                    width: '100%',
-                  }}
-                  className="custom-select-sucursal"
-                >
-                  <Option value="all">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ 
-                        fontSize: 18,
-                        width: 28,
-                        height: 28,
+                
+                {/* Si es admin, muestra Select para elegir. Si no, solo muestra su sucursal */}
+                {esAdmin ? (
+                  <Select
+                    value={selectedSucursal}
+                    onChange={setSelectedSucursal}
+                    style={{ width: '100%' }}
+                    size="large"
+                    showSearch
+                    optionFilterProp="children"
+                    placeholder="Seleccionar sucursal"
+                    dropdownStyle={{
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    }}
+                    suffixIcon={
+                      <div style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '6px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '6px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        fontSize: 12,
+                        fontWeight: 600
                       }}>
-                        🌐
-                      </span>
-                      <span style={{ fontWeight: 600, fontSize: 14 }}>Todas las Sucursales</span>
-                    </div>
-                  </Option>
-                  {sucursales.map((sucursal) => (
-                    <Option key={sucursal} value={sucursal}>
+                        🏢
+                      </div>
+                    }
+                    className="custom-select-sucursal"
+                  >
+                    <Option value="all">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ 
                           fontSize: 18,
@@ -560,17 +567,68 @@ const Inventory: React.FC = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderRadius: '6px',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         }}>
-                          🏪
+                          🌐
                         </span>
-                        <span style={{ fontWeight: 500, fontSize: 14 }}>
-                          {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
-                        </span>
+                        <span style={{ fontWeight: 600, fontSize: 14 }}>Todas las Sucursales</span>
                       </div>
                     </Option>
-                  ))}
-                </Select>
+                    {sucursales.map((sucursal) => (
+                      <Option key={sucursal} value={sucursal}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ 
+                            fontSize: 18,
+                            width: 28,
+                            height: 28,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          }}>
+                            🏪
+                          </span>
+                          <span style={{ fontWeight: 500, fontSize: 14 }}>
+                            {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
+                          </span>
+                        </div>
+                      </Option>
+                    ))}
+                  </Select>
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: 48,
+                    padding: '0 16px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                    border: '2px solid #10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12
+                  }}>
+                    <span style={{ 
+                      fontSize: 20,
+                      width: 32,
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    }}>
+                      🏪
+                    </span>
+                    <span style={{ 
+                      fontWeight: 600, 
+                      fontSize: 16,
+                      color: '#065f46'
+                    }}>
+                      {selectedSucursal.charAt(0).toUpperCase() + selectedSucursal.slice(1)}
+                    </span>
+                  </div>
+                )}
               </div>
             </Col>
             <Col 

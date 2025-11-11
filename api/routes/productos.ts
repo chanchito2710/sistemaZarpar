@@ -26,7 +26,9 @@ import {
   obtenerInventario,
   obtenerFiltrosProductos,
   eliminarProducto,
-  eliminarProductosMultiple
+  eliminarProductosMultiple,
+  obtenerStockEnTransito,
+  limpiarStockEnTransito
 } from '../controllers/productosController.js';
 import { verificarAutenticacion } from '../middleware/auth.js';
 
@@ -167,6 +169,30 @@ router.get(
  * TRANSFERENCIAS - HISTORIAL
  * ===================================
  */
+
+/**
+ * @route   GET /api/productos/stock-en-transito
+ * @desc    Obtener todos los productos con stock en tránsito
+ * @access  Private (requiere autenticación)
+ * @returns Array de productos con stock_en_transito > 0
+ */
+router.get(
+  '/stock-en-transito',
+  verificarAutenticacion,
+  obtenerStockEnTransito
+);
+
+/**
+ * @route   POST /api/productos/limpiar-stock-transito
+ * @desc    Limpiar stock en tránsito seleccionado (devolver a casa central)
+ * @access  Private (requiere autenticación)
+ * @body    { items: [{ producto_id: number, sucursal: string }] }
+ */
+router.post(
+  '/limpiar-stock-transito',
+  verificarAutenticacion,
+  limpiarStockEnTransito
+);
 
 /**
  * @route   GET /api/productos/historial-transferencias

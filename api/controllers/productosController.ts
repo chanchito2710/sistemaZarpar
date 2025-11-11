@@ -6,7 +6,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
 import { tablaClientesExiste } from '../utils/database.js';
 
 /**
@@ -1472,24 +1472,29 @@ export const obtenerHistorialTransferencias = async (req: Request, res: Response
   console.log('Query params:', req.query);
   console.log('Headers:', req.headers.authorization);
   
-  let connection;
+  let connection: PoolConnection | undefined;
   
   try {
     connection = await pool.getConnection();
     
     const { fecha_desde, fecha_hasta, sucursal_destino } = req.query;
     
-    let query = `
+    // Query para obtener todos los productos individuales con detalles del producto
+    let queryProductos = `
       SELECT 
-        id,
-        producto_id,
-        producto_nombre,
-        sucursal_origen,
-        sucursal_destino,
-        cantidad,
-        usuario_email,
-        fecha_envio
-      FROM historial_transferencias
+        ht.id,
+        ht.producto_id,
+        ht.producto_nombre,
+        ht.sucursal_origen,
+        ht.sucursal_destino,
+        ht.cantidad,
+        ht.usuario_email,
+        ht.fecha_envio,
+        p.marca,
+        p.tipo,
+        DATE_FORMAT(ht.fecha_envio, '%Y-%m-%d %H:%i:%s') as fecha_grupo
+      FROM historial_transferencias ht
+      LEFT JOIN productos p ON ht.producto_id = p.id
       WHERE 1=1
     `;
     
@@ -1497,38 +1502,87 @@ export const obtenerHistorialTransferencias = async (req: Request, res: Response
     
     // Filtro por fecha desde
     if (fecha_desde) {
-      query += ` AND fecha_envio >= ?`;
+      queryProductos += ` AND fecha_envio >= ?`;
       params.push(fecha_desde);
       console.log('📅 Filtro fecha_desde:', fecha_desde);
     }
     
     // Filtro por fecha hasta
     if (fecha_hasta) {
-      query += ` AND fecha_envio <= DATE_ADD(?, INTERVAL 1 DAY)`;
+      queryProductos += ` AND fecha_envio <= DATE_ADD(?, INTERVAL 1 DAY)`;
       params.push(fecha_hasta);
       console.log('📅 Filtro fecha_hasta:', fecha_hasta);
     }
     
     // Filtro por sucursal destino
     if (sucursal_destino && sucursal_destino !== 'todas') {
-      query += ` AND sucursal_destino = ?`;
+      queryProductos += ` AND sucursal_destino = ?`;
       params.push(sucursal_destino);
       console.log('🏢 Filtro sucursal_destino:', sucursal_destino);
     }
     
-    query += ` ORDER BY fecha_envio DESC`;
+    queryProductos += ` ORDER BY fecha_envio DESC`;
     
-    console.log('🔍 Query SQL:', query);
+    console.log('🔍 Query SQL:', queryProductos);
     console.log('🔍 Params:', params);
     
-    const [rows] = await connection.query<RowDataPacket[]>(query, params);
+    const [rows] = await connection.query<RowDataPacket[]>(queryProductos, params);
     
     console.log('✅ Registros encontrados:', rows.length);
     
+    // Agrupar por envío (fecha_grupo + sucursal_destino + usuario_email)
+    const enviosAgrupados: any[] = [];
+    const mapaEnvios = new Map<string, any>();
+    
+    rows.forEach((row: any) => {
+      // Crear clave única para cada envío (redondeado a 5 segundos para agrupar envíos muy cercanos)
+      const fechaDate = new Date(row.fecha_envio);
+      const segundos = Math.floor(fechaDate.getSeconds() / 5) * 5;
+      fechaDate.setSeconds(segundos);
+      const claveEnvio = `${fechaDate.toISOString()}_${row.sucursal_destino}_${row.usuario_email}`;
+      
+      if (!mapaEnvios.has(claveEnvio)) {
+        // Crear nuevo envío agrupado
+        mapaEnvios.set(claveEnvio, {
+          id: row.id, // Usar el ID del primer producto como ID del envío
+          fecha_envio: row.fecha_envio,
+          sucursal_origen: row.sucursal_origen,
+          sucursal_destino: row.sucursal_destino,
+          usuario_email: row.usuario_email,
+          productos: [],
+          total_productos: 0,
+          total_unidades: 0
+        });
+      }
+      
+      // Agregar producto al envío
+      const envio = mapaEnvios.get(claveEnvio);
+      envio.productos.push({
+        id: row.id,
+        producto_id: row.producto_id,
+        producto_nombre: row.producto_nombre,
+        marca: row.marca,
+        tipo: row.tipo,
+        cantidad: row.cantidad
+      });
+      envio.total_productos++;
+      envio.total_unidades += row.cantidad;
+    });
+    
+    // Convertir mapa a array
+    mapaEnvios.forEach((envio) => {
+      enviosAgrupados.push(envio);
+    });
+    
+    // Ordenar por fecha descendente
+    enviosAgrupados.sort((a, b) => new Date(b.fecha_envio).getTime() - new Date(a.fecha_envio).getTime());
+    
+    console.log('✅ Envíos agrupados:', enviosAgrupados.length);
+    
     res.status(200).json({
       success: true,
-      data: rows,
-      total: rows.length
+      data: enviosAgrupados,
+      total: enviosAgrupados.length
     });
     
   } catch (error) {
@@ -1561,6 +1615,7 @@ export const obtenerInventario = async (req: Request, res: Response): Promise<vo
         p.id as producto_id,
         p.nombre as producto,
         p.marca,
+        p.tipo,
         p.tipo as modelo,
         ps.sucursal,
         ps.stock,
@@ -1784,5 +1839,111 @@ export const eliminarProducto = async (req: Request, res: Response): Promise<voi
 export const eliminarProductosMultiple = async (req: Request, res: Response): Promise<void> => {
   // Reutilizar la misma lógica que eliminarProducto
   await eliminarProducto(req, res);
+};
+
+/**
+ * Obtener todos los productos con stock en tránsito
+ * GET /api/productos/stock-en-transito
+ */
+export const obtenerStockEnTransito = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = `
+      SELECT 
+        ps.producto_id,
+        ps.sucursal,
+        ps.stock_en_transito,
+        p.nombre as producto_nombre,
+        p.marca,
+        p.tipo
+      FROM productos_sucursal ps
+      INNER JOIN productos p ON ps.producto_id = p.id
+      WHERE ps.stock_en_transito > 0
+      ORDER BY ps.sucursal ASC, p.nombre ASC
+    `;
+    
+    const [rows] = await pool.query<RowDataPacket[]>(query);
+    
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (error) {
+    console.error('Error al obtener stock en tránsito:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener stock en tránsito'
+    });
+  }
+};
+
+/**
+ * Limpiar stock en tránsito seleccionado
+ * POST /api/productos/limpiar-stock-transito
+ * Body: { items: [{ producto_id: number, sucursal: string }] }
+ */
+export const limpiarStockEnTransito = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { items } = req.body;
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Se requiere un array de items para limpiar'
+      });
+      return;
+    }
+    
+    await connection.beginTransaction();
+    
+    // Obtener la sucursal principal
+    const sucursalPrincipal = await obtenerSucursalPrincipal();
+    
+    for (const item of items) {
+      const { producto_id, sucursal } = item;
+      
+      // 1. Obtener la cantidad en tránsito
+      const [rows] = await connection.query<RowDataPacket[]>(
+        'SELECT stock_en_transito FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?',
+        [producto_id, sucursal]
+      );
+      
+      if (rows.length === 0) continue;
+      
+      const stockEnTransito = rows[0].stock_en_transito;
+      
+      if (stockEnTransito <= 0) continue;
+      
+      // 2. Devolver el stock a la sucursal principal
+      await connection.query(
+        'UPDATE productos_sucursal SET stock = stock + ? WHERE producto_id = ? AND sucursal = ?',
+        [stockEnTransito, producto_id, sucursalPrincipal]
+      );
+      
+      // 3. Poner stock_en_transito a 0 en la sucursal destino
+      await connection.query(
+        'UPDATE productos_sucursal SET stock_en_transito = 0 WHERE producto_id = ? AND sucursal = ?',
+        [producto_id, sucursal]
+      );
+    }
+    
+    await connection.commit();
+    
+    res.json({
+      success: true,
+      message: `${items.length} productos limpiados exitosamente`
+    });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al limpiar stock en tránsito:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al limpiar stock en tránsito'
+    });
+  } finally {
+    connection.release();
+  }
 };
 
