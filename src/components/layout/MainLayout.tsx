@@ -747,8 +747,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                   src={logoEmpresa} 
                   alt="Logo" 
                   style={{
-                    maxWidth: '140px',
-                    maxHeight: '48px',
+                    maxWidth: '224px',
+                    maxHeight: '77px',
                     width: 'auto',
                     height: 'auto',
                     objectFit: 'contain'
@@ -1444,7 +1444,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     <p className="ant-upload-hint" style={{ color: '#999', fontSize: 11 }}>
                       JPG, PNG, GIF, SVG
                       <br />
-                      Recomendado: 300x100 px
+                      Recomendado: 480x160 px (máx: 224x77px en sidebar)
                     </p>
                   </Upload.Dragger>
                 </div>
