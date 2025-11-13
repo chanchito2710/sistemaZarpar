@@ -1179,7 +1179,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       {/* Modal de Personalización de Logo */}
       <Modal
         title={
-          <span>
+          <span style={{ color: '#000' }}>
             <PictureOutlined style={{ marginRight: 8, color: '#1890ff' }} />
             Personalizar Logo de la Empresa
           </span>
