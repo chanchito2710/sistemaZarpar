@@ -946,15 +946,15 @@ const Accounts: React.FC = () => {
       title: 'Fecha',
       dataIndex: 'fecha_movimiento',
       key: 'fecha_movimiento',
-      width: 150,
+      responsive: ['sm', 'md', 'lg', 'xl'], // Visible desde móviles grandes
       render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm'),
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo',
       key: 'tipo',
-      width: 100,
       align: 'center',
+      responsive: ['sm', 'md', 'lg', 'xl'], // Visible desde móviles grandes
       render: (tipo: string) => (
         <Tag color={tipo === 'venta' ? 'red' : 'green'}>
           {tipo === 'venta' ? 'Venta' : 'Pago'}
@@ -1062,8 +1062,8 @@ const Accounts: React.FC = () => {
       title: 'Debe',
       dataIndex: 'debe',
       key: 'debe',
-      width: 120,
       align: 'right',
+      responsive: ['md', 'lg', 'xl'], // Visible desde tablets
       render: (value: any) => {
         const numValue = parseFloat(value) || 0;
         return numValue > 0 ? (
@@ -1077,8 +1077,8 @@ const Accounts: React.FC = () => {
       title: 'Haber',
       dataIndex: 'haber',
       key: 'haber',
-      width: 120,
       align: 'right',
+      responsive: ['md', 'lg', 'xl'], // Visible desde tablets
       render: (value: any) => {
         const numValue = parseFloat(value) || 0;
         return numValue > 0 ? (
@@ -1092,8 +1092,8 @@ const Accounts: React.FC = () => {
       title: 'Saldo',
       dataIndex: 'saldo',
       key: 'saldo',
-      width: 120,
       align: 'right',
+      responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible (muy importante)
       render: (value: any) => {
         const numValue = parseFloat(value) || 0;
         return (
@@ -1106,8 +1106,8 @@ const Accounts: React.FC = () => {
     {
       title: 'Acciones',
       key: 'acciones',
-      width: 80,
       align: 'center',
+      responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible
       className: 'no-print', // Clase para no imprimir en PDF
       render: (_: any, record: any) => (
         <Tooltip title="Ver detalle completo">
@@ -1717,7 +1717,7 @@ const Accounts: React.FC = () => {
                 title: 'Fecha',
                 dataIndex: 'fecha_pago',
                 key: 'fecha_pago',
-                width: 150,
+                responsive: ['sm', 'md', 'lg', 'xl'], // Visible desde móviles grandes
                 render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm'),
                 sorter: (a: any, b: any) => dayjs(a.fecha_pago).valueOf() - dayjs(b.fecha_pago).valueOf(),
               },
@@ -1725,13 +1725,13 @@ const Accounts: React.FC = () => {
                 title: 'Cliente',
                 dataIndex: 'cliente_nombre',
                 key: 'cliente_nombre',
-                width: 200,
+                responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible
               },
               {
                 title: 'Sucursal',
                 dataIndex: 'sucursal',
                 key: 'sucursal',
-                width: 120,
+                responsive: ['sm', 'md', 'lg', 'xl'], // Visible desde móviles grandes
                 render: (sucursal: string) => (
                   <Tag color="blue">{sucursal.toUpperCase()}</Tag>
                 ),
@@ -1740,8 +1740,8 @@ const Accounts: React.FC = () => {
                 title: 'Monto',
                 dataIndex: 'monto',
                 key: 'monto',
-                width: 120,
                 align: 'right' as const,
+                responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible (muy importante)
                 render: (monto: number) => (
                   <Text strong style={{ color: '#52c41a' }}>
                     ${parseFloat(String(monto || 0)).toFixed(2)}
@@ -1752,7 +1752,7 @@ const Accounts: React.FC = () => {
                 title: 'Método',
                 dataIndex: 'metodo_pago',
                 key: 'metodo_pago',
-                width: 120,
+                responsive: ['md', 'lg', 'xl'], // Visible desde tablets
                 render: (metodo: string) => (
                   <Tag color={metodo === 'efectivo' ? 'green' : 'blue'}>
                     {metodo === 'efectivo' ? '💵 Efectivo' : '🏦 Transferencia'}
@@ -1763,7 +1763,7 @@ const Accounts: React.FC = () => {
                 title: 'Comprobante',
                 dataIndex: 'comprobante',
                 key: 'comprobante',
-                width: 150,
+                responsive: ['lg', 'xl'], // Visible solo en pantallas grandes
                 render: (comprobante: string) => comprobante || '-',
               },
               {
@@ -1771,14 +1771,15 @@ const Accounts: React.FC = () => {
                 dataIndex: 'observaciones',
                 key: 'observaciones',
                 ellipsis: true,
+                responsive: ['lg', 'xl'], // Visible solo en pantallas grandes
                 render: (obs: string) => obs || '-',
               },
               {
                 title: 'Saldo Cliente',
                 dataIndex: 'saldo_actual_cliente',
                 key: 'saldo_actual_cliente',
-                width: 130,
                 align: 'right' as const,
+                responsive: ['md', 'lg', 'xl'], // Visible desde tablets
                 render: (saldo: number) => (
                   <Text style={{ color: parseFloat(String(saldo || 0)) > 0 ? '#f5222d' : '#52c41a' }}>
                     ${parseFloat(String(saldo || 0)).toFixed(2)}
