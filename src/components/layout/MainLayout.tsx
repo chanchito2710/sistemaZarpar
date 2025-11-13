@@ -67,63 +67,87 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // Función para actualizar el favicon dinámicamente
   const actualizarFavicon = (base64: string) => {
-    console.log('🔄 Actualizando favicon...');
-    
-    // Eliminar todos los favicons existentes para forzar actualización en Chrome
-    const existingFavicons = document.querySelectorAll("link[rel*='icon']");
-    console.log(`🗑️ Eliminando ${existingFavicons.length} favicons existentes`);
-    existingFavicons.forEach(link => link.remove());
-    
-    // Crear nuevo favicon con timestamp para evitar cache
-    const timestamp = new Date().getTime();
-    const faviconUrl = `${base64}?t=${timestamp}`;
-    console.log(`⏰ Timestamp agregado: ${timestamp}`);
-    
-    // Agregar favicon estándar
-    const link = document.createElement('link');
-    link.rel = 'icon';
-    link.type = 'image/x-icon';
-    link.href = faviconUrl;
-    document.head.appendChild(link);
-    console.log('✅ Favicon estándar agregado');
-    
-    // Agregar shortcut icon (para compatibilidad con navegadores antiguos)
-    const shortcutLink = document.createElement('link');
-    shortcutLink.rel = 'shortcut icon';
-    shortcutLink.type = 'image/x-icon';
-    shortcutLink.href = faviconUrl;
-    document.head.appendChild(shortcutLink);
-    console.log('✅ Shortcut icon agregado');
-    
-    // Forzar recarga del favicon en Chrome
-    // Truco: cambiar y restaurar el href para forzar actualización
-    setTimeout(() => {
-      link.href = link.href;
-      console.log('🔁 Favicon forzado a recargar');
-    }, 100);
-    
-    console.log('✅ Favicon actualizado completamente');
+    try {
+      console.log('🔄 Actualizando favicon...');
+      
+      if (!base64 || typeof base64 !== 'string') {
+        console.error('❌ Base64 inválido:', base64);
+        return;
+      }
+      
+      // Eliminar todos los favicons existentes para forzar actualización en Chrome
+      const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+      console.log(`🗑️ Eliminando ${existingFavicons.length} favicons existentes`);
+      existingFavicons.forEach(link => {
+        try {
+          link.remove();
+        } catch (e) {
+          console.warn('No se pudo eliminar favicon:', e);
+        }
+      });
+      
+      // Crear nuevo favicon con timestamp para evitar cache
+      const timestamp = new Date().getTime();
+      const faviconUrl = `${base64}?t=${timestamp}`;
+      console.log(`⏰ Timestamp agregado: ${timestamp}`);
+      
+      // Agregar favicon estándar
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/x-icon';
+      link.href = faviconUrl;
+      document.head.appendChild(link);
+      console.log('✅ Favicon estándar agregado');
+      
+      // Agregar shortcut icon (para compatibilidad con navegadores antiguos)
+      const shortcutLink = document.createElement('link');
+      shortcutLink.rel = 'shortcut icon';
+      shortcutLink.type = 'image/x-icon';
+      shortcutLink.href = faviconUrl;
+      document.head.appendChild(shortcutLink);
+      console.log('✅ Shortcut icon agregado');
+      
+      // Forzar recarga del favicon en Chrome
+      // Truco: cambiar y restaurar el href para forzar actualización
+      setTimeout(() => {
+        try {
+          link.href = link.href;
+          console.log('🔁 Favicon forzado a recargar');
+        } catch (e) {
+          console.warn('No se pudo forzar recarga:', e);
+        }
+      }, 100);
+      
+      console.log('✅ Favicon actualizado completamente');
+    } catch (error) {
+      console.error('❌ Error al actualizar favicon:', error);
+      message.error('Error al actualizar el favicon');
+    }
   };
 
   // Cargar logo y favicon desde localStorage al iniciar
   useEffect(() => {
-    console.log('🚀 Cargando logos desde localStorage...');
-    
-    const logoGuardado = localStorage.getItem('logoEmpresa');
-    if (logoGuardado) {
-      console.log('✅ Logo empresarial encontrado');
-      setLogoEmpresa(logoGuardado);
-    } else {
-      console.log('⚠️ No hay logo empresarial guardado');
-    }
-    
-    const faviconGuardado = localStorage.getItem('faviconEmpresa');
-    if (faviconGuardado) {
-      console.log('✅ Favicon encontrado, actualizando...');
-      setFaviconEmpresa(faviconGuardado);
-      actualizarFavicon(faviconGuardado);
-    } else {
-      console.log('⚠️ No hay favicon guardado, usando el por defecto');
+    try {
+      console.log('🚀 Cargando logos desde localStorage...');
+      
+      const logoGuardado = localStorage.getItem('logoEmpresa');
+      if (logoGuardado) {
+        console.log('✅ Logo empresarial encontrado');
+        setLogoEmpresa(logoGuardado);
+      } else {
+        console.log('⚠️ No hay logo empresarial guardado');
+      }
+      
+      const faviconGuardado = localStorage.getItem('faviconEmpresa');
+      if (faviconGuardado) {
+        console.log('✅ Favicon encontrado, actualizando...');
+        setFaviconEmpresa(faviconGuardado);
+        actualizarFavicon(faviconGuardado);
+      } else {
+        console.log('⚠️ No hay favicon guardado, usando el por defecto');
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar logos desde localStorage:', error);
     }
   }, []);
 
@@ -566,23 +590,66 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // Función para manejar la subida del favicon
   const handleUploadFavicon = (file: File) => {
-    console.log('📤 Subiendo favicon:', file.name, file.type, file.size);
+    try {
+      console.log('📤 Subiendo favicon:', file.name, file.type, file.size);
+      
+      // Validar el archivo
+      if (!file) {
+        message.error('No se seleccionó ningún archivo');
+        return false;
+      }
+      
+      // Validar tamaño (máximo 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        message.error('El archivo es muy grande. Máximo 2MB.');
+        return false;
+      }
+      
+      // Validar tipo de archivo
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/x-icon', 'image/svg+xml'];
+      if (!validTypes.includes(file.type)) {
+        message.warning('Formato no recomendado. Usa PNG, ICO o SVG.');
+      }
+      
+      const reader = new FileReader();
+      
+      reader.onerror = (error) => {
+        console.error('❌ Error al leer el archivo:', error);
+        message.error('Error al leer el archivo');
+      };
+      
+      reader.onload = (e) => {
+        try {
+          const base64 = e.target?.result as string;
+          
+          if (!base64 || typeof base64 !== 'string') {
+            console.error('❌ Base64 inválido');
+            message.error('Error al procesar la imagen');
+            return;
+          }
+          
+          console.log('✅ Favicon convertido a base64, longitud:', base64.length);
+          
+          setFaviconEmpresa(base64);
+          localStorage.setItem('faviconEmpresa', base64);
+          console.log('💾 Favicon guardado en localStorage');
+          
+          actualizarFavicon(base64);
+          console.log('🔄 Favicon actualizado en DOM');
+          
+          message.success('Favicon actualizado correctamente');
+        } catch (error) {
+          console.error('❌ Error al procesar el favicon:', error);
+          message.error('Error al procesar el favicon');
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('❌ Error al subir favicon:', error);
+      message.error('Error al subir el favicon');
+    }
     
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      console.log('✅ Favicon convertido a base64, longitud:', base64.length);
-      
-      setFaviconEmpresa(base64);
-      localStorage.setItem('faviconEmpresa', base64);
-      console.log('💾 Favicon guardado en localStorage');
-      
-      actualizarFavicon(base64);
-      console.log('🔄 Favicon actualizado en DOM');
-      
-      message.success('Favicon actualizado correctamente');
-    };
-    reader.readAsDataURL(file);
     return false; // Prevenir upload automático
   };
 
