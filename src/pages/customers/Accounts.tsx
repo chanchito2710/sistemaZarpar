@@ -1292,7 +1292,6 @@ const Accounts: React.FC = () => {
           loading={loading}
           rowKey={(record) => `${record.sucursal}-${record.cliente_id}`}
           size="small"
-          scroll={{ x: 1000 }}
           pagination={{
             defaultPageSize: 20,
             showSizeChanger: true,
