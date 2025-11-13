@@ -821,7 +821,7 @@ const Accounts: React.FC = () => {
       title: 'Cliente',
       dataIndex: 'cliente_nombre',
       key: 'cliente_nombre',
-      width: 200,
+      responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible
       render: (text: string) => (
         <Space>
           <UserOutlined style={{ color: '#1890ff' }} />
@@ -833,8 +833,8 @@ const Accounts: React.FC = () => {
       title: 'Sucursal',
       dataIndex: 'sucursal',
       key: 'sucursal',
-      width: 120,
       align: 'center',
+      responsive: ['sm', 'md', 'lg', 'xl'], // Oculto en móviles muy pequeños
       render: (text: string) => (
         <Tag color="blue" icon={<ShopOutlined />}>
           {text ? text.toUpperCase() : 'N/A'}
@@ -845,8 +845,8 @@ const Accounts: React.FC = () => {
       title: 'Total Debe',
       dataIndex: 'total_debe',
       key: 'total_debe',
-      width: 120,
       align: 'right',
+      responsive: ['md', 'lg', 'xl'], // Visible desde tablets
       render: (value: any) => {
         const numValue = parseFloat(value) || 0;
         return (
@@ -860,8 +860,8 @@ const Accounts: React.FC = () => {
       title: 'Total Haber',
       dataIndex: 'total_haber',
       key: 'total_haber',
-      width: 120,
       align: 'right',
+      responsive: ['md', 'lg', 'xl'], // Visible desde tablets
       render: (value: any) => {
         const numValue = parseFloat(value) || 0;
         return (
@@ -875,8 +875,8 @@ const Accounts: React.FC = () => {
       title: 'Saldo Actual',
       dataIndex: 'saldo_actual',
       key: 'saldo_actual',
-      width: 130,
       align: 'right',
+      responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible (más importante)
       render: (value: any) => {
         const numValue = parseFloat(value) || 0;
         return (
@@ -896,8 +896,8 @@ const Accounts: React.FC = () => {
       title: 'Último Movimiento',
       dataIndex: 'ultimo_movimiento',
       key: 'ultimo_movimiento',
-      width: 150,
       align: 'center',
+      responsive: ['lg', 'xl'], // Visible solo en pantallas grandes
       render: (fecha: string) => (
         <Space direction="vertical" size={0}>
           <Text style={{ fontSize: '12px' }}>
@@ -912,16 +912,16 @@ const Accounts: React.FC = () => {
     {
       title: 'Acciones',
       key: 'acciones',
-      width: 200,
       align: 'center',
-      fixed: 'right',
+      responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible
       render: (_: any, record: ClienteCuentaCorriente) => (
-        <Space size="small">
+        <Space size="small" direction="vertical" style={{ width: '100%' }}>
           <Button
             type="primary"
             size="small"
             icon={<DollarOutlined />}
             onClick={() => handleAbrirModalPago(record)}
+            block
           >
             Registrar Pago
           </Button>
@@ -929,6 +929,7 @@ const Accounts: React.FC = () => {
             size="small"
             icon={<EyeOutlined />}
             onClick={() => handleVerDetalle(record)}
+            block
           >
             Ver Detalle
           </Button>
