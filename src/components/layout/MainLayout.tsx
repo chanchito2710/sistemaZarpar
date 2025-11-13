@@ -67,15 +67,33 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // Función para actualizar el favicon dinámicamente
   const actualizarFavicon = (base64: string) => {
-    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-    if (link) {
-      link.href = base64;
-    } else {
-      const newLink = document.createElement('link');
-      newLink.rel = 'icon';
-      newLink.href = base64;
-      document.head.appendChild(newLink);
-    }
+    // Eliminar todos los favicons existentes para forzar actualización en Chrome
+    const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+    existingFavicons.forEach(link => link.remove());
+    
+    // Crear nuevo favicon con timestamp para evitar cache
+    const timestamp = new Date().getTime();
+    const faviconUrl = `${base64}?t=${timestamp}`;
+    
+    // Agregar favicon estándar
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/x-icon';
+    link.href = faviconUrl;
+    document.head.appendChild(link);
+    
+    // Agregar shortcut icon (para compatibilidad con navegadores antiguos)
+    const shortcutLink = document.createElement('link');
+    shortcutLink.rel = 'shortcut icon';
+    shortcutLink.type = 'image/x-icon';
+    shortcutLink.href = faviconUrl;
+    document.head.appendChild(shortcutLink);
+    
+    // Forzar recarga del favicon en Chrome
+    // Truco: cambiar y restaurar el href para forzar actualización
+    setTimeout(() => {
+      link.href = link.href;
+    }, 100);
   };
 
   // Cargar logo y favicon desde localStorage al iniciar
@@ -547,11 +565,29 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const handleEliminarFavicon = () => {
     setFaviconEmpresa(null);
     localStorage.removeItem('faviconEmpresa');
-    // Restaurar favicon original
-    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-    if (link) {
-      link.href = '/favicon.svg';
-    }
+    
+    // Eliminar todos los favicons existentes
+    const existingFavicons = document.querySelectorAll("link[rel*='icon']");
+    existingFavicons.forEach(link => link.remove());
+    
+    // Restaurar favicon original con timestamp para evitar cache
+    const timestamp = new Date().getTime();
+    const faviconUrl = `/favicon.svg?t=${timestamp}`;
+    
+    // Agregar favicon estándar
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/svg+xml';
+    link.href = faviconUrl;
+    document.head.appendChild(link);
+    
+    // Agregar shortcut icon
+    const shortcutLink = document.createElement('link');
+    shortcutLink.rel = 'shortcut icon';
+    shortcutLink.type = 'image/svg+xml';
+    shortcutLink.href = faviconUrl;
+    document.head.appendChild(shortcutLink);
+    
     message.success('Favicon eliminado correctamente');
   };
 
