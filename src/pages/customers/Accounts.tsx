@@ -559,10 +559,33 @@ const Accounts: React.FC = () => {
       const logoEmpresa = localStorage.getItem('logoEmpresa');
       
       if (logoEmpresa) {
-        // Si hay logo personalizado, mostrarlo
+        // Si hay logo personalizado, mostrarlo con proporciones correctas
         try {
-          doc.addImage(logoEmpresa, 'PNG', 14, 10, 40, 15);
-          yPos = 30;
+          // Crear una imagen temporal para obtener dimensiones originales
+          const img = new Image();
+          img.src = logoEmpresa;
+          
+          // Calcular dimensiones manteniendo proporción
+          const maxWidth = 50;  // Ancho máximo en PDF
+          const maxHeight = 20; // Alto máximo en PDF
+          
+          let width = img.width;
+          let height = img.height;
+          
+          // Calcular escala para que quepa en el espacio máximo
+          const scaleX = maxWidth / width;
+          const scaleY = maxHeight / height;
+          const scale = Math.min(scaleX, scaleY); // Usar la escala menor para que quepa
+          
+          // Aplicar escala
+          width = width * scale;
+          height = height * scale;
+          
+          // Centrar verticalmente si es necesario
+          const yOffset = (maxHeight - height) / 2;
+          
+          doc.addImage(logoEmpresa, 'PNG', 14, 10 + yOffset, width, height);
+          yPos = 10 + maxHeight + 5; // Ajustar yPos según altura máxima
         } catch (error) {
           console.error('Error al cargar logo en PDF:', error);
           // Si hay error, usar el texto por defecto
@@ -591,8 +614,8 @@ const Accounts: React.FC = () => {
         yPos = 20;
       }
       
-      // Título documento (derecha)
-      const tituloY = logoEmpresa ? yPos - 12 : 18;
+      // Título documento (derecha) - Alineado con el logo
+      const tituloY = logoEmpresa ? 18 : 18;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
@@ -602,6 +625,11 @@ const Accounts: React.FC = () => {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
       doc.text(fechaActual, 196, tituloY + 6, { align: 'right' });
+      
+      // Asegurar que yPos esté debajo del título si es necesario
+      if (yPos < tituloY + 10) {
+        yPos = tituloY + 10;
+      }
       
       // Línea separadora elegante
       const lineaY = yPos + 2;
