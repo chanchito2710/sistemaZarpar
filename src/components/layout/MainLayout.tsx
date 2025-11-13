@@ -65,6 +65,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { token } = theme.useToken();
   const { usuario, isAuthenticated, isLoading, logout } = useAuth();
 
+  // Función para actualizar el favicon dinámicamente
+  const actualizarFavicon = (base64: string) => {
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (link) {
+      link.href = base64;
+    } else {
+      const newLink = document.createElement('link');
+      newLink.rel = 'icon';
+      newLink.href = base64;
+      document.head.appendChild(newLink);
+    }
+  };
+
   // Cargar logo y favicon desde localStorage al iniciar
   useEffect(() => {
     const logoGuardado = localStorage.getItem('logoEmpresa');
@@ -514,19 +527,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     setLogoEmpresa(null);
     localStorage.removeItem('logoEmpresa');
     message.success('Logo eliminado correctamente');
-  };
-
-  // Función para actualizar el favicon dinámicamente
-  const actualizarFavicon = (base64: string) => {
-    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-    if (link) {
-      link.href = base64;
-    } else {
-      const newLink = document.createElement('link');
-      newLink.rel = 'icon';
-      newLink.href = base64;
-      document.head.appendChild(newLink);
-    }
   };
 
   // Función para manejar la subida del favicon
