@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col, Select, Statistic, Card } from 'antd';
+import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col, Select, Statistic, Card, Upload, message } from 'antd';
 import './MainLayout.css';
 import {
   UserOutlined,
@@ -16,6 +16,9 @@ import {
   PrinterOutlined,
   CheckCircleOutlined,
   WalletOutlined,
+  PictureOutlined,
+  UploadOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { menuItems } from '../../utils/menuItems';
@@ -52,10 +55,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // Usar contexto de caja para compartir estado entre componentes
   const { montoCaja, setMontoCaja, triggerActualizacion } = useCaja();
   
+  // Estados para personalización de logo
+  const [modalPersonalizarVisible, setModalPersonalizarVisible] = useState(false);
+  const [logoEmpresa, setLogoEmpresa] = useState<string | null>(null);
+  
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
   const { usuario, isAuthenticated, isLoading, logout } = useAuth();
+
+  // Cargar logo desde localStorage al iniciar
+  useEffect(() => {
+    const logoGuardado = localStorage.getItem('logoEmpresa');
+    if (logoGuardado) {
+      setLogoEmpresa(logoGuardado);
+    }
+  }, []);
 
   // Cargar ventas del día
   useEffect(() => {
@@ -464,6 +479,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       case 'database':
         navigate('/admin/database');
         break;
+      case 'customize':
+        setModalPersonalizarVisible(true);
+        break;
       case 'logout':
         await logout();
         navigate('/login', { replace: true });
@@ -471,15 +489,39 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   };
 
+  // Función para manejar la subida del logo
+  const handleUploadLogo = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setLogoEmpresa(base64);
+      localStorage.setItem('logoEmpresa', base64);
+      message.success('Logo actualizado correctamente');
+    };
+    reader.readAsDataURL(file);
+    return false; // Prevenir upload automático
+  };
+
+  // Función para eliminar el logo
+  const handleEliminarLogo = () => {
+    setLogoEmpresa(null);
+    localStorage.removeItem('logoEmpresa');
+    message.success('Logo eliminado correctamente');
+  };
+
   // Verificar si el usuario es administrador
   const esAdministrador = usuario?.email === 'admin@zarparuy.com';
 
   const userMenuItems = [
-    // Opción de Base de Datos solo para administrador
+    // Opciones solo para administrador
     ...(esAdministrador ? [{
       key: 'database',
       icon: <DatabaseOutlined />,
       label: 'Base de Datos',
+    }, {
+      key: 'customize',
+      icon: <PictureOutlined />,
+      label: 'Personalizar',
     }] : []),
     ...(esAdministrador ? [{
       type: 'divider' as const,
@@ -525,32 +567,49 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           }}
         >
           {!collapsed ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: 16,
-                }}
-              >
-                Z
-              </div>
-              <span
-                style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: token.colorText,
-                }}
-              >
-                Sistema Zarpar
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}>
+              {logoEmpresa ? (
+                <img 
+                  src={logoEmpresa} 
+                  alt="Logo" 
+                  style={{
+                    maxWidth: '140px',
+                    maxHeight: '48px',
+                    width: 'auto',
+                    height: 'auto',
+                    objectFit: 'contain'
+                  }}
+                />
+              ) : (
+                <>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: 16,
+                      flexShrink: 0,
+                    }}
+                  >
+                    Z
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 600,
+                      color: token.colorText,
+                    }}
+                  >
+                    Sistema Zarpar
+                  </span>
+                </>
+              )}
             </div>
           ) : (
             <div
@@ -1115,6 +1174,101 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <Text type="secondary">No se encontró el comprobante</Text>
           </div>
         )}
+      </Modal>
+
+      {/* Modal de Personalización de Logo */}
+      <Modal
+        title={
+          <span>
+            <PictureOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+            Personalizar Logo de la Empresa
+          </span>
+        }
+        open={modalPersonalizarVisible}
+        onCancel={() => setModalPersonalizarVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <div style={{ padding: '20px 0' }}>
+          {/* Vista previa del logo actual */}
+          {logoEmpresa && (
+            <div style={{ marginBottom: 24, textAlign: 'center' }}>
+              <Text strong style={{ display: 'block', marginBottom: 12 }}>
+                Logo Actual:
+              </Text>
+              <div
+                style={{
+                  padding: 20,
+                  background: '#f5f5f5',
+                  borderRadius: 8,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  minHeight: 100,
+                }}
+              >
+                <img
+                  src={logoEmpresa}
+                  alt="Logo actual"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '150px',
+                    objectFit: 'contain',
+                  }}
+                />
+              </div>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={handleEliminarLogo}
+                style={{ marginTop: 12 }}
+              >
+                Eliminar Logo
+              </Button>
+            </div>
+          )}
+
+          <Divider />
+
+          {/* Subir nuevo logo */}
+          <div>
+            <Text strong style={{ display: 'block', marginBottom: 12 }}>
+              {logoEmpresa ? 'Cambiar Logo:' : 'Subir Logo:'}
+            </Text>
+            <Upload.Dragger
+              name="logo"
+              accept="image/*"
+              beforeUpload={handleUploadLogo}
+              showUploadList={false}
+              style={{ padding: '40px 20px' }}
+            >
+              <p className="ant-upload-drag-icon">
+                <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
+              </p>
+              <p className="ant-upload-text" style={{ fontSize: 16 }}>
+                Haz clic o arrastra una imagen aquí
+              </p>
+              <p className="ant-upload-hint" style={{ color: '#999' }}>
+                Formatos soportados: JPG, PNG, GIF, SVG
+                <br />
+                Tamaño recomendado: 300x100 px (máximo 2 MB)
+              </p>
+            </Upload.Dragger>
+          </div>
+
+          {/* Información adicional */}
+          <div style={{ marginTop: 24, padding: 16, background: '#e6f7ff', borderRadius: 8 }}>
+            <Text strong style={{ color: '#1890ff', display: 'block', marginBottom: 8 }}>
+              ℹ️ Información:
+            </Text>
+            <ul style={{ margin: 0, paddingLeft: 20, color: '#666' }}>
+              <li>El logo se mostrará en el sidebar de la aplicación</li>
+              <li>También aparecerá en todos los reportes PDF</li>
+              <li>Se ajustará automáticamente al espacio disponible</li>
+              <li>Para mejores resultados, usa una imagen horizontal</li>
+            </ul>
+          </div>
+        </div>
       </Modal>
     </Layout>
   );

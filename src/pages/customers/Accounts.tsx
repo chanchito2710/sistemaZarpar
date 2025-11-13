@@ -533,34 +533,61 @@ const Accounts: React.FC = () => {
       // 1. HEADER PROFESIONAL
       // ========================================
       
-      // Logo y nombre empresa (izquierda)
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('ZARPAR', 14, 18);
+      // Obtener logo personalizado si existe
+      const logoEmpresa = localStorage.getItem('logoEmpresa');
       
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text('Repuestos de Celulares', 14, 24);
+      if (logoEmpresa) {
+        // Si hay logo personalizado, mostrarlo
+        try {
+          doc.addImage(logoEmpresa, 'PNG', 14, 10, 40, 15);
+          yPos = 30;
+        } catch (error) {
+          console.error('Error al cargar logo en PDF:', error);
+          // Si hay error, usar el texto por defecto
+          doc.setFontSize(16);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text('ZARPAR', 14, 18);
+          
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 100, 100);
+          doc.text('Repuestos de Celulares', 14, 24);
+          yPos = 20;
+        }
+      } else {
+        // Logo y nombre empresa por defecto (izquierda)
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('ZARPAR', 14, 18);
+        
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text('Repuestos de Celulares', 14, 24);
+        yPos = 20;
+      }
       
       // Título documento (derecha)
+      const tituloY = logoEmpresa ? yPos - 12 : 18;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
-      doc.text('ESTADO DE CUENTA', 196, 18, { align: 'right' });
+      doc.text('ESTADO DE CUENTA', 196, tituloY, { align: 'right' });
       
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(fechaActual, 196, 24, { align: 'right' });
+      doc.text(fechaActual, 196, tituloY + 6, { align: 'right' });
       
       // Línea separadora elegante
+      const lineaY = yPos + 2;
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.5);
-      doc.line(14, 28, 196, 28);
+      doc.line(14, lineaY, 196, lineaY);
       
-      yPos = 36;
+      yPos = lineaY + 8;
       
       // ========================================
       // 2. INFORMACIÓN DEL CLIENTE
