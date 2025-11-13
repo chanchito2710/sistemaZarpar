@@ -1535,7 +1535,6 @@ const Accounts: React.FC = () => {
                 loading={loadingMovimientos}
                 rowKey="id"
                 size="small"
-                scroll={{ x: 1200 }}
                 pagination={{
                   defaultPageSize: 10,
                   showTotal: (total) => `Total: ${total} movimientos`,
@@ -1789,7 +1788,6 @@ const Accounts: React.FC = () => {
             dataSource={historialPagos}
             rowKey="id"
             size="small"
-            scroll={{ x: 1000 }}
             pagination={{
               defaultPageSize: 15,
               showTotal: (total) => `Total: ${total} pagos`,
