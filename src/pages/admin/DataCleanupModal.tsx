@@ -244,7 +244,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
           >
             <Space>
               <Text strong>Productos</Text>
-              <Tag color="red">⚠️ RESETEA STOCK A 0 (NO elimina productos)</Tag>
+              <Tag color="red">⚠️ ELIMINA TODOS LOS PRODUCTOS DE LA BASE DE DATOS</Tag>
             </Space>
           </Checkbox>
         </Card>
@@ -284,7 +284,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
               {opciones.clientes && <Tag color="volcano">✓ Clientes</Tag>}
               {opciones.movimientosCaja && <Tag color="gold">✓ Movimientos de Caja</Tag>}
               {opciones.comisiones && <Tag color="purple">✓ Comisiones</Tag>}
-              {opciones.productos && <Tag color="red">✓ Stock de Productos (reset a 0)</Tag>}
+              {opciones.productos && <Tag color="red">✓ TODOS los Productos (ELIMINACIÓN COMPLETA)</Tag>}
             </Space>
           </Col>
         </Row>

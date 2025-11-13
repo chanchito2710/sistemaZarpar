@@ -8,7 +8,11 @@ import {
   procesarDevolucion,
   procesarReemplazo,
   obtenerStockFallas,
-  obtenerSaldosFavor
+  obtenerStockFallasPorFecha,
+  obtenerSaldosFavor,
+  obtenerHistorialReemplazos,
+  obtenerDetalleFallas,
+  obtenerEstadisticasFallas
 } from '../controllers/devolucionesController.js';
 import { verificarAutenticacion } from '../middleware/auth.js';
 
@@ -29,8 +33,19 @@ router.post('/reemplazar', procesarReemplazo);
 // Obtener stock de fallas
 router.get('/stock-fallas', obtenerStockFallas);
 
+// Obtener stock de fallas histórico por fecha
+router.get('/stock-fallas-historico', obtenerStockFallasPorFecha);
+
 // Obtener saldos a favor
 router.get('/saldos-favor', obtenerSaldosFavor);
 
-export default router;
+// Obtener historial de reemplazos de un producto
+router.get('/historial-reemplazos/:detalleId', obtenerHistorialReemplazos);
 
+// Obtener detalle de fallas de un producto
+router.get('/detalle-fallas/:productoId', obtenerDetalleFallas);
+
+// Obtener estadísticas completas de fallas
+router.get('/estadisticas-fallas', obtenerEstadisticasFallas);
+
+export default router;

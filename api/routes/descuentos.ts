@@ -22,3 +22,7 @@ router.put('/:sucursal', verificarAdmin, actualizarConfiguracionDescuento);
 
 export default router;
 
+
+
+
+

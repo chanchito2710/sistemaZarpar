@@ -35,8 +35,12 @@ import {
   SearchOutlined,
   ReloadOutlined,
   FileExcelOutlined,
+  EyeOutlined,
+  CalendarOutlined,
+  InfoCircleOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
-import { devolucionesService } from '../../services/api';
+import { devolucionesService, vendedoresService } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import dayjs, { Dayjs } from 'dayjs';
 import './Returns.css';
@@ -64,16 +68,9 @@ interface ProductoVendido {
   marca: string;
   dias_desde_venta: number;
   estado_garantia: 'vigente' | 'vencida';
-}
-
-interface StockFalla {
-  producto_id: number;
-  nombre: string;
-  marca: string;
-  tipo: string;
-  sucursal: string;
-  stock_fallas: number;
-  stock_actual: number;
+  tipo_devolucion?: 'devolucion' | 'reemplazo' | null;
+  metodo_devolucion?: 'cuenta_corriente' | 'saldo_favor' | null;
+  fecha_devolucion?: string | null;
 }
 
 interface SaldoFavor {
@@ -86,10 +83,13 @@ interface SaldoFavor {
 }
 
 const Returns: React.FC = () => {
-  const { usuario, esAdmin, sucursalUsuario } = useAuth();
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.esAdmin || false;
+  const sucursalUsuario = usuario?.sucursal?.toLowerCase() || '';
   
   const [loading, setLoading] = useState(false);
   const [productosVendidos, setProductosVendidos] = useState<ProductoVendido[]>([]);
+  const [sucursales, setSucursales] = useState<string[]>([]);
   const [sucursal, setSucursal] = useState<string>(esAdmin ? 'todas' : sucursalUsuario);
   const [fechaRango, setFechaRango] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   
@@ -104,26 +104,34 @@ const Returns: React.FC = () => {
   const [formReemplazo] = Form.useForm();
   const [procesandoReemplazo, setProcesandoReemplazo] = useState(false);
   
-  // Drawer Stock Fallas
-  const [drawerFallasVisible, setDrawerFallasVisible] = useState(false);
-  const [stockFallas, setStockFallas] = useState<StockFalla[]>([]);
-  const [loadingFallas, setLoadingFallas] = useState(false);
-  
   // Drawer Saldos a Favor
   const [drawerSaldosVisible, setDrawerSaldosVisible] = useState(false);
   const [saldosFavor, setSaldosFavor] = useState<SaldoFavor[]>([]);
   const [loadingSaldos, setLoadingSaldos] = useState(false);
 
+  // Modal Historial de Reemplazos
+  const [modalHistorialVisible, setModalHistorialVisible] = useState(false);
+  const [productoHistorial, setProductoHistorial] = useState<ProductoVendido | null>(null);
+  const [historialReemplazos, setHistorialReemplazos] = useState<any[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+
+  // Cargar sucursales disponibles al montar el componente
+  useEffect(() => {
+    const cargarSucursales = async () => {
+      try {
+        const sucursalesData = await vendedoresService.obtenerSucursales();
+        setSucursales(sucursalesData);
+      } catch (error) {
+        console.error('Error al cargar sucursales:', error);
+      }
+    };
+    cargarSucursales();
+  }, []);
+
   useEffect(() => {
     cargarProductosVendidos();
   }, [sucursal, fechaRango]);
 
-  // Recargar stock de fallas cuando cambia la sucursal (solo si el drawer está abierto)
-  useEffect(() => {
-    if (drawerFallasVisible) {
-      cargarStockFallas();
-    }
-  }, [sucursal]);
 
   const cargarProductosVendidos = async () => {
     setLoading(true);
@@ -197,17 +205,28 @@ const Returns: React.FC = () => {
         metodo_devolucion: values.metodo_devolucion,
         monto_devuelto: values.monto_devuelto,
         observaciones: values.observaciones,
+        tipo_stock: values.tipo_stock, // Nuevo campo
         procesado_por: usuario?.email,
         fecha_venta: productoSeleccionado.fecha_venta,
       };
       
       await devolucionesService.procesarDevolucion(data);
       
-      message.success(
-        values.metodo_devolucion === 'cuenta_corriente'
-          ? '✅ Devolución procesada - Monto agregado a cuenta corriente'
-          : '✅ Devolución procesada - Saldo a favor creado'
-      );
+      // Mensaje personalizado según el tipo de stock
+      let mensajeExito = '';
+      if (values.metodo_devolucion === 'cuenta_corriente') {
+        mensajeExito = '✅ Devolución procesada - Crédito agregado a cuenta corriente del cliente';
+      } else {
+        mensajeExito = '✅ Devolución procesada - Efectivo devuelto y descontado de caja';
+      }
+      
+      if (values.tipo_stock === 'principal') {
+        mensajeExito += ' | Producto devuelto a Stock Principal';
+      } else {
+        mensajeExito += ' | Producto enviado a Stock de Mermas (Fallas)';
+      }
+      
+      message.success(mensajeExito);
       
       setModalDevolucionVisible(false);
       formDevolucion.resetFields();
@@ -255,21 +274,6 @@ const Returns: React.FC = () => {
     }
   };
 
-  const cargarStockFallas = async () => {
-    setLoadingFallas(true);
-    try {
-      // Si es admin, usar la sucursal seleccionada; si no, usar la del usuario
-      const sucursalFiltro = esAdmin ? sucursal : sucursalUsuario;
-      const data = await devolucionesService.obtenerStockFallas(sucursalFiltro);
-      setStockFallas(data);
-    } catch (error) {
-      message.error('Error al cargar stock de fallas');
-      console.error(error);
-    } finally {
-      setLoadingFallas(false);
-    }
-  };
-
   const cargarSaldosFavor = async () => {
     setLoadingSaldos(true);
     try {
@@ -283,14 +287,28 @@ const Returns: React.FC = () => {
     }
   };
 
-  const abrirDrawerFallas = () => {
-    setDrawerFallasVisible(true);
-    cargarStockFallas();
-  };
-
   const abrirDrawerSaldos = () => {
     setDrawerSaldosVisible(true);
     cargarSaldosFavor();
+  };
+
+  const cargarHistorialReemplazos = async (detalleId: number) => {
+    setLoadingHistorial(true);
+    try {
+      const data = await devolucionesService.obtenerHistorialReemplazos(detalleId);
+      setHistorialReemplazos(data);
+    } catch (error) {
+      message.error('Error al cargar historial de reemplazos');
+      console.error(error);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  const abrirModalHistorial = (producto: ProductoVendido) => {
+    setProductoHistorial(producto);
+    setModalHistorialVisible(true);
+    cargarHistorialReemplazos(producto.detalle_id);
   };
 
   const columns = [
@@ -298,7 +316,7 @@ const Returns: React.FC = () => {
       title: 'Fecha Venta',
       dataIndex: 'fecha_venta',
       key: 'fecha_venta',
-      width: 110,
+      responsive: ['md'] as any,
       render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY'),
       sorter: (a: ProductoVendido, b: ProductoVendido) => 
         new Date(a.fecha_venta).getTime() - new Date(b.fecha_venta).getTime(),
@@ -307,99 +325,148 @@ const Returns: React.FC = () => {
       title: 'N° Venta',
       dataIndex: 'numero_venta',
       key: 'numero_venta',
-      width: 140,
+      responsive: ['sm'] as any,
     },
     {
       title: 'Cliente',
       dataIndex: 'cliente_nombre',
       key: 'cliente_nombre',
-      width: 180,
     },
     {
       title: 'Producto',
       dataIndex: 'nombre_producto',
       key: 'nombre_producto',
-      width: 200,
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo_producto',
       key: 'tipo_producto',
-      width: 100,
+      responsive: ['lg'] as any,
       render: (tipo: string) => <Tag color="blue">{tipo}</Tag>,
     },
     {
       title: 'Marca',
       dataIndex: 'marca',
       key: 'marca',
-      width: 100,
+      responsive: ['lg'] as any,
     },
     {
       title: 'Precio',
       dataIndex: 'precio_unitario',
       key: 'precio_unitario',
-      width: 100,
+      responsive: ['md'] as any,
       render: (precio: number) => `$${precio.toLocaleString('es-UY')}`,
     },
     {
       title: 'Garantía',
       key: 'garantia',
-      width: 120,
       render: (_: any, record: ProductoVendido) => {
         const diasRestantes = 90 - record.dias_desde_venta;
-        return record.estado_garantia === 'vigente' ? (
-          <Tooltip title={`${diasRestantes} días restantes`}>
-            <Tag color="success" icon={<CheckCircleOutlined />}>
-              Vigente
-            </Tag>
-          </Tooltip>
-        ) : (
-          <Tag color="error" icon={<WarningOutlined />}>
-            Vencida
-          </Tag>
+        const fueDevuelto = record.tipo_devolucion === 'devolucion';
+        const fueReemplazado = record.tipo_devolucion === 'reemplazo';
+        
+        return (
+          <Space direction="vertical" size={2}>
+            {record.estado_garantia === 'vigente' ? (
+              <Tooltip title={`${diasRestantes} días restantes`}>
+                <Tag color="success" icon={<CheckCircleOutlined />}>
+                  Vigente
+                </Tag>
+              </Tooltip>
+            ) : (
+              <Tag color="error" icon={<WarningOutlined />}>
+                Vencida
+              </Tag>
+            )}
+            
+            {fueDevuelto && (
+              <Tag color={record.metodo_devolucion === 'cuenta_corriente' ? 'blue' : 'orange'} style={{ fontSize: 10, marginTop: 4 }}>
+                {record.metodo_devolucion === 'cuenta_corriente' 
+                  ? `💳 Devuelto en C.C. (${new Date(record.fecha_devolucion).toLocaleDateString('es-UY')})` 
+                  : `💰 Devuelto en efectivo (${new Date(record.fecha_devolucion).toLocaleDateString('es-UY')})`}
+              </Tag>
+            )}
+            
+            {fueReemplazado && (
+              <Tag 
+                color="purple" 
+                icon={<EyeOutlined />}
+                style={{ fontSize: 10, marginTop: 4, cursor: 'pointer' }}
+                onClick={() => abrirModalHistorial(record)}
+              >
+                Producto reemplazado
+              </Tag>
+            )}
+          </Space>
         );
       },
     },
     {
       title: 'Acciones',
       key: 'acciones',
-      fixed: 'right' as const,
-      width: 180,
-      render: (_: any, record: ProductoVendido) => (
-        <Space size="small">
-          <Tooltip title="Devolver dinero">
-            <Button
-              type="primary"
-              icon={<UndoOutlined />}
-              size="small"
-              onClick={() => abrirModalDevolucion(record)}
-              disabled={record.estado_garantia === 'vencida'}
-            >
-              Devolver
-            </Button>
-          </Tooltip>
-          <Tooltip title="Reemplazar producto">
-            <Button
-              type="default"
-              icon={<SwapOutlined />}
-              size="small"
-              onClick={() => abrirModalReemplazo(record)}
-              disabled={record.estado_garantia === 'vencida'}
-            >
-              Reemplazar
-            </Button>
-          </Tooltip>
-        </Space>
-      ),
+      render: (_: any, record: ProductoVendido) => {
+        const fueDevuelto = record.tipo_devolucion === 'devolucion';
+        const fueReemplazado = record.tipo_devolucion === 'reemplazo';
+        
+        // Botón "Devolver" se deshabilita si: garantía vencida O fue devuelto
+        const devolverDeshabilitado = record.estado_garantia === 'vencida' || fueDevuelto;
+        
+        // Botón "Reemplazar" se deshabilita si: garantía vencida O fue devuelto
+        // Los productos pueden reemplazarse múltiples veces mientras esté vigente la garantía, pero NO si fue devuelto
+        const reemplazarDeshabilitado = record.estado_garantia === 'vencida' || fueDevuelto;
+        
+        return (
+          <Space size="small">
+            <Tooltip title={
+              fueDevuelto 
+                ? "Este producto ya fue devuelto" 
+                : record.estado_garantia === 'vencida' 
+                  ? "Garantía vencida" 
+                  : "Devolver dinero"
+            }>
+              <Button
+                type="primary"
+                icon={<UndoOutlined />}
+                size="small"
+                onClick={() => abrirModalDevolucion(record)}
+                disabled={devolverDeshabilitado}
+              >
+                Devolver
+              </Button>
+            </Tooltip>
+            <Tooltip title={
+              record.estado_garantia === 'vencida' 
+                ? "Garantía vencida" 
+                : fueDevuelto
+                  ? "No se puede reemplazar un producto ya devuelto"
+                  : fueReemplazado 
+                    ? "Producto ya reemplazado - Puede reemplazarse nuevamente mientras esté vigente la garantía"
+                    : "Reemplazar producto"
+            }>
+              <Button
+                type="default"
+                icon={<SwapOutlined />}
+                size="small"
+                onClick={() => abrirModalReemplazo(record)}
+                disabled={reemplazarDeshabilitado}
+              >
+                Reemplazar
+              </Button>
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
 
   return (
     <div className="returns-container">
-      <Title level={2}>🔄 Devoluciones y Reemplazos</Title>
-      <Text type="secondary">
-        Gestión de garantías, devoluciones y stock de fallas
-      </Text>
+      <div style={{ marginBottom: '12px' }}>
+        <Title level={3} style={{ marginBottom: '4px' }}>🔄 Devoluciones y Reemplazos</Title>
+        <Text type="secondary" style={{ fontSize: '12px' }}>
+          Gestión de garantías, devoluciones y stock de fallas
+        </Text>
+      </div>
 
       <Alert
         message="📝 Política de Garantía"
@@ -407,10 +474,9 @@ const Returns: React.FC = () => {
         type="info"
         showIcon
         className="returns-alert"
-        style={{ marginTop: '16px' }}
       />
 
-      <Row gutter={[16, 16]} className="returns-statistics">
+      <Row gutter={[12, 12]} className="returns-statistics">
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
@@ -432,16 +498,6 @@ const Returns: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card className="returns-card-clickable" onClick={abrirDrawerFallas}>
-            <Statistic
-              title="Stock de Fallas"
-              value="Ver"
-              prefix={<FileExcelOutlined />}
-              valueStyle={{ color: '#1890ff', fontSize: '18px' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
           <Card className="returns-card-clickable" onClick={abrirDrawerSaldos}>
             <Statistic
               title="Saldos a Favor"
@@ -456,20 +512,21 @@ const Returns: React.FC = () => {
       <Card
         title="Productos Vendidos"
         extra={
-          <Space>
-            {esAdmin && (
-              <Select
-                value={sucursal}
-                onChange={setSucursal}
-                style={{ width: 150 }}
-              >
-                <Option value="todas">Todas las Sucursales</Option>
-                <Option value="pando">Pando</Option>
-                <Option value="maldonado">Maldonado</Option>
-                <Option value="rivera">Rivera</Option>
-                {/* Agregar más sucursales dinámicamente */}
-              </Select>
-            )}
+          <Space wrap>
+            <Select
+              value={sucursal}
+              onChange={setSucursal}
+              style={{ width: 150 }}
+              disabled={!esAdmin}
+              placeholder="Sucursal"
+            >
+              {esAdmin && <Option value="todas">Todas</Option>}
+              {sucursales.map(suc => (
+                <Option key={suc} value={suc}>
+                  {suc.toUpperCase()}
+                </Option>
+              ))}
+            </Select>
             <RangePicker
               value={fechaRango}
               onChange={(dates) => setFechaRango(dates)}
@@ -492,7 +549,6 @@ const Returns: React.FC = () => {
           dataSource={productosVendidos}
           rowKey="detalle_id"
           loading={loading}
-          scroll={{ x: 1400 }}
           pagination={{
             pageSize: 50,
             showTotal: (total) => `Total: ${total} productos`,
@@ -542,7 +598,7 @@ const Returns: React.FC = () => {
                     💳 A Cuenta Corriente (si existe)
                   </Radio>
                   <Radio value="saldo_favor">
-                    💰 Saldo a Favor (para futuras compras)
+                    💰 Devolver efectivo
                   </Radio>
                 </Radio.Group>
               </Form.Item>
@@ -566,6 +622,56 @@ const Returns: React.FC = () => {
                 name="observaciones"
               >
                 <TextArea rows={3} placeholder="Motivo de la devolución (opcional)" />
+              </Form.Item>
+
+              <Form.Item
+                label="📦 Destino del Producto Devuelto"
+                name="tipo_stock"
+                rules={[{ required: true, message: 'Selecciona el destino del producto' }]}
+              >
+                <Radio.Group style={{ width: '100%' }}>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Radio 
+                      value="principal" 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        padding: '12px',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '8px',
+                        marginBottom: '8px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: '#52c41a' }}>
+                          ✅ Devolver a Stock Principal
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                          El producto está en buen estado y puede revenderse
+                        </div>
+                      </div>
+                    </Radio>
+                    <Radio 
+                      value="mermas" 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        padding: '12px',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: '#ff4d4f' }}>
+                          ❌ Enviar a Stock de Mermas (Fallas)
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                          El producto tiene defectos o daños y no puede revenderse
+                        </div>
+                      </div>
+                    </Radio>
+                  </Space>
+                </Radio.Group>
               </Form.Item>
 
               <Form.Item>
@@ -665,111 +771,6 @@ const Returns: React.FC = () => {
         )}
       </Modal>
 
-      {/* Drawer Stock Fallas */}
-      <Drawer
-        title="📦 Stock de Fallas - Todos los Productos"
-        placement="right"
-        width={900}
-        open={drawerFallasVisible}
-        onClose={() => setDrawerFallasVisible(false)}
-      >
-        <Alert
-          message={esAdmin ? "💡 Información" : `📍 Sucursal: ${(sucursalUsuario || sucursal || '').toUpperCase()}`}
-          description={esAdmin 
-            ? "Los productos con fallas aparecen primero. Los productos sin fallas (0) se muestran al final de la lista. Cambia la sucursal en el selector principal para ver otras sucursales."
-            : "Mostrando todos los productos de tu sucursal. Los productos con fallas aparecen primero."
-          }
-          type="info"
-          showIcon
-          className="returns-alert"
-        />
-        <Table
-          dataSource={stockFallas}
-          loading={loadingFallas}
-          rowKey="producto_id"
-          rowClassName={(record) => record.stock_fallas > 0 ? 'row-with-fallas' : ''}
-          columns={[
-            { 
-              title: 'Producto', 
-              dataIndex: 'nombre', 
-              key: 'nombre', 
-              width: 220,
-              render: (nombre, record) => (
-                <Text strong={record.stock_fallas > 0} type={record.stock_fallas > 0 ? 'danger' : undefined}>
-                  {nombre}
-                </Text>
-              ),
-              sorter: (a, b) => (a.nombre || '').localeCompare(b.nombre || ''),
-              sortDirections: ['ascend', 'descend'],
-            },
-            { 
-              title: 'Tipo', 
-              dataIndex: 'tipo', 
-              key: 'tipo', 
-              width: 120, 
-              render: (tipo) => <Tag color="orange">{tipo}</Tag>,
-              sorter: (a, b) => (a.tipo || '').localeCompare(b.tipo || ''),
-              sortDirections: ['ascend', 'descend'],
-            },
-            { 
-              title: 'Marca', 
-              dataIndex: 'marca', 
-              key: 'marca', 
-              width: 120,
-              sorter: (a, b) => (a.marca || '').localeCompare(b.marca || ''),
-              sortDirections: ['ascend', 'descend'],
-            },
-            { 
-              title: 'Sucursal', 
-              dataIndex: 'sucursal', 
-              key: 'sucursal', 
-              width: 100, 
-              render: (suc) => <Tag color={esAdmin ? 'blue' : 'default'}>{suc.toUpperCase()}</Tag>,
-              sorter: esAdmin ? (a, b) => a.sucursal.localeCompare(b.sucursal) : undefined,
-              sortDirections: ['ascend', 'descend'],
-            },
-            { 
-              title: 'Stock Fallas', 
-              dataIndex: 'stock_fallas', 
-              key: 'stock_fallas', 
-              width: 120,
-              align: 'center' as const,
-              render: (fallas) => {
-                if (fallas > 0) {
-                  return (
-                    <Badge 
-                      count={fallas} 
-                      style={{ backgroundColor: '#ff4d4f', fontWeight: 'bold', fontSize: '14px' }} 
-                      showZero={false}
-                    />
-                  );
-                }
-                return <Text type="secondary">0</Text>;
-              },
-              sorter: (a, b) => (a.stock_fallas || 0) - (b.stock_fallas || 0),
-              sortDirections: ['ascend', 'descend'],
-              defaultSortOrder: 'descend' as const,
-            },
-            { 
-              title: 'Stock Actual', 
-              dataIndex: 'stock_actual', 
-              key: 'stock_actual', 
-              width: 100,
-              align: 'center' as const,
-              render: (stock) => <Text>{stock}</Text>,
-              sorter: (a, b) => (a.stock_actual || 0) - (b.stock_actual || 0),
-              sortDirections: ['ascend', 'descend'],
-            },
-          ]}
-          pagination={{ 
-            pageSize: 50,
-            showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} productos`,
-            showSizeChanger: true,
-            pageSizeOptions: ['20', '50', '100', '200']
-          }}
-        />
-      </Drawer>
-
       {/* Drawer Saldos a Favor */}
       <Drawer
         title="💰 Saldos a Favor de Clientes"
@@ -803,6 +804,139 @@ const Returns: React.FC = () => {
           pagination={{ pageSize: 20 }}
         />
       </Drawer>
+
+      {/* Modal: Historial de Reemplazos */}
+      <Modal
+        title={
+          <Space>
+            <EyeOutlined style={{ color: '#722ed1' }} />
+            <span>📜 Historial de Reemplazos</span>
+          </Space>
+        }
+        open={modalHistorialVisible}
+        onCancel={() => {
+          setModalHistorialVisible(false);
+          setProductoHistorial(null);
+          setHistorialReemplazos([]);
+        }}
+        footer={[
+          <Button key="close" onClick={() => setModalHistorialVisible(false)}>
+            Cerrar
+          </Button>
+        ]}
+        width={800}
+      >
+        {productoHistorial && (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            {/* Info del Producto */}
+            <Card size="small">
+              <Space direction="vertical" size={4}>
+                <Text strong style={{ fontSize: 16 }}>
+                  {productoHistorial.nombre_producto}
+                </Text>
+                <Space size="large">
+                  <Text type="secondary">
+                    <strong>Cliente:</strong> {productoHistorial.cliente_nombre}
+                  </Text>
+                  <Text type="secondary">
+                    <strong>Venta:</strong> {productoHistorial.numero_venta}
+                  </Text>
+                  <Text type="secondary">
+                    <strong>Sucursal:</strong> {productoHistorial.sucursal.toUpperCase()}
+                  </Text>
+                </Space>
+              </Space>
+            </Card>
+
+            {/* Tabla de Historial */}
+            <Table
+              dataSource={historialReemplazos}
+              loading={loadingHistorial}
+              rowKey="id"
+              pagination={false}
+              size="middle"
+              locale={{
+                emptyText: 'No hay reemplazos registrados para este producto'
+              }}
+              columns={[
+                {
+                  title: '#',
+                  key: 'numero',
+                  width: 60,
+                  align: 'center' as const,
+                  render: (_: any, __: any, index: number) => (
+                    <Tag color="purple" style={{ fontSize: 14, padding: '4px 12px' }}>
+                      {historialReemplazos.length - index}
+                    </Tag>
+                  )
+                },
+                {
+                  title: 'FECHA',
+                  dataIndex: 'fecha_proceso',
+                  key: 'fecha_proceso',
+                  width: 180,
+                  render: (fecha: string) => (
+                    <Space>
+                      <CalendarOutlined style={{ color: '#722ed1', fontSize: 16 }} />
+                      <Text strong>{dayjs(fecha).format('DD/MM/YYYY HH:mm')}</Text>
+                    </Space>
+                  )
+                },
+                {
+                  title: 'CANTIDAD',
+                  dataIndex: 'cantidad_reemplazada',
+                  key: 'cantidad_reemplazada',
+                  width: 120,
+                  align: 'center' as const,
+                  render: (cantidad: number) => (
+                    <Tag color="blue" style={{ fontSize: 14, padding: '4px 12px' }}>
+                      {cantidad} {cantidad === 1 ? 'unidad' : 'unidades'}
+                    </Tag>
+                  )
+                },
+                {
+                  title: 'PROCESADO POR',
+                  dataIndex: 'procesado_por',
+                  key: 'procesado_por',
+                  render: (email: string) => (
+                    <Space>
+                      <UserOutlined style={{ color: '#1890ff', fontSize: 16 }} />
+                      <Text>{email || 'Sistema'}</Text>
+                    </Space>
+                  )
+                },
+                {
+                  title: 'OBSERVACIONES',
+                  dataIndex: 'observaciones',
+                  key: 'observaciones',
+                  ellipsis: true,
+                  render: (obs: string) => (
+                    obs ? (
+                      <Tooltip title={obs}>
+                        <Text type="secondary" italic>{obs}</Text>
+                      </Tooltip>
+                    ) : (
+                      <Text type="secondary" style={{ opacity: 0.5 }}>—</Text>
+                    )
+                  )
+                }
+              ]}
+            />
+
+            {/* Resumen */}
+            {historialReemplazos.length > 0 && (
+              <Card size="small" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+                <Space>
+                  <InfoCircleOutlined style={{ color: '#52c41a' }} />
+                  <Text>
+                    Este producto ha sido reemplazado <Text strong>{historialReemplazos.length}</Text> {historialReemplazos.length === 1 ? 'vez' : 'veces'}
+                  </Text>
+                </Space>
+              </Card>
+            )}
+          </Space>
+        )}
+      </Modal>
     </div>
   );
 };

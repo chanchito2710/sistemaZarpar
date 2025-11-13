@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col } from 'antd';
+import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col, Select, Statistic, Card } from 'antd';
 import './MainLayout.css';
 import {
   UserOutlined,
@@ -15,11 +15,13 @@ import {
   ShoppingCartOutlined,
   PrinterOutlined,
   CheckCircleOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { menuItems } from '../../utils/menuItems';
 import { useAuth } from '../../contexts/AuthContext';
-import { ventasService } from '../../services/api';
+import { useCaja } from '../../contexts/CajaContext';
+import { ventasService, cajaService, vendedoresService } from '../../services/api';
 import type { MenuProps } from 'antd';
 
 const { Header, Sider, Content } = Layout;
@@ -40,6 +42,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [ventaSeleccionada, setVentaSeleccionada] = useState<any>(null);
   const [detallesVenta, setDetallesVenta] = useState<any[]>([]);
   const [loadingComprobante, setLoadingComprobante] = useState(false);
+  
+  // Estados para caja en el header
+  const [sucursales, setSucursales] = useState<string[]>([]);
+  const [casaPrincipal, setCasaPrincipal] = useState<string>('');
+  const [sucursalSeleccionadaCaja, setSucursalSeleccionadaCaja] = useState<string>('');
+  const [loadingCaja, setLoadingCaja] = useState(false);
+  
+  // Usar contexto de caja para compartir estado entre componentes
+  const { montoCaja, setMontoCaja, triggerActualizacion } = useCaja();
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,21 +79,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     const cargarUltimasVentas = async () => {
       try {
         setLoadingVentas(true);
-        const ventas = await ventasService.obtenerUltimas(3);
         
-        // Filtrar ventas según rol del usuario
+        // Obtener ventas según rol del usuario
         if (usuario) {
+          let ventas;
           if (usuario.esAdmin) {
-            // Admin ve todas las ventas
-            setUltimasVentas(ventas);
+            // Admin obtiene las 3 últimas ventas globales
+            ventas = await ventasService.obtenerUltimas(3);
           } else {
-            // Usuario normal solo ve ventas de su sucursal
+            // Usuario normal obtiene las 3 últimas ventas de SU sucursal
             const sucursalUsuario = usuario.sucursal?.toLowerCase() || '';
-            const ventasFiltradas = ventas.filter(
-              (venta: any) => venta.sucursal.toLowerCase() === sucursalUsuario
-            );
-            setUltimasVentas(ventasFiltradas);
+            ventas = await ventasService.obtenerUltimas(3, sucursalUsuario);
           }
+        setUltimasVentas(ventas);
         }
       } catch (error) {
         console.error('Error al cargar últimas ventas:', error);
@@ -92,10 +101,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     };
 
     if (usuario) {
-      cargarUltimasVentas();
-      // Actualizar cada 1 minuto
-      const interval = setInterval(cargarUltimasVentas, 1 * 60 * 1000);
-      return () => clearInterval(interval);
+    cargarUltimasVentas();
+    // Actualizar cada 1 minuto
+    const interval = setInterval(cargarUltimasVentas, 1 * 60 * 1000);
+    return () => clearInterval(interval);
     }
   }, [usuario]);
 
@@ -103,21 +112,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const handleRefreshVentas = async () => {
     try {
       setLoadingVentas(true);
-      const ventas = await ventasService.obtenerUltimas(3);
       
-      // Filtrar ventas según rol del usuario
+      // Obtener ventas según rol del usuario
       if (usuario) {
+        let ventas;
         if (usuario.esAdmin) {
-          // Admin ve todas las ventas
-          setUltimasVentas(ventas);
+          // Admin obtiene las 3 últimas ventas globales
+          ventas = await ventasService.obtenerUltimas(3);
         } else {
-          // Usuario normal solo ve ventas de su sucursal
+          // Usuario normal obtiene las 3 últimas ventas de SU sucursal
           const sucursalUsuario = usuario.sucursal?.toLowerCase() || '';
-          const ventasFiltradas = ventas.filter(
-            (venta: any) => venta.sucursal.toLowerCase() === sucursalUsuario
-          );
-          setUltimasVentas(ventasFiltradas);
+          ventas = await ventasService.obtenerUltimas(3, sucursalUsuario);
         }
+      setUltimasVentas(ventas);
       }
     } catch (error) {
       console.error('Error al refrescar ventas:', error);
@@ -125,6 +132,84 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       setLoadingVentas(false);
     }
   };
+
+  // Cargar sucursales
+  useEffect(() => {
+    const cargarSucursales = async () => {
+      try {
+        const sucursalesDisponibles = await vendedoresService.obtenerSucursales();
+        setSucursales(sucursalesDisponibles);
+        
+        // Casa principal por defecto es la primera sucursal
+        // TODO: En el futuro, obtener esto desde la configuración de la base de datos
+        const casaPrincipalNombre = sucursalesDisponibles[0] || '';
+        setCasaPrincipal(casaPrincipalNombre);
+        
+        // Determinar sucursal inicial para mostrar caja
+        if (usuario) {
+          if (usuario.esAdmin) {
+            // Admin: mostrar casa principal por defecto
+            setSucursalSeleccionadaCaja(casaPrincipalNombre);
+          } else {
+            // Usuario normal: su propia sucursal
+            setSucursalSeleccionadaCaja(usuario.sucursal?.toLowerCase() || '');
+          }
+        }
+      } catch (error) {
+        console.error('Error al cargar sucursales:', error);
+      }
+    };
+    
+    if (usuario) {
+      cargarSucursales();
+    }
+  }, [usuario]);
+  
+  // Cargar monto de caja
+  const cargarMontoCaja = async (sucursal: string) => {
+    if (!sucursal) {
+      console.log('⚠️ No hay sucursal para cargar caja');
+      return;
+    }
+    
+    console.log('📥 Cargando monto de caja para sucursal:', sucursal);
+    setLoadingCaja(true);
+    try {
+      const data = await cajaService.obtenerCaja(sucursal);
+      const montoNuevo = data?.monto_actual || 0;
+      console.log('💵 Monto de caja recibido:', montoNuevo);
+      setMontoCaja(montoNuevo);
+      console.log('✅ Estado de montoCaja actualizado');
+    } catch (error) {
+      console.error('❌ Error al cargar monto de caja:', error);
+      setMontoCaja(0);
+    } finally {
+      setLoadingCaja(false);
+    }
+  };
+  
+  // Efecto para cargar caja cuando cambia la sucursal seleccionada
+  useEffect(() => {
+    if (sucursalSeleccionadaCaja) {
+      cargarMontoCaja(sucursalSeleccionadaCaja);
+      
+      // Actualizar cada 2 minutos
+      const interval = setInterval(() => {
+        cargarMontoCaja(sucursalSeleccionadaCaja);
+      }, 2 * 60 * 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [sucursalSeleccionadaCaja]);
+  
+  // Efecto para recargar caja cuando se dispara actualización desde otros componentes
+  useEffect(() => {
+    if (triggerActualizacion > 0 && sucursalSeleccionadaCaja) {
+      console.log('🔄 Trigger de actualización detectado:', triggerActualizacion);
+      cargarMontoCaja(sucursalSeleccionadaCaja);
+    }
+  }, [triggerActualizacion]);
+
 
   // Obtener color e ícono del método de pago
   const getMetodoPagoColor = (metodo: string): string => {
@@ -376,12 +461,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const handleUserMenuClick = async ({ key }: { key: string }) => {
     switch (key) {
-      case 'profile':
-        navigate('/profile');
-        break;
-      case 'settings':
-        navigate('/settings');
-        break;
       case 'database':
         navigate('/admin/database');
         break;
@@ -396,25 +475,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const esAdministrador = usuario?.email === 'admin@zarparuy.com';
 
   const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Mi Perfil',
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: 'Configuración',
-    },
     // Opción de Base de Datos solo para administrador
     ...(esAdministrador ? [{
       key: 'database',
       icon: <DatabaseOutlined />,
       label: 'Base de Datos',
     }] : []),
-    {
+    ...(esAdministrador ? [{
       type: 'divider' as const,
-    },
+    }] : []),
     {
       key: 'logout',
       icon: <LogoutOutlined />,
@@ -727,7 +796,48 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
           }}
         >
-          <div></div>
+          {/* Caja en el centro del header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Selector de sucursal (solo admin) */}
+            {usuario?.esAdmin && (
+              <Select
+                value={sucursalSeleccionadaCaja}
+                onChange={(value) => setSucursalSeleccionadaCaja(value)}
+                style={{ width: 140 }}
+                size="middle"
+                loading={loadingCaja}
+                options={sucursales.map(s => ({
+                  label: s.toUpperCase(),
+                  value: s
+                }))}
+              />
+            )}
+            
+            {/* Div verde con la caja */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 12,
+              background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(82, 196, 26, 0.2)',
+            }}>
+              <WalletOutlined style={{ fontSize: 20, color: 'white' }} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', lineHeight: 1 }}>
+                  Caja {!usuario?.esAdmin ? sucursalSeleccionadaCaja.toUpperCase() : ''}
+                </Text>
+                <Text strong style={{ fontSize: 16, color: 'white', lineHeight: 1.2 }}>
+                  {loadingCaja ? (
+                    <Spin size="small" style={{ color: 'white' }} />
+                  ) : (
+                    `$${montoCaja.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  )}
+                </Text>
+              </div>
+            </div>
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Dropdown

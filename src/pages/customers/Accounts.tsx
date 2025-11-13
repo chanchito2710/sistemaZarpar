@@ -3,7 +3,7 @@
  * Gestión de clientes deudores con cuenta corriente
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -36,14 +36,16 @@ import {
   UserOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  WalletOutlined
+  WalletOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { cuentaCorrienteService, vendedoresService } from '../../services/api';
+import { cuentaCorrienteService, vendedoresService, cajaService } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCaja } from '../../contexts/CajaContext';
 import './Accounts.css';
 
 const { Title, Text } = Typography;
@@ -76,11 +78,11 @@ interface ProductoVenta {
 
 interface MovimientoCuentaCorriente {
   id: number;
-  tipo: 'venta' | 'pago';
+  tipo: 'venta' | 'pago' | 'ajuste';
   debe: number;
   haber: number;
   saldo: number;
-  descripcion: string;
+  descripcion?: string;
   fecha_movimiento: string;
   venta_id?: number;
   pago_id?: number;
@@ -103,18 +105,22 @@ const Accounts: React.FC = () => {
   const esAdmin = usuario?.esAdmin || false;
   const sucursalUsuario = usuario?.sucursal?.toLowerCase() || '';
   
+  // Contexto de caja para actualizar en tiempo real
+  const { actualizarCaja } = useCaja();
+  
   // Estados principales
   const [clientes, setClientes] = useState<ClienteCuentaCorriente[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingSucursales, setLoadingSucursales] = useState<boolean>(false);
+  const [montoCaja, setMontoCaja] = useState<number>(0);
+  const [loadingCaja, setLoadingCaja] = useState<boolean>(false);
   
   // Filtros
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>(
     esAdmin ? 'todas' : sucursalUsuario
   );
-  const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(null);
-  const [fechaHasta, setFechaHasta] = useState<Dayjs | null>(null);
+  const [busquedaCliente, setBusquedaCliente] = useState<string>('');
   
   // Modal de pago
   const [modalPagoVisible, setModalPagoVisible] = useState<boolean>(false);
@@ -149,13 +155,15 @@ const Accounts: React.FC = () => {
   }, []);
 
   /**
-   * Efecto: cargar clientes cuando cambia sucursal
+   * Efecto: cargar clientes y caja cuando cambia sucursal
    */
   useEffect(() => {
     if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
       cargarClientes();
+      cargarMontoCaja();
     } else if (sucursalSeleccionada === 'todas' && sucursales.length > 0) {
       cargarTodosLosClientes();
+      setMontoCaja(0);
     }
   }, [sucursalSeleccionada, sucursales]);
 
@@ -171,7 +179,7 @@ const Accounts: React.FC = () => {
       // Auto-seleccionar según permisos
       if (esAdmin) {
         // Admin puede ver todas
-      setSucursalSeleccionada('todas');
+        setSucursalSeleccionada('todas');
       } else {
         // Usuario normal solo su sucursal
         setSucursalSeleccionada(sucursalUsuario);
@@ -181,6 +189,27 @@ const Accounts: React.FC = () => {
       message.error('Error al cargar las sucursales');
     } finally {
       setLoadingSucursales(false);
+    }
+  };
+
+  /**
+   * Cargar monto de caja de la sucursal seleccionada
+   */
+  const cargarMontoCaja = async () => {
+    if (!sucursalSeleccionada || sucursalSeleccionada === 'todas') {
+      setMontoCaja(0);
+      return;
+    }
+    
+    setLoadingCaja(true);
+    try {
+      const data = await cajaService.obtenerCaja(sucursalSeleccionada);
+      setMontoCaja(data?.monto_actual || 0);
+    } catch (error) {
+      console.error('❌ Error al cargar monto de caja:', error);
+      setMontoCaja(0);
+    } finally {
+      setLoadingCaja(false);
     }
   };
 
@@ -196,29 +225,13 @@ const Accounts: React.FC = () => {
       const data = await cuentaCorrienteService.obtenerClientesConSaldo(sucursalSeleccionada);
       console.log('📦 Datos recibidos:', data);
       
-      // Filtrar por fechas si están seleccionadas
-      let clientesFiltrados = data;
-      if (fechaDesde || fechaHasta) {
-        clientesFiltrados = data.filter((cliente: ClienteCuentaCorriente) => {
-          const fechaMovimiento = dayjs(cliente.ultimo_movimiento);
-          
-          if (fechaDesde && fechaMovimiento.isBefore(fechaDesde, 'day')) {
-            return false;
-          }
-          if (fechaHasta && fechaMovimiento.isAfter(fechaHasta, 'day')) {
-            return false;
-          }
-          return true;
-        });
-      }
-      
       // Ordenar por fecha de último movimiento (más reciente primero)
-      clientesFiltrados.sort((a: ClienteCuentaCorriente, b: ClienteCuentaCorriente) => {
+      const clientesOrdenados = data.sort((a: ClienteCuentaCorriente, b: ClienteCuentaCorriente) => {
         return dayjs(b.ultimo_movimiento).valueOf() - dayjs(a.ultimo_movimiento).valueOf();
       });
       
-      console.log('✅ Clientes filtrados y ordenados:', clientesFiltrados.length);
-      setClientes(clientesFiltrados);
+      console.log('✅ Clientes ordenados:', clientesOrdenados.length);
+      setClientes(clientesOrdenados);
     } catch (error) {
       console.error('❌ Error al cargar clientes:', error);
       message.error(`Error al cargar los clientes de ${sucursalSeleccionada}`);
@@ -241,21 +254,6 @@ const Accounts: React.FC = () => {
       const resultados = await Promise.all(promesas);
       let todosLosClientes: ClienteCuentaCorriente[] = resultados.flat();
       
-      // Filtrar por fechas si están seleccionadas
-      if (fechaDesde || fechaHasta) {
-        todosLosClientes = todosLosClientes.filter((cliente: ClienteCuentaCorriente) => {
-          const fechaMovimiento = dayjs(cliente.ultimo_movimiento);
-          
-          if (fechaDesde && fechaMovimiento.isBefore(fechaDesde, 'day')) {
-            return false;
-          }
-          if (fechaHasta && fechaMovimiento.isAfter(fechaHasta, 'day')) {
-            return false;
-          }
-          return true;
-        });
-      }
-      
       // Ordenar por fecha de último movimiento (más reciente primero)
       todosLosClientes.sort((a: ClienteCuentaCorriente, b: ClienteCuentaCorriente) => {
         return dayjs(b.ultimo_movimiento).valueOf() - dayjs(a.ultimo_movimiento).valueOf();
@@ -268,26 +266,6 @@ const Accounts: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  /**
-   * Aplicar filtros
-   */
-  const handleAplicarFiltros = () => {
-    if (sucursalSeleccionada === 'todas') {
-      cargarTodosLosClientes();
-    } else {
-      cargarClientes();
-    }
-  };
-
-  /**
-   * Limpiar filtros
-   */
-  const handleLimpiarFiltros = () => {
-    setFechaDesde(null);
-    setFechaHasta(null);
-    setSucursalSeleccionada('todas');
   };
 
   /**
@@ -445,6 +423,17 @@ const Accounts: React.FC = () => {
         await cargarClientes();
       }
       
+      // Actualizar caja si el pago fue en efectivo
+      if (metodoPago === 'efectivo' && sucursalSeleccionada !== 'todas') {
+        console.log('💰 Actualizando monto de caja después de pago en efectivo...');
+        await cargarMontoCaja();
+        
+        // Disparar actualización de caja en el header usando contexto
+        console.log('🔔 Disparando actualización de caja en header');
+        actualizarCaja();
+        console.log('✅ Actualización de caja disparada');
+      }
+      
       // Si el modal de detalle está abierto, recargar también el detalle del cliente
       if (modalDetalleVisible && clienteSeleccionado) {
         console.log('🔄 Actualizando detalle del cliente...');
@@ -481,6 +470,12 @@ const Accounts: React.FC = () => {
       }
       
       console.log('✅ Clientes recargados exitosamente');
+      
+      // Recargar página automáticamente después de 1 segundo para actualizar todo
+      console.log('🔄 Recargando página automáticamente...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
       
     } catch (error) {
       console.error('Error al registrar pago:', error);
@@ -521,7 +516,7 @@ const Accounts: React.FC = () => {
   };
 
   /**
-   * Imprimir estado de cuenta
+   * Imprimir estado de cuenta - DISEÑO MINIMALISTA
    */
   const handleImprimirEstado = (cliente: ClienteCuentaCorriente) => {
     if (!movimientos || movimientos.length === 0) {
@@ -530,352 +525,251 @@ const Accounts: React.FC = () => {
     }
     
     try {
-      // Crear documento PDF
       const doc = new jsPDF();
       const fechaActual = dayjs().format('DD/MM/YYYY HH:mm');
       let yPos = 20;
       
       // ========================================
-      // 1. HEADER ELEGANTE CON DISEÑO CORPORATIVO
+      // 1. HEADER PROFESIONAL
       // ========================================
       
-      // Fondo azul para el header
-      doc.setFillColor(24, 144, 255);
-      doc.rect(0, 0, 210, 45, 'F');
-      
-      // Logo conceptual (círculo con iniciales)
-      doc.setFillColor(255, 255, 255);
-      doc.circle(20, 22, 8, 'F');
-      doc.setTextColor(24, 144, 255);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Z', 17, 25);
-      
-      // Título principal
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.setFont('helvetica', 'bold');
-      doc.text('ZARPAR', 32, 20);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Repuestos de Celulares', 32, 27);
-      
-      // Información de contacto
-      doc.setFontSize(8);
-      doc.text('www.zarparuy.com | contacto@zarparuy.com', 32, 32);
-      
-      // Título del documento (derecha)
+      // Logo y nombre empresa (izquierda)
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text('ESTADO DE CUENTA', 210, 20, { align: 'right' });
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Fecha: ${fechaActual}`, 210, 27, { align: 'right' });
-      
-      // Resetear color de texto
       doc.setTextColor(0, 0, 0);
-      yPos = 55;
+      doc.text('ZARPAR', 14, 18);
       
-      // ========================================
-      // 2. INFORMACIÓN DEL CLIENTE (CAJA CON BORDE)
-      // ========================================
-      
-      // Caja de información
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(14, yPos, 182, 28, 2, 2, 'S');
-      
-      // Título de la sección
-      doc.setFillColor(245, 247, 250);
-      doc.roundedRect(14, yPos, 182, 8, 2, 2, 'F');
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text('INFORMACIÓN DEL CLIENTE', 18, yPos + 5);
+      doc.text('Repuestos de Celulares', 14, 24);
       
-      doc.setTextColor(0, 0, 0);
-      yPos += 13;
-      
-      // Datos del cliente en columnas
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Cliente:', 18, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(cliente.cliente_nombre, 42, yPos);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('Sucursal:', 120, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(cliente.sucursal ? cliente.sucursal.toUpperCase() : 'N/A', 142, yPos);
-      
-      yPos += 8;
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('Cliente ID:', 18, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`#${cliente.cliente_id}`, 42, yPos);
-      
-      // Último movimiento
-      doc.setFont('helvetica', 'bold');
-      doc.text('Último movimiento:', 120, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(dayjs(cliente.ultimo_movimiento).format('DD/MM/YYYY'), 162, yPos);
-      
-      yPos += 15;
-      
-      // ========================================
-      // 3. DETALLE DE MOVIMIENTOS
-      // ========================================
-      
+      // Título documento (derecha)
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('Detalle de Movimientos', 14, yPos);
-      yPos += 8;
+      doc.setTextColor(0, 0, 0);
+      doc.text('ESTADO DE CUENTA', 196, 18, { align: 'right' });
       
-      // Procesar cada movimiento
-      for (let i = 0; i < movimientos.length; i++) {
-        const mov = movimientos[i];
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(fechaActual, 196, 24, { align: 'right' });
+      
+      // Línea separadora elegante
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(14, 28, 196, 28);
+      
+      yPos = 36;
+      
+      // ========================================
+      // 2. INFORMACIÓN DEL CLIENTE
+      // ========================================
+      
+      // Nombre del cliente
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(cliente.cliente_nombre, 14, yPos);
+      
+      // Información adicional en gris
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120, 120, 120);
+      doc.text(`ID: ${cliente.cliente_id}`, 14, yPos + 5);
+      doc.text(`${cliente.sucursal ? cliente.sucursal.toUpperCase() : 'N/A'}`, 60, yPos + 5);
+      doc.text(`Último mov: ${dayjs(cliente.ultimo_movimiento).format('DD/MM/YYYY')}`, 110, yPos + 5);
+      
+      yPos += 12;
+      
+      // ========================================
+      // 3. DETALLE DE MOVIMIENTOS - MINIMALISTA
+      // ========================================
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Detalle de Movimientos', 14, yPos);
+      yPos += 6;
+      
+      // Ordenar movimientos de más viejo a más nuevo
+      const movimientosOrdenados = [...movimientos].sort((a, b) => {
+        return dayjs(a.fecha_movimiento).diff(dayjs(b.fecha_movimiento));
+      });
+      
+      // Filtrar solo ventas y pagos visibles
+      const movimientosFiltrados = movimientosOrdenados.filter(mov => {
+        return mov.tipo === 'venta' || mov.tipo === 'pago';
+      });
+      
+      // Procesar cada movimiento de forma minimalista
+      let saldoAcumulado = 0;
+      
+      for (let i = 0; i < movimientosFiltrados.length; i++) {
+        const mov = movimientosFiltrados[i];
         
         // Verificar si necesitamos nueva página
-        if (yPos > 250) {
+        if (yPos > 265) {
           doc.addPage();
           yPos = 20;
         }
         
+        // Calcular altura del renglón
+        const numProductos = mov.tipo === 'venta' ? (mov.productos?.length || 0) : 0;
+        const alturaReglon = mov.tipo === 'venta' ? 14 + numProductos * 3 : 8;
+        
+        // Color de fondo alternado claro (solo en renglones impares)
+        const esImpar = i % 2 === 1;
+        if (esImpar) {
+          doc.setFillColor(248, 248, 248);
+          doc.rect(14, yPos - 1, 182, alturaReglon, 'F');
+        }
+        
         // ========================================
-        // 3.1 MOVIMIENTO DE VENTA CON DETALLE
+        // VENTA - DISEÑO MINIMALISTA
         // ========================================
         if (mov.tipo === 'venta' && mov.productos && mov.productos.length > 0) {
-          // Encabezado del movimiento
-          doc.setFillColor(245, 247, 250);
-          doc.roundedRect(14, yPos, 182, 8, 1, 1, 'F');
+          // Encabezado simple - CENTRADO VERTICALMENTE
+          yPos += 3;
           
-          doc.setFontSize(10);
+          doc.setFontSize(8);
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(59, 130, 246);
-          doc.text(`📄 ${mov.descripcion}`, 18, yPos + 5);
-          
-          doc.setTextColor(100, 100, 100);
-          doc.setFont('helvetica', 'normal');
-          doc.text(dayjs(mov.fecha_movimiento).format('DD/MM/YYYY HH:mm'), 150, yPos + 5);
-          
           doc.setTextColor(0, 0, 0);
-          yPos += 12;
+          doc.text(`Venta ${mov.descripcion}`, 16, yPos);
           
-          // Tabla de productos
-          const productosData = mov.productos.map((prod: ProductoVenta) => [
-            prod.cantidad.toString(),
-            `${prod.producto_nombre}\n${prod.producto_marca} | ${prod.producto_tipo}`,
-            `$${parseFloat(String(prod.precio_unitario || 0)).toFixed(2)}`,
-            `$${parseFloat(String(prod.subtotal || 0)).toFixed(2)}`
-          ]);
-          
-          autoTable(doc, {
-            startY: yPos,
-            head: [['Cant.', 'Producto', 'P. Unit.', 'Subtotal']],
-            body: productosData,
-            theme: 'plain',
-            headStyles: {
-              fillColor: [255, 255, 255],
-              textColor: [100, 100, 100],
-              fontSize: 8,
-              fontStyle: 'bold',
-              lineWidth: 0.1,
-              lineColor: [200, 200, 200]
-            },
-            bodyStyles: {
-              fontSize: 8,
-              cellPadding: 2
-            },
-            columnStyles: {
-              0: { cellWidth: 15, halign: 'center' },
-              1: { cellWidth: 110 },
-              2: { cellWidth: 27, halign: 'right' },
-              3: { cellWidth: 27, halign: 'right', fontStyle: 'bold' }
-            },
-            margin: { left: 18, right: 18 },
-            styles: {
-              overflow: 'linebreak',
-              cellWidth: 'wrap'
-            }
-          });
-          
-          yPos = (doc as any).lastAutoTable.finalY + 3;
-          
-          // Subtotal, descuento y total de la venta
-          const subtotalVenta = parseFloat(String(mov.subtotal_venta || 0));
-          const descuentoVenta = parseFloat(String(mov.descuento_venta || 0));
-          const totalVenta = parseFloat(String(mov.total_venta || 0));
-          
-          // Línea separadora
-          doc.setDrawColor(230, 230, 230);
-          doc.line(18, yPos, 192, yPos);
-          yPos += 5;
-          
-          // Resumen financiero
-          doc.setFontSize(9);
-          
-          // Subtotal
           doc.setFont('helvetica', 'normal');
-          doc.text('Subtotal:', 140, yPos);
-          doc.text(`$${subtotalVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
-          yPos += 5;
+          doc.setFontSize(6);
+          doc.setTextColor(120, 120, 120);
+          doc.text(dayjs(mov.fecha_movimiento).format('DD/MM/YYYY'), 115, yPos);
           
-          // Descuento (si existe)
-          if (descuentoVenta > 0) {
-            doc.setTextColor(245, 34, 45);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Descuento:', 140, yPos);
-            doc.text(`-$${descuentoVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
-            doc.setTextColor(0, 0, 0);
-            yPos += 5;
+          yPos += 3;
+          
+          // Lista de productos - COMPACTA
+          doc.setFontSize(6);
+          doc.setTextColor(60, 60, 60);
+          for (const prod of mov.productos) {
+            const cantidad = prod.cantidad;
+            const nombre = `${prod.producto_nombre}`;
+            const precio = `($${parseFloat(String(prod.precio_unitario || 0)).toFixed(2)})`;
+            const subtotal = `$${parseFloat(String(prod.subtotal || 0)).toFixed(2)}`;
+            
+            doc.text(`${cantidad}x ${nombre} ${precio}`, 20, yPos);
+          doc.setFont('helvetica', 'bold');
+            doc.text(subtotal, 194, yPos, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+            yPos += 3;
           }
           
-          // Total
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.text('TOTAL:', 140, yPos);
-          doc.setTextColor(59, 130, 246);
-          doc.text(`$${totalVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
-          doc.setTextColor(0, 0, 0);
-          yPos += 5;
+          // Cálculos
+            const subtotalVenta = parseFloat(String(mov.subtotal_venta || 0));
+            const descuentoVenta = parseFloat(String(mov.descuento_venta || 0));
+          const totalVenta = parseFloat(String(mov.total_venta || 0));
           
-          // Saldo acumulado
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(100, 100, 100);
-          doc.text('Saldo:', 140, yPos);
-          const saldoVenta = parseFloat(String(mov.saldo || 0));
-          const colorSaldo = saldoVenta > 0 ? [245, 34, 45] : [82, 196, 26];
-          doc.setTextColor(colorSaldo[0], colorSaldo[1], colorSaldo[2]);
-          doc.text(`$${saldoVenta.toFixed(2)}`, 192, yPos, { align: 'right' });
-          doc.setTextColor(0, 0, 0);
+          yPos += 1;
           
-          yPos += 12;
+          // Subtotal y descuento
+          doc.setFontSize(6);
+            doc.setTextColor(120, 120, 120);
+          doc.text('Subtotal:', 155, yPos);
+          doc.text(`$${subtotalVenta.toFixed(2)}`, 194, yPos, { align: 'right' });
+            
+            if (descuentoVenta > 0) {
+            yPos += 3;
+            doc.text('Desc:', 155, yPos);
+            doc.text(`-$${descuentoVenta.toFixed(2)}`, 194, yPos, { align: 'right' });
+          }
+          
+          yPos += 3;
+          
+          // Total en rojo
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(220, 38, 38);
+          doc.text('Saldo:', 155, yPos);
+          doc.text(`$${totalVenta.toFixed(2)}`, 194, yPos, { align: 'right' });
+          
+          saldoAcumulado += totalVenta;
+          
+          doc.setTextColor(0, 0, 0);
+          yPos += 3;
           
         } else if (mov.tipo === 'pago') {
           // ========================================
-          // 3.2 MOVIMIENTO DE PAGO
+          // PAGO - DISEÑO MINIMALISTA
           // ========================================
           
-          doc.setFillColor(240, 255, 244);
-          doc.roundedRect(14, yPos, 182, 12, 1, 1, 'F');
+          // Centrado vertical
+          yPos += 3;
           
-          doc.setFontSize(10);
+          doc.setFontSize(8);
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(82, 196, 26);
-          doc.text('💰 PAGO RECIBIDO', 18, yPos + 5);
+          doc.setTextColor(0, 0, 0);
+          doc.text('PAGO RECIBIDO', 16, yPos);
           
-          doc.setTextColor(100, 100, 100);
           doc.setFont('helvetica', 'normal');
-          doc.text(dayjs(mov.fecha_movimiento).format('DD/MM/YYYY HH:mm'), 150, yPos + 5);
+          doc.setFontSize(6);
+          doc.setTextColor(120, 120, 120);
+          doc.text(dayjs(mov.fecha_movimiento).format('DD/MM/YYYY'), 115, yPos);
           
-          doc.setTextColor(0, 0, 0);
-          doc.setFontSize(9);
           const montoPago = parseFloat(String(mov.haber || 0));
-          doc.text(`Monto: $${montoPago.toFixed(2)}`, 18, yPos + 10);
+          saldoAcumulado -= montoPago;
           
-          if (mov.comprobante) {
-            doc.text(`Comprobante: ${mov.comprobante}`, 80, yPos + 10);
-          }
-          
+          // Monto en verde - alineado
+          doc.setFontSize(7);
           doc.setFont('helvetica', 'bold');
-          doc.text('Saldo:', 150, yPos + 10);
-          const saldoPago = parseFloat(String(mov.saldo || 0));
-          const colorSaldoPago = saldoPago > 0 ? [245, 34, 45] : [82, 196, 26];
-          doc.setTextColor(colorSaldoPago[0], colorSaldoPago[1], colorSaldoPago[2]);
-          doc.text(`$${saldoPago.toFixed(2)}`, 192, yPos + 10, { align: 'right' });
-          doc.setTextColor(0, 0, 0);
+          doc.setTextColor(34, 197, 94);
+          doc.text('Saldo:', 155, yPos);
+          doc.text(`-$${montoPago.toFixed(2)}`, 194, yPos, { align: 'right' });
           
-          yPos += 18;
+          doc.setTextColor(0, 0, 0);
+          yPos += 3;
         }
         
-        // Línea separadora entre movimientos
-        if (i < movimientos.length - 1) {
-          doc.setDrawColor(220, 220, 220);
-          doc.setLineDash([2, 2]);
+        // Línea separadora muy fina
+        if (i < movimientosFiltrados.length - 1) {
+          doc.setDrawColor(235, 235, 235);
+          doc.setLineWidth(0.1);
           doc.line(14, yPos, 196, yPos);
-          doc.setLineDash([]);
-          yPos += 8;
+          yPos += 2;
         }
       }
       
       // ========================================
-      // 4. RESUMEN FINAL
+      // 4. RESUMEN FINAL PROFESIONAL
       // ========================================
       
-      // Verificar espacio para el resumen
-      if (yPos > 230) {
-        doc.addPage();
-        yPos = 20;
-      }
+      yPos += 8;
       
-      yPos += 10;
+      // Línea separadora doble
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.line(14, yPos, 196, yPos);
+      doc.setLineWidth(0.1);
+      doc.line(14, yPos + 1, 196, yPos + 1);
       
-      // Caja de resumen final
-      doc.setFillColor(24, 144, 255);
-      doc.roundedRect(14, yPos, 182, 35, 2, 2, 'F');
+      yPos += 7;
       
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
+      // Resumen elegante
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text('RESUMEN DE CUENTA', 105, yPos + 10, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+      const saldoActual = Number(cliente.saldo_actual) || 0;
+      doc.text('SALDO ACTUAL:', 14, yPos);
       
-      // Total debe
+      // Color según el saldo
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Total Debe:', 30, yPos + 20);
-      const totalDebe = parseFloat(String(cliente.total_debe || 0));
-      doc.text(`$${totalDebe.toFixed(2)}`, 80, yPos + 20, { align: 'right' });
-      
-      // Total haber
-      doc.text('Total Haber:', 110, yPos + 20);
-      const totalHaber = parseFloat(String(cliente.total_haber || 0));
-      doc.text(`$${totalHaber.toFixed(2)}`, 160, yPos + 20, { align: 'right' });
-      
-      // Saldo final
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('SALDO ACTUAL:', 30, yPos + 30);
-      
-      const saldoActual = parseFloat(cliente.saldo_actual || 0);
-      const textoSaldo = saldoActual > 0 ? `$${saldoActual.toFixed(2)} (DEBE)` : saldoActual < 0 ? `$${Math.abs(saldoActual).toFixed(2)} (A FAVOR)` : '$0.00';
-      doc.text(textoSaldo, 185, yPos + 30, { align: 'right' });
-      
-      // ========================================
-      // 5. FOOTER PROFESIONAL
-      // ========================================
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        
-        // Línea superior del footer
-        doc.setDrawColor(24, 144, 255);
-        doc.setLineWidth(0.5);
-        doc.line(14, 280, 196, 280);
-        
-        // Texto del footer
-        doc.setFontSize(8);
-        doc.setTextColor(120, 120, 120);
-        doc.setFont('helvetica', 'normal');
-        doc.text(
-          'Este documento es un estado de cuenta generado automáticamente por Sistema ZARPAR.',
-          105,
-          285,
-          { align: 'center' }
-        );
-        doc.text(
-          `Página ${i} de ${pageCount} | Generado el ${fechaActual}`,
-          105,
-          290,
-          { align: 'center' }
-        );
+      if (saldoActual > 0) {
+        doc.setTextColor(220, 38, 38); // Rojo
+        doc.text(`$${saldoActual.toFixed(2)}`, 194, yPos, { align: 'right' });
+      } else if (saldoActual < 0) {
+        doc.setTextColor(34, 197, 94); // Verde
+        doc.text(`$${Math.abs(saldoActual).toFixed(2)} (a favor)`, 194, yPos, { align: 'right' });
+      } else {
+        doc.setTextColor(120, 120, 120); // Gris
+        doc.text('$0.00', 194, yPos, { align: 'right' });
       }
       
       // ========================================
-      // 6. GUARDAR PDF CON NOMBRE PERSONALIZADO
+      // 5. GUARDAR PDF CON NOMBRE PERSONALIZADO
       // ========================================
       const nombreCliente = cliente.cliente_nombre.replace(/\s+/g, '_');
       const fechaDescarga = dayjs().format('DD-MM-YYYY');
@@ -1069,29 +963,37 @@ const Accounts: React.FC = () => {
                     border: '1px solid #e0e0e0',
                   }}
                 >
-                  <Row justify="space-between">
+                  <Row justify="space-between" align="middle">
                     <Col span={18}>
-                      <Text strong style={{ fontSize: '12px', display: 'block' }}>
-                        {producto.producto_nombre}
+                      <Space size={4} wrap={false} style={{ flexWrap: 'nowrap' }}>
+                    <Text strong style={{ fontSize: '11px' }}>
+                      {producto.producto_nombre}
+                    </Text>
+                    {producto.producto_tipo && (
+                          <>
+                            <Text type="secondary" style={{ fontSize: '10px' }}>•</Text>
+                      <Text style={{ fontSize: '10px', color: '#1890ff' }}>
+                              {producto.producto_tipo}
                       </Text>
-                      {producto.producto_tipo && (
-                        <Text style={{ fontSize: '10px', color: '#1890ff', display: 'block' }}>
-                          {producto.producto_tipo}
-                        </Text>
-                      )}
-                      {producto.producto_marca && (
-                        <Text type="secondary" style={{ fontSize: '10px', display: 'block' }}>
-                          {producto.producto_marca}
-                        </Text>
-                      )}
+                          </>
+                    )}
+                    {producto.producto_marca && (
+                          <>
+                            <Text type="secondary" style={{ fontSize: '10px' }}>•</Text>
                       <Text type="secondary" style={{ fontSize: '10px' }}>
-                        {producto.cantidad} x ${parseFloat(producto.precio_unitario || 0).toFixed(2)}
+                              {producto.producto_marca}
                       </Text>
+                          </>
+                    )}
+                    <Text type="secondary" style={{ fontSize: '10px' }}>
+                          ({producto.cantidad} x ${parseFloat(producto.precio_unitario || 0).toFixed(2)})
+                    </Text>
+                  </Space>
                     </Col>
                     <Col span={6} style={{ textAlign: 'right' }}>
-                      <Text strong style={{ fontSize: '12px', color: '#52c41a' }}>
-                        ${parseFloat(producto.subtotal || 0).toFixed(2)}
-                      </Text>
+                  <Text strong style={{ fontSize: '11px', color: '#52c41a' }}>
+                    ${parseFloat(producto.subtotal || 0).toFixed(2)}
+                  </Text>
                     </Col>
                   </Row>
                 </div>
@@ -1175,10 +1077,24 @@ const Accounts: React.FC = () => {
   ];
 
   /**
-   * Calcular estadísticas
+   * Filtrar clientes por búsqueda
    */
-  const totalDeudores = clientes.length;
-  const deudaTotal = clientes.reduce((sum, c) => sum + parseFloat(c.saldo_actual as any || '0'), 0);
+  const clientesFiltrados = useMemo(() => {
+    if (!busquedaCliente.trim()) {
+      return clientes;
+    }
+    
+    const busquedaLower = busquedaCliente.toLowerCase().trim();
+    return clientes.filter((cliente) => 
+      cliente.cliente_nombre.toLowerCase().includes(busquedaLower)
+    );
+  }, [clientes, busquedaCliente]);
+
+  /**
+   * Calcular estadísticas (basadas en clientes filtrados)
+   */
+  const totalDeudores = clientesFiltrados.length;
+  const deudaTotal = clientesFiltrados.reduce((sum, c) => sum + parseFloat(c.saldo_actual as any || '0'), 0);
   const deudaPromedio = totalDeudores > 0 ? deudaTotal / totalDeudores : 0;
 
   return (
@@ -1209,7 +1125,13 @@ const Accounts: React.FC = () => {
                 type="primary"
                 size="large"
                 icon={<ReloadOutlined />}
-                onClick={handleAplicarFiltros}
+                onClick={() => {
+                  if (sucursalSeleccionada === 'todas') {
+                    cargarTodosLosClientes();
+                  } else {
+                    cargarClientes();
+                  }
+                }}
                 loading={loading}
               >
                 Actualizar
@@ -1243,13 +1165,13 @@ const Accounts: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={8}>
-          <Card size="small">
+          <Card size="small" loading={loadingCaja}>
             <Statistic
-              title="Deuda Promedio"
-              value={deudaPromedio}
+              title={`Caja ${sucursalSeleccionada !== 'todas' ? sucursalSeleccionada.toUpperCase() : ''}`}
+              value={montoCaja}
               precision={2}
               prefix="$"
-              valueStyle={{ color: '#fa8c16' }}
+              valueStyle={{ color: '#52c41a' }}
             />
           </Card>
         </Col>
@@ -1285,36 +1207,17 @@ const Accounts: React.FC = () => {
               </Select>
             </Space>
           </Col>
-          <Col xs={24} sm={10}>
+          <Col xs={24} sm={16}>
             <Space direction="vertical" size={0} style={{ width: '100%' }}>
-              <Text strong>Rango de Fechas (Último Movimiento)</Text>
-              <RangePicker
-                value={[fechaDesde, fechaHasta]}
-                onChange={(dates) => {
-                  setFechaDesde(dates ? dates[0] : null);
-                  setFechaHasta(dates ? dates[1] : null);
-                }}
+              <Text strong>🔍 Buscar Cliente</Text>
+              <Input
+                placeholder="Buscar por nombre de cliente..."
+                value={busquedaCliente}
+                onChange={(e) => setBusquedaCliente(e.target.value)}
+                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                allowClear
                 style={{ width: '100%' }}
-                format="DD/MM/YYYY"
-                placeholder={['Desde', 'Hasta']}
               />
-            </Space>
-          </Col>
-          <Col xs={24} sm={6}>
-            <Space style={{ marginTop: 20 }}>
-              <Button
-                type="primary"
-                icon={<CalendarOutlined />}
-                onClick={handleAplicarFiltros}
-                loading={loading}
-              >
-                Aplicar Filtros
-              </Button>
-              <Button
-                onClick={handleLimpiarFiltros}
-              >
-                Limpiar
-              </Button>
             </Space>
           </Col>
         </Row>
@@ -1322,11 +1225,13 @@ const Accounts: React.FC = () => {
 
       {/* Tabla de clientes */}
       <Card>
-        {!loading && clientes.length === 0 && (
+        {!loading && clientesFiltrados.length === 0 && (
           <Alert
-            message="No hay clientes con saldo pendiente"
+            message={busquedaCliente.trim() ? "No se encontraron resultados" : "No hay clientes con saldo pendiente"}
             description={
-              sucursalSeleccionada === 'todas'
+              busquedaCliente.trim()
+                ? `No se encontraron clientes que coincidan con "${busquedaCliente}"`
+                : sucursalSeleccionada === 'todas'
                 ? 'No se encontraron clientes con deuda en ninguna sucursal'
                 : `No se encontraron clientes con deuda en la sucursal ${sucursalSeleccionada?.toUpperCase()}`
             }
@@ -1337,7 +1242,7 @@ const Accounts: React.FC = () => {
         )}
         <Table
           columns={columns}
-          dataSource={clientes}
+          dataSource={clientesFiltrados}
           loading={loading}
           rowKey={(record) => `${record.sucursal}-${record.cliente_id}`}
           size="small"
@@ -1606,7 +1511,7 @@ const Accounts: React.FC = () => {
                     </Text>
                     <Text>
                       <DollarOutlined style={{ marginRight: 8 }} />
-                      Monto: ${parseFloat(movimientos[0].haber || 0).toFixed(2)}
+                      Monto: ${Number(movimientos[0].haber || 0).toFixed(2)}
                     </Text>
                     <Text>
                       {movimientos[0].descripcion}

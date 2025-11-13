@@ -42,7 +42,8 @@ import {
   SettingOutlined,
   ThunderboltOutlined,
   RocketOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  InboxOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth } from '../../contexts/AuthContext';
@@ -127,10 +128,29 @@ const Products: React.FC = () => {
   const [modalStockVisible, setModalStockVisible] = useState(false);
   const [modalAgregarMarca, setModalAgregarMarca] = useState(false);
   const [modalGestionarPrecios, setModalGestionarPrecios] = useState(false);
+  const [modalEditarPrecios, setModalEditarPrecios] = useState(false);
+  const [modalGestionarStock, setModalGestionarStock] = useState(false);
+  const [modalEditarStock, setModalEditarStock] = useState(false);
   
   // Estados para filtros del modal de gestión
   const [busquedaModalGestion, setBusquedaModalGestion] = useState('');
   const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
+  const [marcaFiltroModalGestion, setMarcaFiltroModalGestion] = useState<string>('todas');
+  
+  // Estados para filtros del modal de gestión de stock
+  const [busquedaModalGestionStock, setBusquedaModalGestionStock] = useState('');
+  const [tipoFiltroModalGestionStock, setTipoFiltroModalGestionStock] = useState<string>('todos');
+  const [marcaFiltroModalGestionStock, setMarcaFiltroModalGestionStock] = useState<string>('todas');
+  
+  // Estado para producto seleccionado para editar precios
+  const [productoEditandoPrecios, setProductoEditandoPrecios] = useState<ProductoCompleto | null>(null);
+  const [preciosPorSucursal, setPreciosPorSucursal] = useState<{ [key: string]: number }>({});
+  
+  // Estado para producto seleccionado para editar stock
+  const [productoEditandoStock, setProductoEditandoStock] = useState<ProductoCompleto | null>(null);
+  const [stockPorSucursal, setStockPorSucursal] = useState<{ [key: string]: number }>({});
+  const [productosConSucursales, setProductosConSucursales] = useState<ProductoCompleto[]>([]);
+  const [loadingProductosConSucursales, setLoadingProductosConSucursales] = useState(false);
   const [modalAgregarTipo, setModalAgregarTipo] = useState(false);
   const [modalAgregarCalidad, setModalAgregarCalidad] = useState(false);
   const [modalGestionarCalidades, setModalGestionarCalidades] = useState(false);
@@ -217,48 +237,99 @@ const Products: React.FC = () => {
   };
 
   /**
-   * Cargar marcas disponibles
+   * Cargar productos con información de TODAS las sucursales
+   * Se usa para el modal "Gestionar Stock" que necesita calcular stock total
+   */
+  const cargarProductosConSucursales = async () => {
+    setLoadingProductosConSucursales(true);
+    try {
+      const data = await productosService.obtenerConSucursales();
+      // Ordenar productos por tipo
+      const datosOrdenados = [...data].sort((a, b) => {
+        const ordenA = obtenerOrdenTipo(a.tipo);
+        const ordenB = obtenerOrdenTipo(b.tipo);
+        if (ordenA !== ordenB) {
+          return ordenA - ordenB;
+        }
+        return a.nombre.localeCompare(b.nombre);
+      });
+      setProductosConSucursales(datosOrdenados);
+      console.log(`✅ ${datosOrdenados.length} productos cargados con todas las sucursales`);
+    } catch (error) {
+      console.error('Error al cargar productos con sucursales:', error);
+      message.error('Error al cargar productos');
+    } finally {
+      setLoadingProductosConSucursales(false);
+    }
+  };
+
+  /**
+   * Cargar marcas disponibles desde la base de datos
    */
   const cargarMarcas = async () => {
     setLoadingMarcas(true);
     try {
       const data = await productosService.obtenerCategorias('marca');
-      setMarcas(data);
+      console.log('✅ Marcas cargadas desde BD:', data);
+      // Validar que sea un array válido
+      if (Array.isArray(data)) {
+        setMarcas(data);
+      } else {
+        console.error('❌ Marcas no es un array:', data);
+        setMarcas([]);
+      }
     } catch (error) {
-      console.error('Error al cargar marcas:', error);
-      message.error('Error al cargar marcas');
+      console.error('❌ Error al cargar marcas:', error);
+      message.error('Error al cargar marcas desde la base de datos');
+      setMarcas([]); // Array vacío en caso de error
     } finally {
       setLoadingMarcas(false);
     }
   };
 
   /**
-   * Cargar tipos disponibles
+   * Cargar tipos disponibles desde la base de datos
    */
   const cargarTipos = async () => {
     setLoadingTipos(true);
     try {
       const data = await productosService.obtenerCategorias('tipo');
-      setTipos(data);
+      console.log('✅ Tipos cargados desde BD:', data);
+      // Validar que sea un array válido
+      if (Array.isArray(data)) {
+        setTipos(data);
+      } else {
+        console.error('❌ Tipos no es un array:', data);
+        setTipos([]);
+      }
     } catch (error) {
-      console.error('Error al cargar tipos:', error);
-      message.error('Error al cargar tipos');
+      console.error('❌ Error al cargar tipos:', error);
+      message.error('Error al cargar tipos desde la base de datos');
+      setTipos([]); // Array vacío en caso de error
     } finally {
       setLoadingTipos(false);
     }
   };
 
   /**
-   * Cargar calidades disponibles
+   * Cargar calidades disponibles desde la base de datos
    */
   const cargarCalidades = async () => {
     setLoadingCalidades(true);
     try {
       const data = await productosService.obtenerCategorias('calidad');
-      setCalidades(data);
+      console.log('✅ Calidades cargadas desde BD:', data);
+      // Validar que sea un array válido
+      if (Array.isArray(data)) {
+        setCalidades(data);
+      } else {
+        console.error('❌ Calidades no es un array:', data);
+        setCalidades([]);
+      }
     } catch (error) {
-      console.error('Error al cargar calidades:', error);
-      message.error('Error al cargar calidades');
+      console.error('❌ Error al cargar calidades:', error);
+      message.error('Error al cargar calidades desde la base de datos');
+      setCalidades([]); // Array vacío en caso de error
     } finally {
       setLoadingCalidades(false);
     }
@@ -444,13 +515,20 @@ const Products: React.FC = () => {
         codigo_barras: values.codigo_barras || undefined
       };
 
+      console.log('📦 Creando producto:', nuevoProducto);
       await productosService.crear(nuevoProducto);
-      message.success('Producto creado exitosamente');
+      message.success('✅ Producto creado exitosamente en todas las sucursales');
       setModalCrearVisible(false);
       formCrear.resetFields();
-      cargarProductos();
+      
+      // Pequeño delay para asegurar que la BD terminó de procesar
+      console.log('⏳ Esperando 500ms antes de recargar productos...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('🔄 Recargando productos de sucursal:', sucursalSeleccionada);
+      await cargarProductos();
     } catch (error) {
-      console.error('Error al crear producto:', error);
+      console.error('❌ Error al crear producto:', error);
       message.error('Error al crear producto');
     }
   };
@@ -714,8 +792,14 @@ const Products: React.FC = () => {
       title: 'Marca',
       dataIndex: 'marca',
       key: 'marca',
-      width: 120,
-      filters: marcas.map(m => ({ text: m.valor, value: m.valor })),
+      width: 100,
+      responsive: ['sm'] as any,
+      filters: Array.isArray(marcas) && marcas.length > 0 
+        ? marcas.map(m => ({ 
+            text: m?.valor || 'Sin marca', 
+            value: m?.valor || '' 
+          }))
+        : [],
       onFilter: (value, record) => record.marca === value,
       render: (marca: string) => marca ? <Text>{marca}</Text> : <Text type="secondary">-</Text>
     },
@@ -723,16 +807,21 @@ const Products: React.FC = () => {
       title: 'Tipo',
       dataIndex: 'tipo',
       key: 'tipo',
-      width: 120,
-      filters: tipos.map(t => ({ text: t.valor, value: t.valor })),
+      width: 100,
+      filters: Array.isArray(tipos) && tipos.length > 0 
+        ? tipos.map(t => ({ 
+            text: t?.valor || 'Sin tipo', 
+            value: t?.valor || '' 
+          }))
+        : [],
       onFilter: (value, record) => record.tipo === value,
       sorter: (a, b) => {
-        const ordenA = obtenerOrdenTipo(a.tipo);
-        const ordenB = obtenerOrdenTipo(b.tipo);
+        const ordenA = obtenerOrdenTipo(a.tipo || '');
+        const ordenB = obtenerOrdenTipo(b.tipo || '');
         if (ordenA !== ordenB) {
           return ordenA - ordenB;
         }
-        return a.nombre.localeCompare(b.nombre);
+        return (a.nombre || '').localeCompare(b.nombre || '');
       },
       defaultSortOrder: 'ascend' as const,
       render: (tipo: string) => {
@@ -752,8 +841,14 @@ const Products: React.FC = () => {
       title: 'Calidad',
       dataIndex: 'calidad',
       key: 'calidad',
-      width: 120,
-      filters: calidades.map(c => ({ text: c.valor, value: c.valor })),
+      width: 100,
+      responsive: ['md'] as any,
+      filters: Array.isArray(calidades) && calidades.length > 0 
+        ? calidades.map(c => ({ 
+            text: c?.valor || 'Sin calidad', 
+            value: c?.valor || '' 
+          }))
+        : [],
       onFilter: (value, record) => record.calidad === value,
       render: (calidad: string) => {
         const color = {
@@ -772,7 +867,7 @@ const Products: React.FC = () => {
       title: 'Stock',
       dataIndex: 'stock',
       key: 'stock',
-      width: 120,
+      width: 100,
       align: 'center',
       sorter: (a, b) => (a.stock || 0) - (b.stock || 0),
       render: (stock: number, record: ProductoCompleto) => {
@@ -783,7 +878,7 @@ const Products: React.FC = () => {
             offset={[10, 0]}
           >
             <Tag color={esBajo ? 'red' : stock > 50 ? 'green' : 'orange'}>
-              {stock || 0} uds
+              {stock || 0}
             </Tag>
           </Badge>
         );
@@ -793,14 +888,14 @@ const Products: React.FC = () => {
       title: 'Precio',
       dataIndex: 'precio',
       key: 'precio',
-      width: 120,
+      width: 100,
       align: 'right',
       sorter: (a, b) => (a.precio || 0) - (b.precio || 0),
       render: (precio: number) => {
         const precioNum = Number(precio) || 0;
         return (
           <Text strong style={{ color: '#52c41a' }}>
-            ${precioNum.toFixed(2)}
+            ${precioNum.toFixed(0)}
           </Text>
         );
       }
@@ -809,8 +904,9 @@ const Products: React.FC = () => {
       title: 'Stock Mín.',
       dataIndex: 'stock_minimo',
       key: 'stock_minimo',
-      width: 100,
+      width: 90,
       align: 'center',
+      responsive: ['lg'] as any,
       render: (stock_minimo: number) => (
         <Text type="secondary">{stock_minimo || 0}</Text>
       )
@@ -819,7 +915,8 @@ const Products: React.FC = () => {
       title: 'Código',
       dataIndex: 'codigo_barras',
       key: 'codigo_barras',
-      width: 140,
+      width: 130,
+      responsive: ['xl'] as any,
       render: (codigo: string) => codigo ? (
         <Tooltip title="Código de barras">
           <Space>
@@ -976,17 +1073,32 @@ const Products: React.FC = () => {
                   )}
                 </>
               )}
+              
+              {/* 📦 Botón Gestionar Stock */}
               <Button
-          icon={<ReloadOutlined />} 
+                icon={<InboxOutlined />}
                 onClick={() => {
-                  cargarSucursales();
-                  cargarProductos();
+                  // Limpiar filtros al abrir el modal
+                  setBusquedaModalGestionStock('');
+                  setTipoFiltroModalGestionStock('todos');
+                  setMarcaFiltroModalGestionStock('todas');
+                  // Cargar productos con información de todas las sucursales
+                  cargarProductosConSucursales();
+                  setModalGestionarStock(true);
                 }}
                 size="large"
-                loading={loadingSucursales || loading}
-        >
-          Actualizar
-        </Button>
+                style={{
+                  background: 'linear-gradient(135deg, #ffb3d9 0%, #ff85c0 100%)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 12px rgba(255, 133, 192, 0.4)',
+                  transition: 'all 0.3s ease'
+                }}
+                className="stock-management-btn"
+              >
+                Gestionar Stock
+              </Button>
             </Space>
           </Col>
         </Row>
@@ -1086,114 +1198,174 @@ const Products: React.FC = () => {
             showTotal: (total) => `Total: ${total} productos`,
             pageSizeOptions: ['10', '20', '50', '100']
             }}
-            scroll={{ x: 1400 }}
           />
         </Card>
 
-      {/* Modal: Crear Producto */}
-        <Modal
-        title="Crear Nuevo Producto"
+      {/* 🎯 Modal: Crear Producto - Diseño Minimalista */}
+      <Modal
+        title={
+          <Space>
+            <PlusOutlined style={{ color: '#52c41a', fontSize: 20 }} />
+            <span style={{ fontSize: 18, fontWeight: 600 }}>Crear Nuevo Producto</span>
+          </Space>
+        }
         open={modalCrearVisible}
         onOk={handleCrearProducto}
         onCancel={() => {
           setModalCrearVisible(false);
           formCrear.resetFields();
         }}
-        okText="Crear Producto"
-          cancelText="Cancelar"
-        width={600}
+        okText="💾 Crear Producto"
+        cancelText="Cancelar"
+        width={700}
+        okButtonProps={{
+          size: 'large',
+          style: { background: 'linear-gradient(135deg, #52c41a 0%, #73d13d 100%)', border: 'none' }
+        }}
+        cancelButtonProps={{ size: 'large' }}
       >
-        <Form form={formCrear} layout="vertical">
-                <Form.Item
-                  label="Nombre del Producto"
-            name="nombre"
-                  rules={[{ required: true, message: 'Por favor ingresa el nombre del producto' }]}
-                >
-            <Input placeholder="Iphone 17 pro max" />
-                </Form.Item>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          {/* Info Card */}
+          <Card size="small" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+            <Space>
+              <TagOutlined style={{ color: '#52c41a' }} />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                El producto se creará en <Text strong>TODAS las sucursales</Text> con stock inicial de 100 unidades
+              </Text>
+            </Space>
+          </Card>
 
-            <Row gutter={16}>
-              <Col span={12}>
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ marginBottom: 8 }}>Marca</div>
-                <Space.Compact style={{ width: '100%' }}>
+          <Form form={formCrear} layout="vertical">
+            {/* Nombre del Producto */}
+            <Form.Item
+              label={<Text strong>📦 Nombre del Producto</Text>}
+              name="nombre"
+              rules={[{ required: true, message: 'El nombre es obligatorio' }]}
+            >
+              <Input 
+                placeholder="Ej: iPhone 15 Display" 
+                size="large"
+                prefix={<TagOutlined style={{ color: '#bfbfbf' }} />}
+              />
+            </Form.Item>
+
+            <Row gutter={[16, 16]}>
+              {/* Marca */}
+              <Col xs={24} sm={12}>
+                <Text strong>🏷️ Marca</Text>
+                <Space.Compact style={{ width: '100%', marginTop: 8 }}>
                   <Form.Item name="marca" noStyle>
                     <Select
-                      placeholder="Iphone"
+                      placeholder="Selecciona marca"
                       loading={loadingMarcas}
                       showSearch
                       allowClear
+                      size="large"
                       style={{ flex: 1 }}
-                      options={marcas.map(m => ({ label: m, value: m }))}
+                      options={Array.isArray(marcas) ? marcas.map(m => ({ 
+                        label: m?.valor || 'Sin marca', 
+                        value: m?.valor || '' 
+                      })) : []}
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                     />
-                </Form.Item>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => setModalAgregarMarca(true)}
-                  />
+                  </Form.Item>
+                  <Tooltip title="Agregar nueva marca">
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => setModalAgregarMarca(true)}
+                      size="large"
+                    />
+                  </Tooltip>
                 </Space.Compact>
-              </div>
-            </Col>
-            <Col span={12}>
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ marginBottom: 8 }}>Tipo</div>
-                <Space.Compact style={{ width: '100%' }}>
+              </Col>
+
+              {/* Tipo */}
+              <Col xs={24} sm={12}>
+                <Text strong>🔧 Tipo</Text>
+                <Space.Compact style={{ width: '100%', marginTop: 8 }}>
                   <Form.Item name="tipo" noStyle>
                     <Select
-                      placeholder="Display"
+                      placeholder="Selecciona tipo"
                       loading={loadingTipos}
                       showSearch
                       allowClear
+                      size="large"
                       style={{ flex: 1 }}
-                      options={tipos.map(t => ({ label: t, value: t }))}
+                      options={Array.isArray(tipos) ? tipos.map(t => ({ 
+                        label: t?.valor || 'Sin tipo', 
+                        value: t?.valor || '' 
+                      })) : []}
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                     />
                   </Form.Item>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => setModalAgregarTipo(true)}
-                  />
+                  <Tooltip title="Agregar nuevo tipo">
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => setModalAgregarTipo(true)}
+                      size="large"
+                    />
+                  </Tooltip>
                 </Space.Compact>
-              </div>
               </Col>
-            </Row>
 
-            <Row gutter={16}>
-            <Col span={12}>
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ marginBottom: 8 }}>Calidad</div>
-                <Space.Compact style={{ width: '100%' }}>
+              {/* Calidad */}
+              <Col xs={24} sm={12}>
+                <Text strong>⭐ Calidad</Text>
+                <Space.Compact style={{ width: '100%', marginTop: 8 }}>
                   <Form.Item name="calidad" noStyle>
                     <Select
-                      placeholder="Selecciona una calidad"
+                      placeholder="Selecciona calidad"
                       loading={loadingCalidades}
                       showSearch
                       allowClear
+                      size="large"
                       style={{ flex: 1 }}
-                      options={calidades.map(c => ({ label: c.valor, value: c.valor }))}
+                      options={Array.isArray(calidades) ? calidades.map(c => ({ 
+                        label: c?.valor || 'Sin calidad', 
+                        value: c?.valor || '' 
+                      })) : []}
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                     />
-                </Form.Item>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => setModalAgregarCalidad(true)}
-                  />
-                  <Button
-                    icon={<SettingOutlined />}
-                    onClick={() => setModalGestionarCalidades(true)}
-                    title="Gestionar Calidades"
-                  />
+                  </Form.Item>
+                  <Tooltip title="Agregar nueva calidad">
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => setModalAgregarCalidad(true)}
+                      size="large"
+                    />
+                  </Tooltip>
+                  <Tooltip title="Gestionar calidades">
+                    <Button
+                      icon={<SettingOutlined />}
+                      onClick={() => setModalGestionarCalidades(true)}
+                      size="large"
+                    />
+                  </Tooltip>
                 </Space.Compact>
-              </div>
               </Col>
-            <Col span={12}>
-              <Form.Item label="Código de Barras" name="codigo_barras">
-                <Input placeholder="Opcional" />
+
+              {/* Código de Barras */}
+              <Col xs={24} sm={12}>
+                <Form.Item label={<Text strong>🔢 Código de Barras (Opcional)</Text>} name="codigo_barras">
+                  <Input 
+                    placeholder="Ej: 7891234567890" 
+                    size="large"
+                    prefix={<BarcodeOutlined style={{ color: '#bfbfbf' }} />}
+                  />
                 </Form.Item>
               </Col>
             </Row>
-        </Form>
+          </Form>
+        </Space>
       </Modal>
 
       {/* Modal: Editar Producto */}
@@ -1552,270 +1724,492 @@ const Products: React.FC = () => {
         </Spin>
       </Modal>
 
-      {/* 🎯 Modal: Gestionar Precios y Stock por Sucursal */}
+      {/* 🎯 Modal: Gestionar Precios */}
       <Modal
         title={
           <Space>
-            <RocketOutlined style={{ color: '#667eea' }} />
-            <span>Gestionar Precios y Stock por Sucursal</span>
+            <DollarOutlined style={{ color: '#667eea', fontSize: 20 }} />
+            <span style={{ fontSize: 18, fontWeight: 600 }}>Gestionar Precios por Sucursal</span>
           </Space>
         }
         open={modalGestionarPrecios}
         onCancel={() => setModalGestionarPrecios(false)}
-        footer={[
-          <Button key="close" onClick={() => setModalGestionarPrecios(false)}>
-            Cerrar
-          </Button>
-        ]}
-        width={900}
+        footer={null}
+        width={1200}
         style={{ top: 20 }}
       >
-        <Spin spinning={loading}>
-          <Space direction="vertical" style={{ width: '100%' }} size="large">
-            {/* Descripción */}
-            <Card size="small" style={{ background: '#f0f5ff', border: '1px solid #adc6ff' }}>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Text strong style={{ color: '#1890ff' }}>
-                  💡 Gestión Centralizada
-                </Text>
-                <Text type="secondary">
-                  Configura stock, precios y stock mínimo para cada producto en todas las sucursales.
-                  Usa el selector de sucursal y la tabla de productos para hacer los cambios.
-                </Text>
-              </Space>
-            </Card>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          {/* Filtros */}
+          <Card bodyStyle={{ padding: '16px' }}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={10}>
+                <Input
+                  placeholder="🔍 Buscar por nombre, marca..."
+                  prefix={<SearchOutlined />}
+                  value={busquedaModalGestion}
+                  onChange={(e) => setBusquedaModalGestion(e.target.value)}
+                  allowClear
+                  size="large"
+                />
+              </Col>
+              <Col xs={24} sm={12} md={7}>
+                <Select
+                  placeholder="Filtrar por tipo"
+                  value={tipoFiltroModalGestion}
+                  onChange={setTipoFiltroModalGestion}
+                  style={{ width: '100%' }}
+                  size="large"
+                >
+                  <Option value="todos">Todos los tipos</Option>
+                  {tipos.map(tipo => (
+                    <Option key={tipo.valor} value={tipo.valor}>{tipo.valor}</Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} sm={12} md={7}>
+                <Select
+                  placeholder="Filtrar por marca"
+                  value={marcaFiltroModalGestion}
+                  onChange={setMarcaFiltroModalGestion}
+                  style={{ width: '100%' }}
+                  size="large"
+                >
+                  <Option value="todas">Todas las marcas</Option>
+                  {marcas.map(marca => (
+                    <Option key={marca.valor} value={marca.valor}>{marca.valor}</Option>
+                  ))}
+                </Select>
+              </Col>
+            </Row>
+          </Card>
 
-            {/* Selector de Sucursal */}
-            <Card size="small" title="🏪 Seleccionar Sucursal">
-              <Select
-                value={sucursalSeleccionada}
-                onChange={setSucursalSeleccionada}
-                style={{ width: '100%' }}
-                size="large"
-              >
-                {sucursales.map(sucursalObj => (
-                  <Option key={sucursalObj.sucursal} value={sucursalObj.sucursal}>
-                    <Space>
-                      <ShopOutlined />
-                      {formatearNombreSucursal(sucursalObj.sucursal)}
-                      {sucursalObj.sucursal === 'maldonado' && (
-                        <Tag color="gold">Stock Principal</Tag>
-                      )}
+          {/* Tabla de Productos */}
+          <Table
+            columns={[
+              {
+                title: 'Producto',
+                key: 'producto',
+                width: 300,
+                render: (_, record: ProductoCompleto) => (
+                  <Space direction="vertical" size={0}>
+                    <Text strong>{record.nombre}</Text>
+                    <Space size={4}>
+                      <Tag color="blue" style={{ fontSize: 11 }}>{record.marca}</Tag>
+                      <Tag color="cyan" style={{ fontSize: 11 }}>{record.tipo}</Tag>
                     </Space>
-                  </Option>
-                ))}
-              </Select>
-            </Card>
-
-            {/* 🔍 Filtros: Búsqueda y Tipo */}
-            <Card size="small" title="🔍 Buscar y Filtrar">
-              <Row gutter={[16, 16]}>
-                <Col xs={24} md={14}>
-                  <Input
-                    placeholder="Buscar por nombre, marca o código..."
-                    prefix={<SearchOutlined style={{ color: '#1890ff' }} />}
-                    value={busquedaModalGestion}
-                    onChange={(e) => setBusquedaModalGestion(e.target.value)}
-                    size="large"
-                    allowClear
-                    style={{
-                      borderRadius: '8px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                    }}
-                  />
-                </Col>
-                <Col xs={24} md={10}>
-                  <Select
-                    placeholder="Filtrar por tipo"
-                    value={tipoFiltroModalGestion}
-                    onChange={setTipoFiltroModalGestion}
-                    style={{ width: '100%' }}
-                    size="large"
-                  >
-                    <Option value="todos">
-                      <Space>
-                        <TagOutlined />
-                        Todos los tipos
-                      </Space>
-                    </Option>
-                    {tipos.map(tipo => (
-                      <Option key={tipo} value={tipo}>
-                        <Space>
-                          <TagOutlined />
-                          {tipo}
-                        </Space>
-                      </Option>
+                  </Space>
+                ),
+              },
+              {
+                title: 'Precios por Sucursal',
+                key: 'precios',
+                render: (_, record: ProductoCompleto) => (
+                  <Space wrap size={[4, 4]}>
+                    {record.sucursales?.slice(0, 3).map((suc: any) => (
+                      <Tag key={suc.sucursal} color={suc.precio > 0 ? 'green' : 'default'}>
+                        {formatearNombreSucursal(suc.sucursal)}: ${suc.precio?.toFixed(0) || '0'}
+                      </Tag>
                     ))}
-                  </Select>
-                </Col>
-              </Row>
-            </Card>
-
-            {/* Lista de Productos con Stock y Precio */}
-            <Card 
-              size="small" 
-              title={
-                <Space>
-                  <TagOutlined />
-                  <Text>Productos - {formatearNombreSucursal(sucursalSeleccionada)}</Text>
-                  <Badge 
-                    count={
-                      productos.filter((producto) => {
-                        const terminoBusqueda = busquedaModalGestion.toLowerCase();
-                        const cumpleBusqueda = !terminoBusqueda || 
-                          producto.nombre.toLowerCase().includes(terminoBusqueda) ||
-                          producto.marca.toLowerCase().includes(terminoBusqueda) ||
-                          producto.codigo_barras?.toLowerCase().includes(terminoBusqueda);
-                        const cumpleTipo = tipoFiltroModalGestion === 'todos' || 
-                          producto.tipo === tipoFiltroModalGestion;
-                        return cumpleBusqueda && cumpleTipo;
-                      }).length
-                    } 
-                    style={{ backgroundColor: '#667eea' }}
-                  />
-                </Space>
-              }
-            >
-              <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                {(() => {
-                  // Filtrar productos según búsqueda y tipo
-                  const productosFiltrados = productos.filter((producto) => {
-                    // Filtro de búsqueda
-                    const terminoBusqueda = busquedaModalGestion.toLowerCase();
-                    const cumpleBusqueda = !terminoBusqueda || 
-                      producto.nombre.toLowerCase().includes(terminoBusqueda) ||
-                      producto.marca.toLowerCase().includes(terminoBusqueda) ||
-                      producto.codigo_barras?.toLowerCase().includes(terminoBusqueda);
-                    
-                    // Filtro de tipo
-                    const cumpleTipo = tipoFiltroModalGestion === 'todos' || 
-                      producto.tipo === tipoFiltroModalGestion;
-                    
-                    return cumpleBusqueda && cumpleTipo;
-                  });
-
-                  // Mostrar mensaje si no hay productos
-                  if (productos.length === 0) {
-                    return (
-                      <div style={{ textAlign: 'center', padding: '40px' }}>
-                        <Text type="secondary">
-                          No hay productos disponibles. Crea productos primero usando el botón "Nuevo Producto".
-                        </Text>
-                      </div>
-                    );
-                  }
-
-                  // Mostrar mensaje si no hay resultados del filtro
-                  if (productosFiltrados.length === 0) {
-                    return (
-                      <div style={{ textAlign: 'center', padding: '40px' }}>
-                        <Text type="secondary" style={{ fontSize: '16px' }}>
-                          🔍 No se encontraron productos con los filtros aplicados
-                        </Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: '14px', marginTop: '8px' }}>
-                          Intenta con otros términos de búsqueda o cambia el filtro de tipo
-                        </Text>
-                      </div>
-                    );
-                  }
-
-                  // Mostrar productos filtrados
-                  return productosFiltrados.map((producto) => {
-                    const sucursalData = producto.sucursales?.find(
-                      s => s.sucursal === sucursalSeleccionada
-                    );
-
-                    return (
-                      <Card 
-                        key={producto.id}
-                        size="small"
-                        style={{ 
-                          background: '#fafafa',
-                          borderLeft: `4px solid ${sucursalData?.stock && sucursalData.stock > 0 ? '#52c41a' : '#ff4d4f'}`
-                        }}
-                      >
-                        <Row gutter={[16, 16]} align="middle">
-                          {/* Información del Producto */}
-                          <Col span={8}>
-                            <Space direction="vertical" size="small">
-                              <Text strong style={{ fontSize: '15px' }}>
-                                {producto.nombre}
-                              </Text>
-                              <Space size="small">
-                                <Tag color="blue">{producto.marca}</Tag>
-                                <Tag color="cyan">{producto.tipo}</Tag>
-                                <Tag color="purple">{producto.calidad}</Tag>
-                              </Space>
-                            </Space>
-                          </Col>
-
-                          {/* Stock Actual */}
-                          <Col span={5}>
-                            <Space direction="vertical" size={0}>
-                              <Text type="secondary" style={{ fontSize: '12px' }}>
-                                Stock Actual
-                              </Text>
-                              <Text 
-                                strong 
-                                style={{ 
-                                  fontSize: '20px',
-                                  color: sucursalData?.stock && sucursalData.stock > (sucursalData.stock_minimo || 10) 
-                                    ? '#52c41a' 
-                                    : '#ff4d4f'
-                                }}
-                              >
-                                {sucursalData?.stock || 0}
-                              </Text>
-                            </Space>
-                          </Col>
-
-                          {/* Precio */}
-                          <Col span={5}>
-                            <Space direction="vertical" size={0}>
-                              <Text type="secondary" style={{ fontSize: '12px' }}>
-                                Precio
-                              </Text>
-                              <Text strong style={{ fontSize: '18px', color: '#52c41a' }}>
-                                ${sucursalData?.precio?.toFixed(2) || '0.00'}
-                              </Text>
-                            </Space>
-                          </Col>
-
-                          {/* Botón de Editar */}
-                          <Col span={6} style={{ textAlign: 'right' }}>
-                            <Button
-                              type="primary"
-                              icon={<EditOutlined />}
-                              onClick={() => {
-                                setProductoEditando(producto);
-                                setModalStockVisible(true);
-                                formStock.setFieldsValue({
-                                  stock: sucursalData?.stock || 0,
-                                  precio: sucursalData?.precio || 0,
-                                  stock_minimo: sucursalData?.stock_minimo || 10
-                                });
-                              }}
-                              style={{
-                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                border: 'none'
-                              }}
-                            >
-                              Editar
-                            </Button>
-                          </Col>
-                        </Row>
-                      </Card>
-                    );
-                  });
-                })()}
-              </Space>
-            </Card>
-          </Space>
-        </Spin>
+                    {record.sucursales && record.sucursales.length > 3 && (
+                      <Tag>+{record.sucursales.length - 3} más</Tag>
+                    )}
+                  </Space>
+                ),
+              },
+              {
+                title: 'Acción',
+                key: 'accion',
+                width: 120,
+                align: 'center' as const,
+                render: (_, record: ProductoCompleto) => (
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={() => {
+                      setProductoEditandoPrecios(record);
+                      // Inicializar precios actuales
+                      const preciosActuales: { [key: string]: number } = {};
+                      record.sucursales?.forEach((suc: any) => {
+                        preciosActuales[suc.sucursal] = suc.precio || 0;
+                      });
+                      setPreciosPorSucursal(preciosActuales);
+                      setModalEditarPrecios(true);
+                    }}
+                    size="small"
+                  >
+                    Editar
+                  </Button>
+                ),
+              },
+            ]}
+            dataSource={productos.filter((producto) => {
+              const terminoBusqueda = busquedaModalGestion.toLowerCase();
+              const cumpleBusqueda = !terminoBusqueda || 
+                producto.nombre.toLowerCase().includes(terminoBusqueda) ||
+                producto.marca.toLowerCase().includes(terminoBusqueda);
+              const cumpleTipo = tipoFiltroModalGestion === 'todos' || 
+                producto.tipo === tipoFiltroModalGestion;
+              const cumpleMarca = marcaFiltroModalGestion === 'todas' || 
+                producto.marca === marcaFiltroModalGestion;
+              return cumpleBusqueda && cumpleTipo && cumpleMarca;
+            })}
+            rowKey="id"
+            pagination={{ pageSize: 10, showSizeChanger: true }}
+            size="small"
+            loading={loading}
+          />
+        </Space>
       </Modal>
 
-      {/* Estilos para el botón de gestión */}
+      {/* Modal: Editar Precios por Sucursal */}
+      <Modal
+        title={
+          <Space>
+            <DollarOutlined style={{ color: '#52c41a' }} />
+            <span>{productoEditandoPrecios?.nombre} - Precios por Sucursal</span>
+          </Space>
+        }
+        open={modalEditarPrecios}
+        onCancel={() => {
+          setModalEditarPrecios(false);
+          setProductoEditandoPrecios(null);
+          setPreciosPorSucursal({});
+        }}
+        onOk={async () => {
+          if (!productoEditandoPrecios) return;
+          
+          try {
+            // Actualizar precios para cada sucursal
+            const promesas = Object.entries(preciosPorSucursal).map(([sucursal, precio]) => {
+              return productosService.actualizarSucursal(
+                productoEditandoPrecios.id,
+                sucursal,
+                {
+                  precio: Number(precio),
+                  // Mantener el stock actual sin cambios
+                  stock: productoEditandoPrecios.sucursales?.find(s => s.sucursal === sucursal)?.stock || 0,
+                  stock_minimo: productoEditandoPrecios.sucursales?.find(s => s.sucursal === sucursal)?.stock_minimo || 10
+                }
+              );
+            });
+
+            await Promise.all(promesas);
+            message.success('✅ Precios actualizados correctamente');
+            setModalEditarPrecios(false);
+            setProductoEditandoPrecios(null);
+            setPreciosPorSucursal({});
+            cargarProductos();
+          } catch (error) {
+            message.error('Error al actualizar precios');
+            console.error(error);
+          }
+        }}
+        width={700}
+        okText="💾 Guardar Precios"
+        cancelText="Cancelar"
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Card size="small" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+            <Space>
+              <TagOutlined style={{ color: '#52c41a' }} />
+              <Text strong>{productoEditandoPrecios?.marca}</Text>
+              <Tag color="blue">{productoEditandoPrecios?.tipo}</Tag>
+            </Space>
+          </Card>
+
+          <Row gutter={[16, 16]}>
+            {sucursales.map((sucursalObj) => {
+              const sucursalNombre = sucursalObj.sucursal;
+              const precioActual = preciosPorSucursal[sucursalNombre] || 0;
+              
+              return (
+                <Col xs={24} sm={12} key={sucursalNombre}>
+                  <Card size="small" bodyStyle={{ padding: '12px' }}>
+                    <Space direction="vertical" style={{ width: '100%' }} size={0}>
+                      <Text strong style={{ fontSize: 13 }}>
+                        <ShopOutlined /> {formatearNombreSucursal(sucursalNombre)}
+                      </Text>
+                      <InputNumber
+                        prefix="$"
+                        value={precioActual}
+                        onChange={(value) => {
+                          setPreciosPorSucursal({
+                            ...preciosPorSucursal,
+                            [sucursalNombre]: value || 0
+                          });
+                        }}
+                        style={{ width: '100%', marginTop: 8 }}
+                        min={0}
+                        precision={2}
+                        size="large"
+                      />
+                    </Space>
+                  </Card>
+                </Col>
+              );
+            })}
+          </Row>
+        </Space>
+      </Modal>
+
+      {/* 📦 Modal: Gestionar Stock */}
+      <Modal
+        title={
+          <Space>
+            <InboxOutlined style={{ color: '#1890ff', fontSize: 20 }} />
+            <span style={{ fontSize: 18, fontWeight: 600, color: 'black' }}>Gestionar Stock por Sucursal</span>
+          </Space>
+        }
+        open={modalGestionarStock}
+        onCancel={() => setModalGestionarStock(false)}
+        footer={null}
+        width={1200}
+        style={{ top: 20 }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          {/* Filtros */}
+          <Card bodyStyle={{ padding: '16px' }}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={10}>
+                <Input
+                  placeholder="🔍 Buscar por nombre, marca..."
+                  prefix={<SearchOutlined />}
+                  value={busquedaModalGestionStock}
+                  onChange={(e) => setBusquedaModalGestionStock(e.target.value)}
+                  allowClear
+                  size="large"
+                />
+              </Col>
+              <Col xs={24} sm={12} md={7}>
+                <Select
+                  placeholder="Filtrar por tipo"
+                  value={tipoFiltroModalGestionStock}
+                  onChange={setTipoFiltroModalGestionStock}
+                  style={{ width: '100%' }}
+                  size="large"
+                >
+                  <Select.Option value="todos">Todos los tipos</Select.Option>
+                  {Array.isArray(tipos) && tipos.map(t => (
+                    <Select.Option key={t?.id || Math.random()} value={t?.valor || ''}>
+                      {t?.valor || 'Sin tipo'}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} sm={12} md={7}>
+                <Select
+                  placeholder="Filtrar por marca"
+                  value={marcaFiltroModalGestionStock}
+                  onChange={setMarcaFiltroModalGestionStock}
+                  style={{ width: '100%' }}
+                  size="large"
+                >
+                  <Select.Option value="todas">Todas las marcas</Select.Option>
+                  {Array.isArray(marcas) && marcas.map(m => (
+                    <Select.Option key={m?.id || Math.random()} value={m?.valor || ''}>
+                      {m?.valor || 'Sin marca'}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* Tabla de productos */}
+          <Table
+            columns={[
+              {
+                title: 'Producto',
+                key: 'producto',
+                width: 300,
+                render: (_, record: ProductoCompleto) => (
+                  <Space direction="vertical" size={0}>
+                    <Text strong>{record.nombre}</Text>
+                    <Space size={4}>
+                      <Tag color="blue" style={{ fontSize: 11 }}>{record.marca}</Tag>
+                      <Tag color="cyan" style={{ fontSize: 11 }}>{record.tipo}</Tag>
+                    </Space>
+                  </Space>
+                ),
+              },
+              {
+                title: 'Stock Total',
+                key: 'stock_total',
+                width: 120,
+                align: 'center' as const,
+                render: (_, record: ProductoCompleto) => {
+                  const stockTotal = record.sucursales?.reduce((sum, suc: any) => sum + (suc.stock || 0), 0) || 0;
+                  return (
+                    <Tag color={stockTotal > 0 ? 'green' : 'red'}>
+                      {stockTotal} unidades
+                    </Tag>
+                  );
+                },
+              },
+              {
+                title: 'Stock por Sucursal',
+                key: 'stock_sucursal',
+                render: (_, record: ProductoCompleto) => (
+                  <Space wrap size={[4, 4]}>
+                    {record.sucursales?.slice(0, 3).map((suc: any) => (
+                      <Tag key={suc.sucursal} color={suc.stock > 0 ? 'blue' : 'default'}>
+                        {formatearNombreSucursal(suc.sucursal)}: {suc.stock || 0}
+                      </Tag>
+                    ))}
+                    {record.sucursales && record.sucursales.length > 3 && (
+                      <Tag>+{record.sucursales.length - 3} más</Tag>
+                    )}
+                  </Space>
+                ),
+              },
+              {
+                title: 'Acción',
+                key: 'accion',
+                width: 120,
+                align: 'center' as const,
+                render: (_, record: ProductoCompleto) => (
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={() => {
+                      setProductoEditandoStock(record);
+                      const stockActual: { [key: string]: number } = {};
+                      record.sucursales?.forEach((suc: any) => {
+                        stockActual[suc.sucursal] = suc.stock || 0;
+                      });
+                      setStockPorSucursal(stockActual);
+                      setModalEditarStock(true);
+                    }}
+                    size="small"
+                  >
+                    Editar
+                  </Button>
+                ),
+              },
+            ]}
+            dataSource={productosConSucursales.filter((producto) => {
+              // Filtro de búsqueda
+              const busqueda = busquedaModalGestionStock.toLowerCase();
+              const coincideBusqueda = busqueda === '' || 
+                producto.nombre.toLowerCase().includes(busqueda) ||
+                (producto.marca && producto.marca.toLowerCase().includes(busqueda));
+              
+              // Filtro de tipo
+              const coincideTipo = tipoFiltroModalGestionStock === 'todos' || 
+                producto.tipo === tipoFiltroModalGestionStock;
+              
+              // Filtro de marca
+              const coincideMarca = marcaFiltroModalGestionStock === 'todas' || 
+                producto.marca === marcaFiltroModalGestionStock;
+              
+              return coincideBusqueda && coincideTipo && coincideMarca;
+            })}
+            rowKey="id"
+            pagination={{ pageSize: 10, showSizeChanger: true }}
+            size="small"
+            loading={loadingProductosConSucursales}
+          />
+        </Space>
+      </Modal>
+
+      {/* Modal: Editar Stock por Sucursal */}
+      <Modal
+        title={
+          <Space>
+            <InboxOutlined style={{ color: '#52c41a' }} />
+            <span>{productoEditandoStock?.nombre} - Stock por Sucursal</span>
+          </Space>
+        }
+        open={modalEditarStock}
+        onCancel={() => {
+          setModalEditarStock(false);
+          setProductoEditandoStock(null);
+          setStockPorSucursal({});
+        }}
+        onOk={async () => {
+          if (!productoEditandoStock) return;
+          
+          try {
+            // Actualizar stock para cada sucursal
+            const promesas = Object.entries(stockPorSucursal).map(([sucursal, stock]) => {
+              return productosService.actualizarSucursal(
+                productoEditandoStock.id,
+                sucursal,
+                {
+                  stock: Number(stock),
+                  // Mantener el precio actual sin cambios
+                  precio: productoEditandoStock.sucursales?.find(s => s.sucursal === sucursal)?.precio || 0,
+                  stock_minimo: productoEditandoStock.sucursales?.find(s => s.sucursal === sucursal)?.stock_minimo || 10
+                }
+              );
+            });
+            
+            await Promise.all(promesas);
+            message.success('✅ Stock actualizado correctamente en todas las sucursales');
+            setModalEditarStock(false);
+            setProductoEditandoStock(null);
+            setStockPorSucursal({});
+            // Recargar ambas listas de productos
+            cargarProductos();
+            cargarProductosConSucursales();
+          } catch (error) {
+            message.error('Error al actualizar stock');
+            console.error(error);
+          }
+        }}
+        okText="💾 Guardar Cambios"
+        cancelText="Cancelar"
+        width={800}
+        okButtonProps={{
+          style: { background: 'linear-gradient(135deg, #52c41a 0%, #73d13d 100%)', border: 'none' }
+        }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Card size="small" style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+            <Space>
+              <TagOutlined style={{ color: '#52c41a' }} />
+              <Text strong>{productoEditandoStock?.marca}</Text>
+              <Tag color="blue">{productoEditandoStock?.tipo}</Tag>
+            </Space>
+          </Card>
+
+          <Row gutter={[16, 16]}>
+            {sucursales.map((sucursalObj) => {
+              const sucursalNombre = sucursalObj.sucursal;
+              const stockActual = stockPorSucursal[sucursalNombre] || 0;
+              
+              return (
+                <Col xs={24} sm={12} key={sucursalNombre}>
+                  <Card size="small" bodyStyle={{ padding: '12px' }}>
+                    <Space direction="vertical" style={{ width: '100%' }} size={0}>
+                      <Text strong style={{ fontSize: 13 }}>
+                        <ShopOutlined /> {formatearNombreSucursal(sucursalNombre)}
+                      </Text>
+                      <InputNumber
+                        prefix="📦"
+                        value={stockActual}
+                        onChange={(value) => {
+                          setStockPorSucursal({
+                            ...stockPorSucursal,
+                            [sucursalNombre]: value || 0
+                          });
+                        }}
+                        style={{ width: '100%', marginTop: 8 }}
+                        min={0}
+                        precision={0}
+                        size="large"
+                        addonAfter="unidades"
+                      />
+                    </Space>
+                  </Card>
+                </Col>
+              );
+            })}
+          </Row>
+        </Space>
+      </Modal>
+
+      {/* Estilos para los botones de gestión */}
       <style>{`
         .price-management-btn:hover {
           background: linear-gradient(135deg, #3e2723 0%, #4a3728 50%, #5d4037 100%) !important;
@@ -1826,6 +2220,17 @@ const Products: React.FC = () => {
         .price-management-btn:active {
           transform: translateY(0px);
           box-shadow: 0 2px 8px rgba(62, 39, 35, 0.4) !important;
+        }
+        
+        .stock-management-btn:hover {
+          background: linear-gradient(135deg, #ff85c0 0%, #ff5ca8 100%) !important;
+          box-shadow: 0 6px 20px rgba(255, 92, 168, 0.6) !important;
+          transform: translateY(-2px);
+        }
+        
+        .stock-management-btn:active {
+          transform: translateY(0px);
+          box-shadow: 0 2px 8px rgba(255, 133, 192, 0.4) !important;
         }
       `}</style>
     </div>

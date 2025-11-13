@@ -1,0 +1,287 @@
+/* ==============================================
+   GLOBAL SALES - ESTILOS PROFESIONALES
+   ============================================== */
+
+.global-sales-container {
+  padding: 16px;
+  max-width: 100%;
+  overflow: hidden;
+  background: #f5f7fa;
+  min-height: calc(100vh - 64px);
+}
+
+/* Header con gradiente */
+.global-sales-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+}
+
+/* Filtros compactos */
+.filters-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Tarjetas de estadísticas con gradientes */
+.stat-card {
+  border-radius: 12px;
+  border: none;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #1890ff 0%, #096dd9 100%);
+}
+
+.stat-card-sales::before {
+  background: linear-gradient(90deg, #1890ff 0%, #096dd9 100%);
+}
+
+.stat-card-revenue::before {
+  background: linear-gradient(90deg, #52c41a 0%, #389e0d 100%);
+}
+
+.stat-card-average::before {
+  background: linear-gradient(90deg, #722ed1 0%, #531dab 100%);
+}
+
+.stat-card-days::before {
+  background: linear-gradient(90deg, #fa8c16 0%, #d46b08 100%);
+}
+
+/* Cards destacadas */
+.highlight-card {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.highlight-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.highlight-card-top {
+  background: linear-gradient(135deg, #fff7e6 0%, #fffbe6 100%);
+  border-left: 4px solid #faad14;
+}
+
+.highlight-card-method {
+  background: linear-gradient(135deg, #f6ffed 0%, #fcffe6 100%);
+  border-left: 4px solid #52c41a;
+}
+
+/* Ranking Card */
+.ranking-card {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sucursal-rank-item {
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  border: 1px solid #f0f0f0;
+}
+
+.sucursal-rank-item:hover {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Tabla Card */
+.table-card {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.table-card .ant-table {
+  border-radius: 8px;
+}
+
+.table-card .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+  font-size: 12px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.table-card .ant-table-tbody > tr:hover > td {
+  background: #f5f7fa;
+}
+
+/* Responsive adaptations */
+@media (max-width: 768px) {
+  .global-sales-container {
+    padding: 12px;
+  }
+
+  .global-sales-header {
+    padding: 16px;
+  }
+
+  .global-sales-header h2 {
+    font-size: 20px !important;
+  }
+
+  .stat-card {
+    margin-bottom: 8px;
+  }
+
+  .highlight-card {
+    margin-bottom: 8px;
+  }
+
+  .sucursal-rank-item {
+    margin-bottom: 8px;
+  }
+
+  .filters-card {
+    padding: 12px;
+  }
+
+  .ant-statistic-title {
+    font-size: 11px !important;
+  }
+
+  .ant-statistic-content-value {
+    font-size: 20px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .global-sales-header {
+    padding: 12px;
+  }
+
+  .global-sales-header h2 {
+    font-size: 18px !important;
+  }
+
+  .stat-card .ant-statistic-content-value {
+    font-size: 18px !important;
+  }
+
+  .highlight-card h3 {
+    font-size: 18px !important;
+  }
+}
+
+/* Animaciones suaves */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-card,
+.highlight-card,
+.ranking-card,
+.table-card {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Badges personalizados */
+.ant-badge-count {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Progress bars personalizadas */
+.ant-progress-line {
+  font-size: 11px;
+}
+
+.ant-progress-text {
+  font-weight: 600;
+}
+
+/* Tags mejorados */
+.ant-tag {
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* Botones */
+.ant-btn-primary {
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+}
+
+.ant-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Modal de detalle de venta */
+.modal-detalle-venta .ant-modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-bottom: none;
+}
+
+.modal-detalle-venta .ant-modal-title {
+  color: white;
+  font-weight: 600;
+}
+
+.modal-detalle-venta .ant-modal-close {
+  color: white;
+}
+
+.modal-detalle-venta .ant-modal-close:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.modal-detalle-venta .ant-descriptions-bordered .ant-descriptions-item-label {
+  font-weight: 600;
+  background: #fafafa;
+}
+
+/* Tarjeta de estado pagado */
+.stat-card-paid::before {
+  background: linear-gradient(90deg, #52c41a 0%, #389e0d 100%);
+}
+
+/* Ajustes de responsividad para móvil */
+@media (max-width: 576px) {
+  .modal-detalle-venta {
+    max-width: 95% !important;
+    margin: 8px auto !important;
+  }
+
+  .modal-detalle-venta .ant-modal-body {
+    padding: 12px;
+  }
+
+  .modal-detalle-venta .ant-descriptions {
+    font-size: 11px;
+  }
+}
+

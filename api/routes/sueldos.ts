@@ -35,3 +35,7 @@ router.delete('/:id', eliminarSueldo);
 
 export default router;
 
+
+
+
+

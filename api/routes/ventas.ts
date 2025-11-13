@@ -17,7 +17,8 @@ import {
   obtenerUltimasVentas,
   obtenerVentasDelDia,
   guardarResumenDiario,
-  obtenerVentasGlobales
+  obtenerVentasGlobales,
+  obtenerVentasDetalladas
 } from '../controllers/ventasController';
 
 const router = Router();
@@ -78,6 +79,14 @@ router.post('/guardar-resumen-diario', guardarResumenDiario);
  * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /:id
  */
 router.get('/ventas-globales', obtenerVentasGlobales);
+
+/**
+ * GET /api/ventas/ventas-detalladas
+ * Obtener ventas detalladas individuales con filtros
+ * Query params: fecha_desde, fecha_hasta, sucursal
+ * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /:id
+ */
+router.get('/ventas-detalladas', obtenerVentasDetalladas);
 
 /**
  * GET /api/ventas/sucursal/:sucursal

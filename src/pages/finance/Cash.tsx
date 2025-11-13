@@ -249,12 +249,24 @@ const Cash: React.FC = () => {
 
   const handleAjustarCaja = async (values: any) => {
     try {
-      await cajaService.ajustarCaja(sucursalSeleccionada, {
+      console.log('📤 [FRONTEND] Enviando ajuste de caja:', {
+        sucursal: sucursalSeleccionada,
+        values,
+        usuario: {
+          id: usuario?.id,
+          email: usuario?.email,
+          esAdmin: usuario?.esAdmin
+        }
+      });
+      
+      const response = await cajaService.ajustarCaja(sucursalSeleccionada, {
         monto_nuevo: values.monto_nuevo,
         concepto: values.concepto,
         usuario_id: usuario?.id || 0,
         usuario_email: usuario?.email || '',
       });
+      
+      console.log('✅ [FRONTEND] Respuesta recibida:', response);
       
       antMessage.success('✅ Caja ajustada exitosamente');
       setModalAjusteVisible(false);
@@ -262,7 +274,9 @@ const Cash: React.FC = () => {
       setSucursalSeleccionada('');
       cargarCajas();
     } catch (error: any) {
-      console.error('Error al ajustar caja:', error);
+      console.error('❌ [FRONTEND] Error al ajustar caja:', error);
+      console.error('❌ [FRONTEND] Response data:', error.response?.data);
+      console.error('❌ [FRONTEND] Response status:', error.response?.status);
       antMessage.error(error.response?.data?.message || 'Error al ajustar caja');
     }
   };

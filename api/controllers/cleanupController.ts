@@ -194,14 +194,31 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
       resultados.push(`✅ Historial de pagos eliminado: ${pagosResult.affectedRows}`);
     }
     
-    // 6. Resetear Stock de Productos (NO elimina productos)
+    // 6. ELIMINAR TODOS LOS PRODUCTOS (completo de la base de datos)
     if (opciones.productos) {
-      const placeholders = sucursales.map(() => '?').join(', ');
-      const [result] = await connection.execute<ResultSetHeader>(
-        `UPDATE productos_sucursal SET stock = 0, stock_en_transito = 0 WHERE sucursal IN (${placeholders})`,
-        sucursales
+      // 🔹 PASO 1: Eliminar referencias en comisiones_vendedores (Foreign Key)
+      const [comisionesProductosResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM comisiones_vendedores`
       );
-      resultados.push(`✅ Stock reseteado a 0 en: ${result.affectedRows} registros`);
+      resultados.push(`✅ Comisiones de productos eliminadas: ${comisionesProductosResult.affectedRows} registros`);
+      
+      // 🔹 PASO 2: Eliminar referencias en ventas_detalle (Foreign Key)
+      const [ventasDetalleResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM ventas_detalle`
+      );
+      resultados.push(`✅ Detalles de ventas eliminados: ${ventasDetalleResult.affectedRows} registros`);
+      
+      // 🔹 PASO 3: Eliminar TODAS las relaciones en productos_sucursal
+      const [relacionesResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM productos_sucursal`
+      );
+      resultados.push(`✅ Relaciones productos-sucursal eliminadas: ${relacionesResult.affectedRows} registros`);
+      
+      // 🔹 PASO 4: Eliminar TODOS los productos de la tabla principal
+      const [productosResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM productos`
+      );
+      resultados.push(`✅ Productos eliminados COMPLETAMENTE: ${productosResult.affectedRows} productos`);
     }
     
     // Commit de la transacción

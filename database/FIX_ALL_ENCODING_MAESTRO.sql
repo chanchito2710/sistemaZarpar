@@ -335,3 +335,7 @@ SELECT 'Todas las tablas de clientes han sido corregidas' as mensaje;
 SELECT 'Los caracteres especiales ahora están en UTF-8 correcto' as mensaje2;
 
 
+
+
+
+

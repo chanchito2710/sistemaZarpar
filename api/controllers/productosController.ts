@@ -411,12 +411,9 @@ export const crearProducto = async (req: Request, res: Response): Promise<void> 
     const productoId = resultado.insertId;
 
     // 🆕 CREAR AUTOMÁTICAMENTE REGISTROS EN productos_sucursal PARA TODAS LAS SUCURSALES
-    // ⭐ DINÁMICO: Obtener TODAS las sucursales de la base de datos
-    const sucursalesResult = await executeQuery<{ sucursal: string }[]>(
-      'SELECT DISTINCT sucursal FROM productos_sucursal ORDER BY sucursal'
-    );
-    
-    const sucursales = sucursalesResult.map(s => s.sucursal);
+    // ⭐ DINÁMICO: Obtener TODAS las sucursales desde las tablas de clientes
+    const { obtenerNombresSucursales } = await import('../utils/database.js');
+    const sucursales = await obtenerNombresSucursales();
     
     console.log(`📦 Agregando producto nuevo a ${sucursales.length} sucursales:`, sucursales);
     
@@ -426,20 +423,17 @@ export const crearProducto = async (req: Request, res: Response): Promise<void> 
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
-    // Insertar en cada sucursal con stock inicial de 100 y precio de referencia de Pando
-    // Obtener precio de referencia de Pando (si existe algún producto)
-    const precioReferenciaResult = await executeQuery<{ precio: number }[]>(
-      `SELECT precio FROM productos_sucursal WHERE sucursal = 'pando' AND activo = 1 LIMIT 1`
-    );
-    const precioReferencia = precioReferenciaResult[0]?.precio || 0;
+    // Obtener sucursal principal dinámica
+    const sucursalPrincipal = await obtenerSucursalPrincipal();
     
+    // Insertar en cada sucursal con stock inicial de 100 y precio inicial de 0
     for (const sucursal of sucursales) {
-      const esStockPrincipal = sucursal === 'maldonado'; // Maldonado es el stock principal
+      const esStockPrincipal = sucursalPrincipal ? sucursal === sucursalPrincipal : false;
       await executeQuery(querySucursal, [
         productoId, 
         sucursal, 
         100, // Stock inicial de 100 unidades
-        precioReferencia, // Precio de referencia
+        0, // Precio inicial de 0 (se debe configurar después)
         10, // Stock mínimo
         esStockPrincipal, 
         1 // Activo
@@ -1304,7 +1298,7 @@ export const confirmarTransferencia = async (req: Request, res: Response): Promi
       );
       const productoNombre = productoRows.length > 0 ? productoRows[0].nombre : 'Desconocido';
       
-      // Pasar de stock_en_transito a stock
+      // Pasar de stock_en_transito a stock real
       await connection.query(
         `UPDATE productos_sucursal 
          SET stock = stock + ?, 
@@ -1336,6 +1330,62 @@ export const confirmarTransferencia = async (req: Request, res: Response): Promi
     res.status(500).json({
       success: false,
       message: 'Error al confirmar transferencia',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * POST /api/productos/confirmar-recepcion-manual
+ * Limpiar indicador de recibidos_recientes manualmente (antes de 48h)
+ * Body: { producto_id, sucursal }
+ */
+export const confirmarRecepcionManual = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { producto_id, sucursal } = req.body;
+    
+    if (!producto_id || !sucursal) {
+      res.status(400).json({
+        success: false,
+        message: 'Datos inválidos: se requiere producto_id y sucursal'
+      });
+      return;
+    }
+    
+    console.log('🔹 [DEBUG] Confirmando recepción manual:', { producto_id, sucursal });
+    
+    // Limpiar recibidos_recientes
+    const [result] = await connection.query<ResultSetHeader>(
+      `UPDATE productos_sucursal 
+       SET recibidos_recientes = 0,
+           fecha_ultima_recepcion = NULL
+       WHERE producto_id = ? AND sucursal = ?`,
+      [producto_id, sucursal]
+    );
+    
+    if (result.affectedRows === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Producto no encontrado en la sucursal especificada'
+      });
+      return;
+    }
+    
+    res.json({
+      success: true,
+      message: 'Recepción confirmada. El indicador ha sido limpiado.',
+      data: { producto_id, sucursal }
+    });
+    
+  } catch (error) {
+    console.error('Error al confirmar recepción manual:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al confirmar recepción',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   } finally {
@@ -1607,6 +1657,8 @@ export const obtenerHistorialTransferencias = async (req: Request, res: Response
  * Query params: sucursal, marca, tipo
  */
 export const obtenerInventario = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
   try {
     const { sucursal, marca, tipo } = req.query;
 
@@ -1622,6 +1674,7 @@ export const obtenerInventario = async (req: Request, res: Response): Promise<vo
         ps.stock_en_transito as recibidos,
         ps.precio,
         ps.stock_minimo,
+        ps.fecha_ultima_recepcion,
         ps.updated_at
       FROM productos p
       INNER JOIN productos_sucursal ps ON p.id = ps.producto_id
@@ -1650,7 +1703,18 @@ export const obtenerInventario = async (req: Request, res: Response): Promise<vo
 
     query += ` ORDER BY ps.sucursal ASC, p.marca ASC, p.nombre ASC`;
 
-    const [rows] = await pool.query<RowDataPacket[]>(query, params);
+    const [rows] = await connection.query<RowDataPacket[]>(query, params);
+
+    // 🐛 DEBUG: Verificar productos con stock_en_transito > 0
+    const enTransito = rows.filter((r: any) => r.recibidos > 0);
+    if (enTransito.length > 0) {
+      console.log('🚚 [BACKEND] Productos en tránsito:', enTransito.map((r: any) => ({
+        producto: r.producto,
+        sucursal: r.sucursal,
+        stock: r.stock,
+        en_transito: r.recibidos
+      })));
+    }
 
     res.json({
       success: true,
@@ -1665,6 +1729,8 @@ export const obtenerInventario = async (req: Request, res: Response): Promise<vo
       message: 'Error al obtener inventario',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
+  } finally {
+    connection.release();
   }
 };
 

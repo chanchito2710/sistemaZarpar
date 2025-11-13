@@ -56,3 +56,7 @@ WHERE tipo IN ('Batería', 'Botón')
 LIMIT 5;
 
 
+
+
+
+

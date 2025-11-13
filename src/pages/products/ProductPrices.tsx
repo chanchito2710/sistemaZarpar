@@ -15,7 +15,8 @@ import {
   Spin,
   message,
   Empty,
-  Divider
+  Divider,
+  Alert
 } from 'antd';
 import {
   FileTextOutlined,
@@ -23,10 +24,12 @@ import {
   ShopOutlined,
   DollarOutlined,
   BarcodeOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  LockOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { productosService, vendedoresService, type ProductoCompleto } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -37,6 +40,22 @@ const { Option } = Select;
  * Componente Principal
  */
 const ProductPrices: React.FC = () => {
+  // Contexto de autenticación
+  const { usuario } = useAuth();
+  
+  // Verificar si es administrador
+  const esAdmin = usuario?.email?.toLowerCase() === 'admin@zarparuy.com';
+  
+  // Obtener sucursal del usuario (si no es admin)
+  const obtenerSucursalUsuario = (): string => {
+    if (esAdmin || !usuario?.email) return '';
+    
+    const email = usuario.email.toLowerCase();
+    // Extraer sucursal del email (ej: "pando@zarparuy.com" -> "pando")
+    const sucursal = email.split('@')[0];
+    return sucursal;
+  };
+  
   // Estados
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
   const [sucursales, setSucursales] = useState<string[]>([]);
@@ -67,6 +86,19 @@ const ProductPrices: React.FC = () => {
   const cargarSucursales = async () => {
     setLoadingSucursales(true);
     try {
+      // Si NO es admin, solo cargar su propia sucursal
+      if (!esAdmin) {
+        const sucursalUsuario = obtenerSucursalUsuario();
+        if (sucursalUsuario) {
+          setSucursales([sucursalUsuario]);
+          setSucursalSeleccionada(sucursalUsuario);
+        } else {
+          message.error('No se pudo determinar la sucursal del usuario');
+        }
+        return;
+      }
+      
+      // Si ES admin, cargar todas las sucursales
       const sucursalesData = await vendedoresService.obtenerSucursales();
       setSucursales(sucursalesData);
       
@@ -402,6 +434,18 @@ const ProductPrices: React.FC = () => {
           boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
         }}
       >
+        {/* Alert para usuarios normales */}
+        {!esAdmin && (
+          <Alert
+            message="🔒 Acceso Restringido"
+            description={`Solo puedes ver y generar precios de tu sucursal asignada: ${obtenerSucursalUsuario().toUpperCase()}`}
+            type="info"
+            showIcon
+            icon={<LockOutlined />}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        
         <Space 
           direction="horizontal" 
           size="large" 
@@ -410,7 +454,7 @@ const ProductPrices: React.FC = () => {
           {/* Selector de Sucursal */}
           <Space direction="vertical" size="small">
             <Text strong style={{ fontSize: 13 }}>
-              <ShopOutlined /> Seleccionar Sucursal
+              <ShopOutlined /> {esAdmin ? 'Seleccionar Sucursal' : 'Tu Sucursal'}
             </Text>
             <Select
               value={sucursalSeleccionada}
@@ -419,6 +463,7 @@ const ProductPrices: React.FC = () => {
               size="large"
               loading={loadingSucursales}
               placeholder="Seleccione una sucursal"
+              disabled={!esAdmin} // ✅ Deshabilitar si NO es admin
             >
               {sucursales.map((sucursal) => (
                 <Option key={sucursal} value={sucursal}>

@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import { executeQuery } from '../config/database';
 import pool from '../config/database';
+import bcrypt from 'bcryptjs';
 
 /**
  * Interfaz para el tipo Vendedor
@@ -504,6 +505,81 @@ export const actualizarEstadoComisiones = async (req: Request, res: Response): P
     res.status(500).json({
       success: false,
       message: 'Error al actualizar estado de comisiones',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Cambiar contraseña de un vendedor
+ * PUT /api/vendedores/:id/password
+ * SOLO ADMINISTRADORES
+ */
+export const cambiarPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+
+    console.log('🔐 Cambiando contraseña para vendedor ID:', id);
+
+    // Validaciones
+    if (!password || password.trim() === '') {
+      res.status(400).json({
+        success: false,
+        message: 'La contraseña es requerida'
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({
+        success: false,
+        message: 'La contraseña debe tener al menos 6 caracteres'
+      });
+      return;
+    }
+
+    // Verificar que el vendedor existe
+    const vendedor = await executeQuery<Vendedor[]>(
+      'SELECT * FROM vendedores WHERE id = ?',
+      [id]
+    );
+
+    if (!vendedor || vendedor.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Vendedor no encontrado'
+      });
+      return;
+    }
+
+    // Encriptar la nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Actualizar la contraseña en la base de datos
+    await executeQuery(
+      'UPDATE vendedores SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [hashedPassword, id]
+    );
+
+    console.log('✅ Contraseña actualizada exitosamente para:', vendedor[0].nombre);
+
+    res.json({
+      success: true,
+      message: `Contraseña actualizada exitosamente para ${vendedor[0].nombre}`,
+      data: {
+        id: Number(id),
+        nombre: vendedor[0].nombre,
+        email: vendedor[0].email
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error al cambiar contraseña:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al cambiar contraseña',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   }

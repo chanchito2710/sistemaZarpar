@@ -213,3 +213,7 @@ WHERE marca = 'Huawei' AND id > 12;
 
 
 
+
+
+
+

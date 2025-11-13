@@ -67,3 +67,7 @@ SELECT '========== 4. VERIFICACIÓN DE DATOS CORRUPTOS ===========' as titulo;
 -- Esta parte será completada con queries específicas por tabla
 
 
+
+
+
+

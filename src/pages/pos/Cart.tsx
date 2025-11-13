@@ -28,6 +28,7 @@ import {
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { productosService, descuentosService, type ProductoCompleto, type Venta } from '../../services/api';
+import { tieneDescuentoUnaVez, consumirDescuentoUnaVez } from '../../utils/descuentoUnaVez';
 import POSCheckout from '../../components/pos/POSCheckout';
 import VentaExitosa from '../../components/pos/VentaExitosa';
 
@@ -136,13 +137,37 @@ const Cart: React.FC = () => {
 
   /**
    * Verificar si el descuento está habilitado para esta sucursal
+   * Considera: descuento normal Y descuento "una vez"
    */
   const verificarDescuentoHabilitado = async () => {
     if (!posData?.sucursal) return;
 
     try {
+      // Verificar descuento normal desde el backend
       const config = await descuentosService.obtenerConfiguracionPorSucursal(posData.sucursal);
-      setDescuentoHabilitado(config.descuento_habilitado === 1 || config.descuento_habilitado === true);
+      const descuentoNormal = config.descuento_habilitado === 1 || config.descuento_habilitado === true;
+      
+      // Verificar descuento "una vez" desde localStorage
+      const descuentoUnaVez = tieneDescuentoUnaVez(posData.sucursal);
+      
+      // Habilitar si tiene descuento normal O descuento de una vez
+      const habilitado = descuentoNormal || descuentoUnaVez;
+      setDescuentoHabilitado(habilitado);
+      
+      console.log('🎯 Verificación de descuento:', {
+        sucursal: posData.sucursal,
+        descuentoNormal,
+        descuentoUnaVez,
+        habilitado
+      });
+      
+      // Mostrar mensaje si el descuento es de "una vez"
+      if (descuentoUnaVez && !descuentoNormal) {
+        message.info({
+          content: '⚡ Descuento de USO ÚNICO habilitado. Se desactivará después de esta venta.',
+          duration: 5
+        });
+      }
     } catch (error) {
       console.error('Error al verificar descuento:', error);
       // Por defecto, deshabilitar descuento si hay error
@@ -347,6 +372,17 @@ const Cart: React.FC = () => {
     // Guardar la venta completada y el carrito para mostrar la página de éxito
     setCarritoVentaCompletada([...carrito]); // Guardar copia del carrito antes de limpiarlo
     setVentaCompletada(venta);
+    
+    // Si se aplicó un descuento Y hay un descuento "una vez" activo, consumirlo
+    if (descuento > 0 && posData?.sucursal && tieneDescuentoUnaVez(posData.sucursal)) {
+      consumirDescuentoUnaVez(posData.sucursal);
+      message.success({
+        content: '⚡ Descuento de uso único aplicado y desactivado automáticamente.',
+        duration: 4
+      });
+      console.log('✅ Descuento "una vez" consumido para:', posData.sucursal);
+    }
+    
     // Limpiar carrito
     setCarrito([]);
     setValorDescuento(0);

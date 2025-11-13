@@ -12,7 +12,8 @@ import {
   actualizarVendedor,
   eliminarVendedor,
   obtenerSucursales,
-  actualizarEstadoComisiones
+  actualizarEstadoComisiones,
+  cambiarPassword
 } from '../controllers/vendedoresController';
 import { verificarAutenticacion, verificarAdmin } from '../middleware/auth';
 
@@ -73,6 +74,13 @@ router.delete('/:id', verificarAutenticacion, verificarAdmin, eliminarVendedor);
  * @access  Private (Solo Administradores)
  */
 router.put('/:id/comisiones', verificarAutenticacion, verificarAdmin, actualizarEstadoComisiones);
+
+/**
+ * @route   PUT /api/vendedores/:id/password
+ * @desc    Cambiar contraseña de un vendedor
+ * @access  Private (Solo Administradores)
+ */
+router.put('/:id/password', verificarAutenticacion, verificarAdmin, cambiarPassword);
 
 export default router;
 

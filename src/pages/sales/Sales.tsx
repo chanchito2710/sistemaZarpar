@@ -68,6 +68,7 @@ const Sales: React.FC = () => {
   );
   const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState<string>('todos');
   const [estadoPagoSeleccionado, setEstadoPagoSeleccionado] = useState<string>('todos');
+  const [soloConDescuentos, setSoloConDescuentos] = useState<boolean>(false);
 
   // Estados de datos
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -102,6 +103,13 @@ const Sales: React.FC = () => {
   useEffect(() => {
     cargarVentas();
   }, []);
+
+  /**
+   * Recargar ventas cuando cambia el filtro de descuentos
+   */
+  useEffect(() => {
+    cargarVentas();
+  }, [soloConDescuentos]);
 
   /**
    * Cargar sucursales desde la API
@@ -146,6 +154,10 @@ const Sales: React.FC = () => {
 
       if (estadoPagoSeleccionado && estadoPagoSeleccionado !== 'todos') {
         filtros.estado_pago = estadoPagoSeleccionado;
+      }
+
+      if (soloConDescuentos) {
+        filtros.con_descuento = 'true';
       }
 
       console.log('🔍 Filtros aplicados:', filtros);
@@ -469,6 +481,23 @@ const Sales: React.FC = () => {
                 loading={loading}
               >
                 Actualizar
+              </Button>
+            </Col>
+            <Col>
+              <Button 
+                icon={<DollarOutlined />}
+                type={soloConDescuentos ? 'primary' : 'default'}
+                onClick={() => {
+                  setSoloConDescuentos(!soloConDescuentos);
+                }}
+                style={{
+                  background: soloConDescuentos ? 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' : undefined,
+                  borderColor: soloConDescuentos ? 'transparent' : undefined,
+                  color: soloConDescuentos ? '#fff' : undefined,
+                  fontWeight: soloConDescuentos ? 'bold' : 'normal'
+                }}
+              >
+                {soloConDescuentos ? '💰 Mostrando con Descuentos' : '🏷️ Solo con Descuentos'}
               </Button>
             </Col>
             <Col>

@@ -107,7 +107,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       email: usuario.email,
       nombre: usuario.nombre,
       cargo: usuario.cargo,
-      sucursal: usuario.sucursal,
+      sucursal: usuario.sucursal.toLowerCase(), // ✅ Normalizar a minúsculas
       esAdmin: esAdmin
     };
 
@@ -150,7 +150,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         nombre: usuario.nombre,
         email: usuario.email,
         cargo: usuario.cargo,
-        sucursal: usuario.sucursal,
+        sucursal: usuario.sucursal.toLowerCase(), // ✅ Normalizar a minúsculas
         esAdmin: esAdmin,
         tablasClientes: tablasClientes,
         permisos: {

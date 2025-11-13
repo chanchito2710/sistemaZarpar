@@ -21,6 +21,7 @@ import {
   obtenerSucursalPrincipalEndpoint,
   prepararTransferencia,
   confirmarTransferencia,
+  confirmarRecepcionManual,
   ajustarTransferencia,
   obtenerHistorialTransferencias,
   obtenerInventario,
@@ -356,6 +357,19 @@ router.post(
   '/confirmar-transferencia',
   verificarAutenticacion,
   confirmarTransferencia
+);
+
+/**
+ * @route   POST /api/productos/confirmar-recepcion-manual
+ * @desc    Confirmar recepción manual: limpiar indicador de recibidos_recientes
+ * @access  Private (requiere autenticación)
+ * @body    { producto_id: number, sucursal: string }
+ * @returns Confirmación de recepción limpiada
+ */
+router.post(
+  '/confirmar-recepcion-manual',
+  verificarAutenticacion,
+  confirmarRecepcionManual
 );
 
 export default router;

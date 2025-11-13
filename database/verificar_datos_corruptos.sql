@@ -121,3 +121,7 @@ WHERE valor LIKE '%Ã%'
 LIMIT 10;
 
 
+
+
+
+

@@ -21,7 +21,7 @@ const Dashboard: React.FC = () => {
   // Configuración del grid de módulos (filtrado según rol)
   const dashboardModules = useMemo(() => {
     // Módulos que solo el admin puede ver
-    const adminOnlyPaths = ['/products', '/staff/sellers'];
+    const adminOnlyPaths = ['/products', '/staff/sellers', '/inventory/transfer'];
     
     // Configuración base
     const allModules = [
@@ -35,6 +35,7 @@ const Dashboard: React.FC = () => {
       // Fila 2
       [
         moduleInfo.inventory,
+        moduleInfo.inventoryMovements,
         moduleInfo.expenses,
         moduleInfo.payroll,
         moduleInfo.inventoryLog,
@@ -43,7 +44,6 @@ const Dashboard: React.FC = () => {
       [
         moduleInfo.sales,
         moduleInfo.accounts,
-        moduleInfo.banks,
         moduleInfo.cash,
       ],
       // Fila 4

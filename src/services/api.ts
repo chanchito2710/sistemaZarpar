@@ -1188,11 +1188,18 @@ export const ventasService = {
 
   /**
    * Obtener las últimas ventas (para Dashboard)
+   * @param limit - Número máximo de ventas a obtener
+   * @param sucursal - (Opcional) Filtrar por sucursal específica
    */
-  obtenerUltimas: async (limit: number = 4): Promise<any[]> => {
+  obtenerUltimas: async (limit: number = 4, sucursal?: string): Promise<any[]> => {
     try {
+      const params: any = {};
+      if (sucursal && sucursal !== 'todas') {
+        params.sucursal = sucursal;
+      }
+      
       const response: AxiosResponse<ApiResponse<any[]>> = 
-        await apiClient.get(`/ventas/ultimas/${limit}`);
+        await apiClient.get(`/ventas/ultimas/${limit}`, { params });
       return response.data.data || [];
     } catch (error) {
       console.error('Error al obtener últimas ventas:', error);
@@ -1247,6 +1254,29 @@ export const ventasService = {
       return response.data.data || [];
     } catch (error) {
       console.error('Error al obtener ventas globales:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener ventas detalladas individuales con filtros
+   */
+  obtenerVentasDetalladas: async (filtros?: {
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    sucursal?: string;
+  }): Promise<any[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros?.fecha_desde) params.append('fecha_desde', filtros.fecha_desde);
+      if (filtros?.fecha_hasta) params.append('fecha_hasta', filtros.fecha_hasta);
+      if (filtros?.sucursal) params.append('sucursal', filtros.sucursal);
+
+      const url = `/ventas/ventas-detalladas${params.toString() ? `?${params.toString()}` : ''}`;
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener ventas detalladas:', error);
       throw error;
     }
   },
@@ -2133,6 +2163,21 @@ export const devolucionesService = {
   },
 
   /**
+   * Obtener stock de fallas histórico por fecha
+   */
+  obtenerStockFallasPorFecha: async (sucursal: string, fecha: string): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get('/devoluciones/stock-fallas-historico', {
+        params: { sucursal, fecha }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener stock de fallas histórico:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Obtener saldos a favor de clientes
    */
   obtenerSaldosFavor: async (sucursal?: string): Promise<any[]> => {
@@ -2143,6 +2188,57 @@ export const devolucionesService = {
       return response.data.data || [];
     } catch (error) {
       console.error('Error al obtener saldos a favor:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener historial de reemplazos de un producto
+   */
+  obtenerHistorialReemplazos: async (detalleId: number): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(`/devoluciones/historial-reemplazos/${detalleId}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener historial de reemplazos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener detalle de fallas de un producto
+   */
+  obtenerDetalleFallas: async (productoId: number, sucursal?: string): Promise<any[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await apiClient.get(`/devoluciones/detalle-fallas/${productoId}`, {
+        params: { sucursal }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener detalle de fallas:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtener estadísticas completas de fallas
+   */
+  obtenerEstadisticasFallas: async (
+    sucursal?: string, 
+    fechaInicio?: string | null, 
+    fechaFin?: string | null
+  ): Promise<any> => {
+    try {
+      const params: any = { sucursal };
+      if (fechaInicio) params.fechaInicio = fechaInicio;
+      if (fechaFin) params.fechaFin = fechaFin;
+      
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.get('/devoluciones/estadisticas-fallas', {
+        params
+      });
+      return response.data.data || {};
+    } catch (error) {
+      console.error('Error al obtener estadísticas de fallas:', error);
       throw error;
     }
   },

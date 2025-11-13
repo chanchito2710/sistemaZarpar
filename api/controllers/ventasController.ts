@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import { executeQuery } from '../config/database';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { registrarMovimientoStock } from '../utils/historialStock.js';
 
 /**
  * Interfaz para una venta
@@ -191,6 +192,21 @@ export const crearVenta = async (req: Request, res: Response): Promise<void> => 
         producto.subtotal
       ]);
 
+      // Obtener stock actual antes de actualizar (para el historial)
+      const queryStockActual = `
+        SELECT stock, stock_fallas 
+        FROM productos_sucursal
+        WHERE producto_id = ? AND sucursal = ?
+      `;
+      
+      const stockActual = await executeQuery<RowDataPacket[]>(queryStockActual, [
+        producto.producto_id,
+        datos.sucursal
+      ]);
+
+      const stockAnterior = stockActual[0]?.stock || 0;
+      const stockFallasAnterior = stockActual[0]?.stock_fallas || 0;
+
       // Actualizar stock del producto en productos_sucursal
       const queryUpdateStock = `
         UPDATE productos_sucursal
@@ -203,6 +219,23 @@ export const crearVenta = async (req: Request, res: Response): Promise<void> => 
         producto.producto_id,
         datos.sucursal
       ]);
+
+      // 📝 Registrar movimiento en historial de stock
+      await registrarMovimientoStock({
+        sucursal: datos.sucursal,
+        producto_id: producto.producto_id,
+        producto_nombre: producto.producto_nombre,
+        cliente_id: datos.cliente_id,
+        cliente_nombre: datos.cliente_nombre,
+        stock_anterior: stockAnterior,
+        stock_nuevo: stockAnterior - producto.cantidad,
+        stock_fallas_anterior: stockFallasAnterior,
+        stock_fallas_nuevo: stockFallasAnterior,
+        tipo_movimiento: 'venta',
+        referencia: numeroVenta,
+        usuario_email: (req as any).usuario?.email || 'sistema',
+        observaciones: `Venta de ${producto.cantidad} unidad(es)`
+      });
     }
 
     // Si es cuenta corriente, registrar movimiento
@@ -463,11 +496,24 @@ export const obtenerDetalleVenta = async (req: Request, res: Response): Promise<
   try {
     const { id } = req.params;
 
+    console.log(`🔍 [DETALLE VENTA] Solicitando detalle de venta ID: ${id}`);
+
     // Obtener venta principal
-    const queryVenta = `SELECT * FROM ventas WHERE id = ?`;
+    const queryVenta = `
+      SELECT 
+        v.*,
+        CAST(v.subtotal AS DECIMAL(10,2)) as subtotal,
+        CAST(v.descuento AS DECIMAL(10,2)) as descuento,
+        CAST(v.total AS DECIMAL(10,2)) as total
+      FROM ventas v 
+      WHERE v.id = ?
+    `;
     const venta = await executeQuery<RowDataPacket[]>(queryVenta, [id]);
 
+    console.log(`📦 [DETALLE VENTA] Venta encontrada:`, venta.length > 0 ? 'SÍ' : 'NO');
+
     if (venta.length === 0) {
+      console.log(`❌ [DETALLE VENTA] Venta ID ${id} no encontrada`);
       res.status(404).json({
         success: false,
         message: 'Venta no encontrada'
@@ -475,27 +521,61 @@ export const obtenerDetalleVenta = async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Obtener detalles de productos con tipo
+    // Obtener detalles de productos vendidos con TODA la información
     const queryDetalle = `
       SELECT 
-        vd.*,
-        p.tipo
+        vd.id,
+        vd.venta_id,
+        vd.producto_id,
+        vd.cantidad,
+        CAST(vd.precio_unitario AS DECIMAL(10,2)) as precio_venta,
+        CAST(vd.subtotal AS DECIMAL(10,2)) as subtotal,
+        vd.producto_nombre as nombre,
+        p.tipo,
+        p.marca,
+        p.calidad,
+        p.codigo_barras as codigo
       FROM ventas_detalle vd
       LEFT JOIN productos p ON vd.producto_id = p.id
       WHERE vd.venta_id = ?
+      ORDER BY vd.id ASC
     `;
+    
+    console.log(`🔍 [DETALLE VENTA] Buscando productos para venta ID: ${id}`);
     const detalles = await executeQuery<RowDataPacket[]>(queryDetalle, [id]);
+    console.log(`📦 [DETALLE VENTA] Productos encontrados: ${detalles.length}`);
+
+    if (detalles.length > 0) {
+      console.log('✅ [DETALLE VENTA] Primer producto:', detalles[0]);
+    }
+
+    // Normalizar datos de productos
+    const productosNormalizados = detalles.map((prod: any) => ({
+      ...prod,
+      id: Number(prod.id) || 0,
+      producto_id: Number(prod.producto_id) || 0,
+      cantidad: Number(prod.cantidad) || 0,
+      precio_venta: Number(prod.precio_venta) || 0,
+      subtotal: Number(prod.subtotal) || 0,
+    }));
+
+    const respuesta = {
+      ...venta[0],
+      subtotal: Number(venta[0].subtotal) || 0,
+      descuento: Number(venta[0].descuento) || 0,
+      total: Number(venta[0].total) || 0,
+      productos: productosNormalizados
+    };
+
+    console.log(`✅ [DETALLE VENTA] Respuesta enviada con ${productosNormalizados.length} productos`);
 
     res.status(200).json({
       success: true,
-      data: {
-        ...venta[0],
-        productos: detalles
-      }
+      data: respuesta
     });
 
   } catch (error) {
-    console.error('Error al obtener detalle de venta:', error);
+    console.error('❌ [DETALLE VENTA] Error:', error);
     res.status(500).json({
       success: false,
       message: 'Error al obtener el detalle de la venta',
@@ -1166,7 +1246,7 @@ export const obtenerHistorialVentas = async (req: Request, res: Response): Promi
     console.log('📋 Endpoint /api/ventas/historial llamado');
     console.log('Query params:', req.query);
 
-    const { sucursal, fecha_desde, fecha_hasta, metodo_pago, estado_pago } = req.query;
+    const { sucursal, fecha_desde, fecha_hasta, metodo_pago, estado_pago, con_descuento } = req.query;
 
     // Query base: obtener ventas con cantidad de productos
     let query = `
@@ -1227,6 +1307,12 @@ export const obtenerHistorialVentas = async (req: Request, res: Response): Promi
       query += ` AND v.estado_pago = ?`;
       params.push(estado_pago);
       console.log('✅ Filtro estado_pago:', estado_pago);
+    }
+
+    // Filtro por ventas con descuento
+    if (con_descuento === 'true') {
+      query += ` AND v.descuento > 0`;
+      console.log('💰 Filtro con_descuento: true (solo ventas con descuentos)');
     }
 
     query += ` GROUP BY v.id ORDER BY v.fecha_venta DESC`;
@@ -1370,12 +1456,13 @@ export const obtenerHistorialPagosCuentaCorriente = async (req: Request, res: Re
 
 /**
  * Obtener últimas ventas para el Dashboard
- * GET /api/ventas/ultimas/:limit?
+ * GET /api/ventas/ultimas/:limit?sucursal=xxx
  */
 export const obtenerUltimasVentas = async (req: Request, res: Response): Promise<void> => {
   try {
     const limitParam = req.params.limit;
     const limit = limitParam ? parseInt(limitParam) : 4;
+    const { sucursal } = req.query;
 
     // Validar que limit sea un número válido
     if (isNaN(limit) || limit < 1 || limit > 100) {
@@ -1386,8 +1473,8 @@ export const obtenerUltimasVentas = async (req: Request, res: Response): Promise
       return;
     }
 
-    // Query simple para obtener las últimas ventas
-    const query = `
+    // Query para obtener las últimas ventas (con filtro opcional de sucursal)
+    let query = `
       SELECT 
         v.id,
         v.numero_venta,
@@ -1397,11 +1484,21 @@ export const obtenerUltimasVentas = async (req: Request, res: Response): Promise
         v.metodo_pago,
         v.fecha_venta
       FROM ventas v
-      ORDER BY v.fecha_venta DESC
-      LIMIT ${limit}
     `;
+    
+    const params: any[] = [];
+    
+    // Si se proporciona sucursal, filtrar por ella
+    if (sucursal && typeof sucursal === 'string' && sucursal !== 'todas') {
+      query += ` WHERE v.sucursal = ?`;
+      params.push(sucursal);
+    }
+    
+    // NOTA: LIMIT no acepta placeholders en MySQL, debe ser literal
+    // Ya validamos que limit es un número seguro (1-100)
+    query += ` ORDER BY v.fecha_venta DESC LIMIT ${limit}`;
 
-    const ventas = await executeQuery<RowDataPacket[]>(query);
+    const ventas = await executeQuery<RowDataPacket[]>(query, params);
 
     // Obtener primer producto para cada venta
     for (const venta of ventas) {
@@ -1647,6 +1744,99 @@ export const obtenerVentasGlobales = async (req: Request, res: Response): Promis
     res.status(500).json({
       success: false,
       message: 'Error al obtener el historial de ventas globales',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener ventas detalladas con filtros (para reportes completos)
+ * GET /api/ventas/ventas-detalladas
+ * Query params: fecha_desde, fecha_hasta, sucursal
+ */
+export const obtenerVentasDetalladas = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fecha_desde, fecha_hasta, sucursal } = req.query;
+
+    console.log('📊 [VENTAS DETALLADAS] Filtros recibidos:', { fecha_desde, fecha_hasta, sucursal });
+
+    let query = `
+      SELECT 
+        v.id,
+        v.numero_venta,
+        v.fecha_venta,
+        v.sucursal,
+        CAST(v.total AS DECIMAL(10,2)) as total,
+        v.metodo_pago,
+        v.estado_pago,
+        v.cliente_id,
+        v.cliente_nombre,
+        v.vendedor_id,
+        v.vendedor_nombre,
+        v.observaciones,
+        (SELECT COUNT(*) FROM ventas_detalle WHERE venta_id = v.id) as cantidad_productos,
+        (SELECT GROUP_CONCAT(DISTINCT p.tipo SEPARATOR ', ') 
+         FROM ventas_detalle vd 
+         INNER JOIN productos p ON vd.producto_id = p.id 
+         WHERE vd.venta_id = v.id) as tipos_productos
+      FROM ventas v
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+
+    // Filtro por fecha desde
+    if (fecha_desde) {
+      query += ` AND DATE(v.fecha_venta) >= ?`;
+      params.push(fecha_desde);
+    }
+
+    // Filtro por fecha hasta
+    if (fecha_hasta) {
+      query += ` AND DATE(v.fecha_venta) <= ?`;
+      params.push(fecha_hasta);
+    }
+
+    // Filtro por sucursal
+    if (sucursal && sucursal !== 'todas') {
+      query += ` AND v.sucursal = ?`;
+      params.push(sucursal);
+    }
+
+    query += ` ORDER BY v.fecha_venta DESC, v.id DESC`;
+
+    console.log('🔍 [VENTAS DETALLADAS] Query SQL:', query);
+    console.log('📝 [VENTAS DETALLADAS] Parámetros:', params);
+
+    const ventas = await executeQuery<RowDataPacket[]>(query, params);
+
+    console.log(`✅ [VENTAS DETALLADAS] Ventas encontradas: ${ventas.length}`);
+    
+    // Log de sucursales únicas encontradas
+    const sucursalesEncontradas = [...new Set(ventas.map((v: any) => v.sucursal))];
+    console.log('🏢 [VENTAS DETALLADAS] Sucursales con ventas:', sucursalesEncontradas);
+
+    // Normalizar datos para asegurar tipos correctos
+    const ventasNormalizadas = ventas.map((venta: any) => ({
+      ...venta,
+      id: Number(venta.id) || 0,
+      total: Number(venta.total) || 0,
+      cliente_id: Number(venta.cliente_id) || 0,
+      vendedor_id: Number(venta.vendedor_id) || 0,
+      cantidad_productos: Number(venta.cantidad_productos) || 0,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: ventasNormalizadas,
+      count: ventasNormalizadas.length
+    });
+
+  } catch (error) {
+    console.error('❌ [VENTAS DETALLADAS] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener ventas detalladas',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   }

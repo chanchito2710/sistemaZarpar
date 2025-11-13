@@ -70,6 +70,7 @@ const Expenses: React.FC = () => {
   // Filtros de fecha para gastos
   const [fechaDesdeGastos, setFechaDesdeGastos] = useState<Dayjs | null>(null);
   const [fechaHastaGastos, setFechaHastaGastos] = useState<Dayjs | null>(null);
+  const [sucursalFiltroGastos, setSucursalFiltroGastos] = useState<string>('');
 
   const esAdmin = usuario?.esAdmin || false;
   const sucursalUsuario = obtenerSucursalDelUsuario();
@@ -93,12 +94,13 @@ const Expenses: React.FC = () => {
 
   useEffect(() => {
     // Establecer sucursal por defecto
-    const sucursalInicial = esAdmin ? '' : sucursalUsuario;
-    
     if (!esAdmin) {
       form.setFieldsValue({ sucursal: sucursalUsuario });
       setSucursalSeleccionada(sucursalUsuario);
+      setSucursalFiltroGastos(sucursalUsuario); // Filtro de gastos también
       cargarSaldoCaja(sucursalUsuario);
+    } else {
+      setSucursalFiltroGastos('todas'); // Admin ve todas por defecto
     }
 
     cargarGastosRecientes();
@@ -110,6 +112,13 @@ const Expenses: React.FC = () => {
       cargarSaldoCaja(sucursalSeleccionada);
     }
   }, [sucursalSeleccionada]);
+
+  // Efecto para recargar gastos cuando cambia el filtro de sucursal
+  useEffect(() => {
+    if (sucursalFiltroGastos) {
+      cargarGastosRecientes(fechaDesdeGastos, fechaHastaGastos, sucursalFiltroGastos);
+    }
+  }, [sucursalFiltroGastos]);
 
   const cargarSaldoCaja = async (sucursal: string) => {
     if (!sucursal) return;
@@ -137,7 +146,7 @@ const Expenses: React.FC = () => {
     }
   };
 
-  const cargarGastosRecientes = async (desde?: Dayjs | null, hasta?: Dayjs | null) => {
+  const cargarGastosRecientes = async (desde?: Dayjs | null, hasta?: Dayjs | null, sucursal?: string) => {
     setLoadingGastos(true);
     try {
       const token = localStorage.getItem('token');
@@ -145,12 +154,18 @@ const Expenses: React.FC = () => {
       // Construir URL con parámetros de fecha si existen
       let url = `${API_URL}/caja/movimientos/historial?tipo_movimiento=gasto&limite=50`;
       
+      // Filtro de sucursal
+      const sucursalFiltro = sucursal || sucursalFiltroGastos;
+      if (sucursalFiltro && sucursalFiltro !== 'todas') {
+        url += `&sucursal=${sucursalFiltro}`;
+      }
+      
       if (desde) {
-        url += `&fechaDesde=${desde.format('YYYY-MM-DD')}`;
+        url += `&fecha_desde=${desde.format('YYYY-MM-DD')}`;
       }
       
       if (hasta) {
-        url += `&fechaHasta=${hasta.format('YYYY-MM-DD')}`;
+        url += `&fecha_hasta=${hasta.format('YYYY-MM-DD')}`;
       }
       
       const response = await fetch(url, {
@@ -172,13 +187,18 @@ const Expenses: React.FC = () => {
   };
   
   const handleFiltrarGastos = () => {
-    cargarGastosRecientes(fechaDesdeGastos, fechaHastaGastos);
+    cargarGastosRecientes(fechaDesdeGastos, fechaHastaGastos, sucursalFiltroGastos);
   };
   
   const handleLimpiarFiltros = () => {
     setFechaDesdeGastos(null);
     setFechaHastaGastos(null);
-    cargarGastosRecientes(null, null);
+    if (esAdmin) {
+      setSucursalFiltroGastos('todas');
+      cargarGastosRecientes(null, null, 'todas');
+    } else {
+      cargarGastosRecientes(null, null, sucursalUsuario);
+    }
   };
 
   const handleRegistrarGasto = async (values: any) => {
@@ -253,8 +273,7 @@ const Expenses: React.FC = () => {
           {dayjs(fecha).format('DD/MM/YYYY HH:mm')}
         </Text>
       ),
-      width: 130,
-      fixed: 'left' as const,
+      responsive: ['xs', 'sm', 'md', 'lg', 'xl'] as any,
     },
     {
       title: 'Sucursal',
@@ -265,7 +284,7 @@ const Expenses: React.FC = () => {
           {sucursal.toUpperCase()}
         </Tag>
       ),
-      width: 100,
+      responsive: ['sm', 'md', 'lg', 'xl'] as any,
     },
     {
       title: 'Monto',
@@ -276,8 +295,8 @@ const Expenses: React.FC = () => {
           -${Math.abs(monto).toFixed(2)}
         </Text>
       ),
-      width: 100,
       align: 'right' as const,
+      responsive: ['xs', 'sm', 'md', 'lg', 'xl'] as any,
     },
     {
       title: 'Concepto',
@@ -289,6 +308,7 @@ const Expenses: React.FC = () => {
           {concepto}
         </Text>
       ),
+      responsive: ['md', 'lg', 'xl'] as any,
     },
     {
       title: 'Usuario',
@@ -299,20 +319,20 @@ const Expenses: React.FC = () => {
           {email}
         </Text>
       ),
-      width: 180,
       ellipsis: true,
+      responsive: ['lg', 'xl'] as any,
     },
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: '16px', maxWidth: '100%', overflow: 'hidden' }}>
       {/* Header */}
-      <Row align="middle" justify="space-between" style={{ marginBottom: '24px' }}>
+      <Row align="middle" justify="space-between" style={{ marginBottom: '16px' }}>
         <Col>
-          <Title level={2} style={{ margin: 0 }}>
+          <Title level={2} style={{ margin: 0, fontSize: '24px' }}>
             💸 Registro de Gastos
           </Title>
-          <Text type="secondary">Registra gastos en efectivo de tu sucursal</Text>
+          <Text type="secondary" style={{ fontSize: '14px' }}>Registra gastos en efectivo de tu sucursal</Text>
         </Col>
       </Row>
 
@@ -322,25 +342,26 @@ const Expenses: React.FC = () => {
         description="Los gastos registrados se descontarán automáticamente del efectivo disponible en la caja de tu sucursal."
         type="info"
         showIcon
-        style={{ marginBottom: '24px' }}
+        style={{ marginBottom: '16px' }}
       />
 
       {/* Saldo disponible en caja */}
       {sucursalSeleccionada && (
         <Card
           style={{
-            marginBottom: '24px',
+            marginBottom: '16px',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             border: 'none',
           }}
+          bodyStyle={{ padding: '16px' }}
         >
-          <Row align="middle" justify="space-between">
-            <Col>
-              <Text style={{ color: 'white', fontSize: '16px', fontWeight: 500 }}>
+          <Row align="middle" justify="space-between" gutter={[16, 16]}>
+            <Col xs={24} sm={12}>
+              <Text style={{ color: 'white', fontSize: '14px', fontWeight: 500, display: 'block' }}>
                 💰 Efectivo Disponible en Caja ({sucursalSeleccionada.toUpperCase()})
               </Text>
             </Col>
-            <Col>
+            <Col xs={24} sm={12} style={{ textAlign: 'right' }}>
               <Spin spinning={loadingSaldo}>
                 <Statistic
                   value={saldoCaja !== null ? saldoCaja : 0}
@@ -348,7 +369,7 @@ const Expenses: React.FC = () => {
                   prefix="$"
                   valueStyle={{
                     color: 'white',
-                    fontSize: '32px',
+                    fontSize: '24px',
                     fontWeight: 'bold',
                   }}
                 />
@@ -358,26 +379,27 @@ const Expenses: React.FC = () => {
         </Card>
       )}
 
-      <Row gutter={[24, 24]}>
-        {/* Formulario de registro */}
-        <Col xs={24} lg={12}>
-          <Card
-            title={
-              <Space>
-                <PlusCircleOutlined />
-                <Text strong>Registrar Nuevo Gasto</Text>
-              </Space>
-            }
-          >
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={handleRegistrarGasto}
-              initialValues={{
-                sucursal: esAdmin ? undefined : sucursalUsuario,
-              }}
-            >
-              {/* Sucursal */}
+      {/* Formulario de registro */}
+      <Card
+        title={
+          <Space>
+            <PlusCircleOutlined />
+            <Text strong>Registrar Nuevo Gasto</Text>
+          </Space>
+        }
+        style={{ marginBottom: '16px' }}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleRegistrarGasto}
+          initialValues={{
+            sucursal: esAdmin ? undefined : sucursalUsuario,
+          }}
+        >
+          <Row gutter={[16, 16]}>
+            {/* Sucursal */}
+            <Col xs={24} sm={12} md={6}>
               <Form.Item
                 label="Sucursal"
                 name="sucursal"
@@ -398,8 +420,10 @@ const Expenses: React.FC = () => {
                   <Option value="tacuarembo">TACUAREMBÓ</Option>
                 </Select>
               </Form.Item>
+            </Col>
 
-              {/* Monto */}
+            {/* Monto */}
+            <Col xs={24} sm={12} md={6}>
               <Form.Item
                 label="Monto ($)"
                 name="monto"
@@ -418,8 +442,10 @@ const Expenses: React.FC = () => {
                   size="large"
                 />
               </Form.Item>
+            </Col>
 
-              {/* Motivo */}
+            {/* Motivo */}
+            <Col xs={24} sm={12} md={6}>
               <Form.Item
                 label="Motivo del Gasto"
                 name="motivo"
@@ -440,8 +466,28 @@ const Expenses: React.FC = () => {
                   ))}
                 </Select>
               </Form.Item>
+            </Col>
 
-              {/* Notas */}
+            {/* Botón */}
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item label=" ">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  size="large"
+                  loading={loading}
+                  block
+                  icon={<FileTextOutlined />}
+                >
+                  💸 Registrar Gasto
+                </Button>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Notas - Fila separada, ancho completo */}
+          <Row>
+            <Col xs={24}>
               <Form.Item
                 label="Notas (Opcional)"
                 name="notas"
@@ -458,7 +504,7 @@ const Expenses: React.FC = () => {
                       ? 'Especifica el motivo del gasto...'
                       : 'Agrega detalles adicionales (opcional)...'
                   }
-                  rows={4}
+                  rows={3}
                   maxLength={500}
                   showCount
                 />
@@ -473,103 +519,116 @@ const Expenses: React.FC = () => {
                   style={{ marginBottom: '16px' }}
                 />
               )}
+            </Col>
+          </Row>
+        </Form>
+      </Card>
 
-              {/* Botón */}
-              <Form.Item>
+      {/* Gastos recientes */}
+      <Card
+        title={
+          <Space>
+            <FileTextOutlined />
+            <Text strong>Gastos Recientes</Text>
+          </Space>
+        }
+        extra={
+          <Button 
+            onClick={handleLimpiarFiltros} 
+            size="small"
+            icon={<ReloadOutlined />}
+          >
+            Actualizar
+          </Button>
+        }
+      >
+        {/* Filtros */}
+        <Space direction="vertical" size="middle" style={{ width: '100%', marginBottom: 16 }}>
+          <Row gutter={[8, 8]} align="middle">
+            {/* Selector de Sucursal */}
+            <Col xs={24} sm={12} md={6}>
+              <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Sucursal:
+                </Text>
+                <Select
+                  value={sucursalFiltroGastos || (esAdmin ? 'todas' : sucursalUsuario)}
+                  onChange={(value) => setSucursalFiltroGastos(value)}
+                  style={{ width: '100%' }}
+                  size="small"
+                  disabled={!esAdmin}
+                >
+                  {esAdmin && <Option value="todas">TODAS</Option>}
+                  <Option value="pando">PANDO</Option>
+                  <Option value="maldonado">MALDONADO</Option>
+                  <Option value="rivera">RIVERA</Option>
+                  <Option value="melo">MELO</Option>
+                  <Option value="paysandu">PAYSANDÚ</Option>
+                  <Option value="salto">SALTO</Option>
+                  <Option value="tacuarembo">TACUAREMBÓ</Option>
+                </Select>
+              </Space>
+            </Col>
+            
+            {/* Filtro de Fechas */}
+            <Col xs={24} sm={12} md={10}>
+              <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Filtrar por rango de fechas:
+                </Text>
+                <RangePicker
+                  value={[fechaDesdeGastos, fechaHastaGastos]}
+                  onChange={(dates) => {
+                    setFechaDesdeGastos(dates ? dates[0] : null);
+                    setFechaHastaGastos(dates ? dates[1] : null);
+                  }}
+                  format="DD/MM/YYYY"
+                  placeholder={['Fecha desde', 'Fecha hasta']}
+                  style={{ width: '100%' }}
+                  size="small"
+                />
+              </Space>
+            </Col>
+            
+            {/* Botones */}
+            <Col xs={24} sm={24} md={8}>
+              <Space size="small" style={{ marginTop: 16 }}>
                 <Button
                   type="primary"
-                  htmlType="submit"
-                  size="large"
-                  loading={loading}
-                  block
-                  icon={<FileTextOutlined />}
+                  size="small"
+                  icon={<CalendarOutlined />}
+                  onClick={handleFiltrarGastos}
+                  loading={loadingGastos}
                 >
-                  💸 Registrar Gasto
+                  Filtrar
                 </Button>
-              </Form.Item>
-            </Form>
-          </Card>
-        </Col>
-
-        {/* Gastos recientes */}
-        <Col xs={24} lg={12}>
-          <Card
-            title={
-              <Space>
-                <FileTextOutlined />
-                <Text strong>Gastos Recientes</Text>
+                <Button
+                  size="small"
+                  onClick={handleLimpiarFiltros}
+                  disabled={!fechaDesdeGastos && !fechaHastaGastos && (esAdmin ? sucursalFiltroGastos === 'todas' : true)}
+                >
+                  Limpiar
+                </Button>
               </Space>
-            }
-            extra={
-              <Button 
-                onClick={handleLimpiarFiltros} 
-                size="small"
-                icon={<ReloadOutlined />}
-              >
-                Actualizar
-              </Button>
-            }
-          >
-            {/* Filtros de fecha */}
-            <Space direction="vertical" size="middle" style={{ width: '100%', marginBottom: 16 }}>
-              <Row gutter={[8, 8]} align="middle">
-                <Col xs={24} sm={14}>
-                  <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Filtrar por rango de fechas:
-                    </Text>
-                    <RangePicker
-                      value={[fechaDesdeGastos, fechaHastaGastos]}
-                      onChange={(dates) => {
-                        setFechaDesdeGastos(dates ? dates[0] : null);
-                        setFechaHastaGastos(dates ? dates[1] : null);
-                      }}
-                      format="DD/MM/YYYY"
-                      placeholder={['Fecha desde', 'Fecha hasta']}
-                      style={{ width: '100%' }}
-                      size="small"
-                    />
-                  </Space>
-                </Col>
-                <Col xs={24} sm={10}>
-                  <Space size="small" style={{ marginTop: 16 }}>
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<CalendarOutlined />}
-                      onClick={handleFiltrarGastos}
-                      loading={loadingGastos}
-                    >
-                      Filtrar
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={handleLimpiarFiltros}
-                      disabled={!fechaDesdeGastos && !fechaHastaGastos}
-                    >
-                      Limpiar
-                    </Button>
-                  </Space>
-                </Col>
-              </Row>
-            </Space>
-            
-            <Table
-              dataSource={gastosRecientes}
-              columns={columnas}
-              rowKey="id"
-              loading={loadingGastos}
-              pagination={{ 
-                pageSize: 10,
-                showSizeChanger: true,
-                showTotal: (total) => `Total: ${total} gastos`,
-              }}
-              size="small"
-              scroll={{ x: 800 }}
-            />
-          </Card>
-        </Col>
-      </Row>
+            </Col>
+          </Row>
+        </Space>
+        
+        <Table
+          dataSource={gastosRecientes}
+          columns={columnas}
+          rowKey="id"
+          loading={loadingGastos}
+          pagination={{ 
+            pageSize: 10,
+            showSizeChanger: false,
+            showTotal: (total) => `Total: ${total} gastos`,
+            simple: true,
+          }}
+          size="small"
+          scroll={{ x: 'max-content' }}
+        />
+      </Card>
     </div>
   );
 };

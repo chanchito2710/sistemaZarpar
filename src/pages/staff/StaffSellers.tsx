@@ -49,13 +49,15 @@ import {
   HistoryOutlined,
   SyncOutlined,
   StopOutlined,
-  PercentageOutlined
+  PercentageOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { comisionesService, vendedoresService, descuentosService } from '../../services/api';
+import './StaffSellers.css';
 
 const { Option } = Select;
 const { Title, Text, Paragraph } = Typography;
@@ -191,6 +193,18 @@ const StaffSellers: React.FC = () => {
   // Estados para descuentos
   const [configuracionDescuentos, setConfiguracionDescuentos] = useState<any[]>([]);
   const [descuentosLoading, setDescuentosLoading] = useState(false);
+  const [sucursalUnaVez, setSucursalUnaVez] = useState<string[]>(() => {
+    // Cargar desde localStorage al iniciar
+    const stored = localStorage.getItem('descuentos_una_vez');
+    return stored ? JSON.parse(stored) : [];
+  }); // Sucursales con "una vez" activo
+
+  // Estados para gestión de usuarios
+  const [usuarios, setUsuarios] = useState<Vendedor[]>([]);
+  const [usuariosLoading, setUsuariosLoading] = useState(false);
+  const [modalCambiarPassword, setModalCambiarPassword] = useState(false);
+  const [usuarioEditandoPassword, setUsuarioEditandoPassword] = useState<Vendedor | null>(null);
+  const [passwordForm] = Form.useForm();
 
   /**
    * Verificar que el usuario sea administrador
@@ -208,6 +222,13 @@ const StaffSellers: React.FC = () => {
   }, [usuario, navigate, messageApi]);
 
   /**
+   * Guardar estado de "una vez" en localStorage
+   */
+  useEffect(() => {
+    localStorage.setItem('descuentos_una_vez', JSON.stringify(sucursalUnaVez));
+  }, [sucursalUnaVez]);
+
+  /**
    * Cargar datos iniciales
    */
   useEffect(() => {
@@ -215,6 +236,7 @@ const StaffSellers: React.FC = () => {
     cargarSucursales();
     cargarComisiones();
     cargarDescuentos();
+    cargarUsuarios();
   }, []);
 
   /**
@@ -278,6 +300,26 @@ const StaffSellers: React.FC = () => {
       console.error('Error al actualizar descuento:', error);
       messageApi.error('Error al actualizar configuración de descuento');
     }
+  };
+
+  /**
+   * Habilitar descuento una sola vez
+   */
+  const handleHabilitarUnaVez = (sucursal: string) => {
+    // Agregar sucursal a la lista de "una vez activo"
+    setSucursalUnaVez(prev => [...prev, sucursal]);
+    messageApi.success({
+      content: `🎯 Descuento habilitado UNA VEZ para ${sucursal.toUpperCase()}. Se deshabilitará automáticamente después del primer uso.`,
+      duration: 4
+    });
+  };
+
+  /**
+   * Cancelar descuento de "una vez" (manual o después de uso)
+   */
+  const handleCancelarUnaVez = (sucursal: string) => {
+    setSucursalUnaVez(prev => prev.filter(s => s !== sucursal));
+    messageApi.info(`Descuento de uso único cancelado para ${sucursal.toUpperCase()}`);
   };
 
   /**
@@ -363,6 +405,95 @@ const StaffSellers: React.FC = () => {
       messageApi.error('Error al cargar vendedores');
     } finally {
       setVendedoresLoading(false);
+    }
+  };
+
+  /**
+   * Cargar usuarios del sistema (solo usuarios de login)
+   */
+  const cargarUsuarios = async () => {
+    try {
+      setUsuariosLoading(true);
+      const response = await axios.get(`${API_URL}/vendedores`);
+      
+      if (response.data.success) {
+        // Filtrar SOLO los usuarios que se usan para login:
+        // 1. admin@zarparuy.com (Administrador)
+        // 2. sucursal@zarparuy.com (Usuarios de sucursales)
+        const usuariosLogin = response.data.data.filter((vendedor: Vendedor) => {
+          const email = vendedor.email.toLowerCase();
+          
+          // Caso 1: Es el administrador
+          if (email === 'admin@zarparuy.com') {
+            return true;
+          }
+          
+          // Caso 2: Es un usuario de sucursal (formato: sucursal@zarparuy.com)
+          // Verificar que el email coincide con el patrón: [sucursal]@zarparuy.com
+          if (email.endsWith('@zarparuy.com')) {
+            const sucursalDelEmail = email.split('@')[0]; // Ej: "pando" de "pando@zarparuy.com"
+            const sucursalDelVendedor = vendedor.sucursal.toLowerCase().replace(/\s+/g, ''); // Normalizar
+            
+            // Verificar que el email coincide con la sucursal
+            // Ej: pando@zarparuy.com debe estar en sucursal "pando"
+            return sucursalDelEmail === sucursalDelVendedor;
+          }
+          
+          return false;
+        });
+        
+        console.log(`📋 Usuarios de login encontrados: ${usuariosLogin.length}`);
+        setUsuarios(usuariosLogin);
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar usuarios:', error);
+      messageApi.error('Error al cargar usuarios');
+    } finally {
+      setUsuariosLoading(false);
+    }
+  };
+
+  /**
+   * Abrir modal para cambiar contraseña
+   */
+  const abrirModalCambiarPassword = (usuario: Vendedor) => {
+    setUsuarioEditandoPassword(usuario);
+    setModalCambiarPassword(true);
+    passwordForm.resetFields();
+  };
+
+  /**
+   * Cambiar contraseña de un usuario
+   */
+  const cambiarPassword = async () => {
+    try {
+      const values = await passwordForm.validateFields();
+      
+      if (!usuarioEditandoPassword) return;
+
+      // Obtener token JWT del localStorage
+      const token = localStorage.getItem('token');
+
+      const response = await axios.put(
+        `${API_URL}/vendedores/${usuarioEditandoPassword.id}/password`,
+        { password: values.password },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        messageApi.success('✅ Contraseña actualizada exitosamente');
+        setModalCambiarPassword(false);
+        passwordForm.resetFields();
+        setUsuarioEditandoPassword(null);
+      }
+    } catch (error: any) {
+      console.error('❌ Error al cambiar contraseña:', error);
+      messageApi.error(error.response?.data?.message || 'Error al cambiar contraseña');
     }
   };
 
@@ -797,44 +928,6 @@ const StaffSellers: React.FC = () => {
         <Tag color={activo ? 'success' : 'error'} icon={activo ? <CheckCircleOutlined /> : <WarningOutlined />}>
           {activo ? 'Activo' : 'Inactivo'}
         </Tag>
-      ),
-    },
-    {
-      title: 'Comisiones',
-      dataIndex: 'cobra_comisiones',
-      key: 'cobra_comisiones',
-      render: (cobra_comisiones: boolean, record: Vendedor) => (
-        <Popconfirm
-          title={cobra_comisiones ? '¿Desactivar comisiones?' : '¿Activar comisiones?'}
-          description={
-            cobra_comisiones 
-              ? `${record.nombre} dejará de cobrar comisiones por ventas`
-              : `${record.nombre} comenzará a cobrar comisiones por ventas`
-          }
-          onConfirm={async () => {
-            try {
-              await vendedoresService.actualizarEstadoComisiones(record.id, !cobra_comisiones);
-              messageApi.success(
-                cobra_comisiones 
-                  ? 'Comisiones desactivadas correctamente'
-                  : 'Comisiones activadas correctamente'
-              );
-              await cargarVendedores();
-            } catch (error) {
-              messageApi.error('Error al actualizar estado de comisiones');
-            }
-          }}
-          okText="Sí"
-          cancelText="Cancelar"
-        >
-          <Tag 
-            color={cobra_comisiones ? 'green' : 'default'} 
-            style={{ cursor: 'pointer', fontSize: 12 }}
-            icon={<DollarOutlined />}
-          >
-            {cobra_comisiones ? '✅ Cobra' : '❌ No cobra'}
-          </Tag>
-        </Popconfirm>
       ),
     },
     {
@@ -1715,7 +1808,12 @@ const StaffSellers: React.FC = () => {
                           title: 'ACCIÓN',
                           key: 'accion',
                           align: 'center',
-                          render: (_: any, record: any) => (
+                          render: (_: any, record: any) => {
+                            const estaUnaVezActivo = sucursalUnaVez.includes(record.sucursal);
+                            
+                            return (
+                              <Space direction="vertical" size={4}>
+                                {/* Botón Habilitar/Deshabilitar normal */}
                             <Popconfirm
                               title={record.descuento_habilitado ? '¿Deshabilitar descuento?' : '¿Habilitar descuento?'}
                               description={
@@ -1731,14 +1829,196 @@ const StaffSellers: React.FC = () => {
                                 type={record.descuento_habilitado ? 'default' : 'primary'}
                                 size="small"
                                 icon={record.descuento_habilitado ? <StopOutlined /> : <CheckCircleOutlined />}
+                                    style={{ width: '100%' }}
                               >
                                 {record.descuento_habilitado ? 'Deshabilitar' : 'Habilitar'}
                               </Button>
                             </Popconfirm>
-                          ),
+                                
+                                {/* Botón Habilitar Una Vez o Cancelar */}
+                                {estaUnaVezActivo ? (
+                                  <Popconfirm
+                                    title="❌ ¿Cancelar uso único?"
+                                    description={`El descuento de ${record.sucursal.toUpperCase()} dejará de estar activo para el próximo uso.`}
+                                    onConfirm={() => handleCancelarUnaVez(record.sucursal)}
+                                    okText="Sí, cancelar"
+                                    cancelText="No"
+                                  >
+                                    <Button
+                                      size="small"
+                                      type="dashed"
+                                      danger
+                                      icon={<StopOutlined />}
+                                      className="btn-una-vez-activo"
+                                      style={{ width: '100%' }}
+                                    >
+                                      Cancelar uso único
+                                    </Button>
+                                  </Popconfirm>
+                                ) : (
+                                  <Popconfirm
+                                    title="🎯 ¿Habilitar descuento UNA VEZ?"
+                                    description={`El descuento para ${record.sucursal.toUpperCase()} se habilitará solo para la próxima venta y se desactivará automáticamente.`}
+                                    onConfirm={() => handleHabilitarUnaVez(record.sucursal)}
+                                    okText="Sí, habilitar una vez"
+                                    cancelText="Cancelar"
+                                  >
+                                    <Button
+                                      size="small"
+                                      type="dashed"
+                                      icon={<ThunderboltOutlined />}
+                                      style={{
+                                        width: '100%',
+                                        borderColor: '#faad14',
+                                        color: '#faad14',
+                                      }}
+                                    >
+                                      Habilitar 1 vez
+                                    </Button>
+                                  </Popconfirm>
+                                )}
+                              </Space>
+                            );
+                          },
                         },
                       ]}
                     />
+                  </Spin>
+                </Card>
+              </>
+            ),
+          },
+          {
+            key: 'usuarios',
+            label: (
+              <Space>
+                <LockOutlined />
+                <span>Gestión de Usuarios</span>
+                <Badge count={usuarios.length} style={{ marginLeft: 8 }} />
+              </Space>
+            ),
+            children: (
+              <>
+                <Alert
+                  message="🔐 Gestión de Usuarios de Login"
+                  description={
+                    <div>
+                      <p style={{ marginBottom: 8 }}>
+                        Aquí solo se muestran los <strong>usuarios que se usan para iniciar sesión</strong> en el sistema:
+                      </p>
+                      <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                        <li><strong>admin@zarparuy.com</strong> → Administrador (acceso a todo)</li>
+                        <li><strong>sucursal@zarparuy.com</strong> → Usuarios de cada sucursal (Ej: pando@zarparuy.com, maldonado@zarparuy.com, etc.)</li>
+                      </ul>
+                      <p style={{ marginTop: 8, marginBottom: 0 }}>
+                        ⚠️ <strong>Importante:</strong> Al cambiar una contraseña aquí, el usuario deberá usar la nueva contraseña en su próximo login.
+                      </p>
+                    </div>
+                  }
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+
+                <Card styles={{ body: { padding: '16px' } }}>
+                  <Spin spinning={usuariosLoading}>
+                    <Table
+                      dataSource={usuarios}
+                      rowKey="id"
+                      size="small"
+                      pagination={{
+                        pageSize: 10,
+                        showSizeChanger: true,
+                        showTotal: (total) => `Total: ${total} usuarios`,
+                      }}
+                      scroll={{ x: 1200 }}
+                    >
+                      {/* Columna: Usuario */}
+                      <Table.Column
+                        title="Usuario"
+                        dataIndex="nombre"
+                        key="nombre"
+                        width={200}
+                        render={(nombre: string, record: Vendedor) => (
+                          <Space direction="vertical" size={0}>
+                            <Text strong>{nombre}</Text>
+                            {record.email === 'admin@zarparuy.com' && (
+                              <Tag icon={<CrownOutlined />} color="gold" style={{ fontSize: 10 }}>
+                                Administrador
+                              </Tag>
+                            )}
+                          </Space>
+                        )}
+                      />
+
+                      {/* Columna: Email */}
+                      <Table.Column
+                        title="Email"
+                        dataIndex="email"
+                        key="email"
+                        width={250}
+                        render={(email: string) => (
+                          <Space>
+                            <MailOutlined style={{ color: '#1890ff' }} />
+                            <Text copyable>{email}</Text>
+                          </Space>
+                        )}
+                      />
+
+                      {/* Columna: Sucursal */}
+                      <Table.Column
+                        title="Sucursal"
+                        dataIndex="sucursal"
+                        key="sucursal"
+                        width={150}
+                        render={(sucursal: string) => (
+                          <Tag color={sucursal === 'Administracion' ? 'gold' : 'blue'}>
+                            {formatearNombreSucursal(sucursal)}
+                          </Tag>
+                        )}
+                      />
+
+                      {/* Columna: Cargo */}
+                      <Table.Column
+                        title="Cargo"
+                        dataIndex="cargo"
+                        key="cargo"
+                        width={150}
+                      />
+
+                      {/* Columna: Estado */}
+                      <Table.Column
+                        title="Estado"
+                        dataIndex="activo"
+                        key="activo"
+                        width={100}
+                        render={(activo: boolean) => (
+                          <Tag icon={activo ? <CheckCircleOutlined /> : <StopOutlined />} color={activo ? 'success' : 'error'}>
+                            {activo ? 'Activo' : 'Inactivo'}
+                          </Tag>
+                        )}
+                      />
+
+                      {/* Columna: Acciones */}
+                      <Table.Column
+                        title="Acciones"
+                        key="acciones"
+                        width={200}
+                        render={(_: any, record: Vendedor) => (
+                          <Button
+                            type="primary"
+                            icon={<LockOutlined />}
+                            onClick={() => abrirModalCambiarPassword(record)}
+                            style={{
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              border: 'none',
+                            }}
+                          >
+                            Cambiar Contraseña
+                          </Button>
+                        )}
+                      />
+                    </Table>
                   </Spin>
                 </Card>
               </>
@@ -2091,6 +2371,87 @@ const StaffSellers: React.FC = () => {
               </div>
             }
             type="info"
+            showIcon
+          />
+        </Form>
+      </Modal>
+
+      {/* Modal: Cambiar Contraseña */}
+      <Modal
+        title={
+          <Space>
+            <LockOutlined />
+            <span>Cambiar Contraseña</span>
+          </Space>
+        }
+        open={modalCambiarPassword}
+        onOk={cambiarPassword}
+        onCancel={() => {
+          setModalCambiarPassword(false);
+          passwordForm.resetFields();
+          setUsuarioEditandoPassword(null);
+        }}
+        okText="Cambiar Contraseña"
+        cancelText="Cancelar"
+        width={500}
+      >
+        <Alert
+          message="🔐 Cambio de Contraseña"
+          description={
+            <div>
+              <Text>Usuario: <Text strong>{usuarioEditandoPassword?.nombre}</Text></Text>
+              <br />
+              <Text>Email: <Text code copyable>{usuarioEditandoPassword?.email}</Text></Text>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
+        <Form form={passwordForm} layout="vertical">
+          <Form.Item
+            name="password"
+            label="Nueva Contraseña"
+            rules={[
+              { required: true, message: 'Por favor ingresa la nueva contraseña' },
+              { min: 6, message: 'La contraseña debe tener al menos 6 caracteres' },
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Ingresa la nueva contraseña"
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="confirmPassword"
+            label="Confirmar Contraseña"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: 'Por favor confirma la contraseña' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Las contraseñas no coinciden'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Confirma la nueva contraseña"
+              size="large"
+            />
+          </Form.Item>
+
+          <Alert
+            message="⚠️ Importante"
+            description="El usuario deberá usar esta nueva contraseña en su próximo inicio de sesión."
+            type="warning"
             showIcon
           />
         </Form>

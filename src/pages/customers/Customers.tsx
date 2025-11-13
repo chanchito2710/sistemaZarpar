@@ -25,7 +25,10 @@ import {
   Statistic,
   Badge,
   Divider,
-  Empty
+  Empty,
+  Drawer,
+  Alert,
+  Descriptions
 } from 'antd';
 import {
   UserOutlined,
@@ -36,7 +39,11 @@ import {
   CalendarOutlined,
   FileTextOutlined,
   PlusOutlined,
-  EyeOutlined
+  EyeOutlined,
+  SwapOutlined,
+  CheckCircleOutlined,
+  TagsOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -84,7 +91,7 @@ const Customers: React.FC = () => {
   const { usuario } = useAuth();
 
   // Estados generales
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('pando');
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>(''); // ✅ Vacío inicialmente
   const [sucursales, setSucursales] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [tabActiva, setTabActiva] = useState('1');
@@ -116,6 +123,22 @@ const Customers: React.FC = () => {
     dayjs().endOf('month')
   ]);
 
+  // Estados del Drawer de Análisis por Cliente
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [clienteAnalisis, setClienteAnalisis] = useState<Cliente | null>(null);
+  const [tabDrawer, setTabDrawer] = useState('1');
+  const [ventasGlobalesCliente, setVentasGlobalesCliente] = useState<any[]>([]);
+  const [pagosCliente, setPagosCliente] = useState<any[]>([]);
+  const [reemplazosCliente, setReemplazosCliente] = useState<any[]>([]);
+  const [productosCliente, setProductosCliente] = useState<any[]>([]);
+  const [saldoCuentaCorriente, setSaldoCuentaCorriente] = useState<number>(0);
+  const [fechasFiltro, setFechasFiltro] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf('month'),
+    dayjs().endOf('month')
+  ]);
+  const [loadingDrawer, setLoadingDrawer] = useState(false);
+  const [buscadorClientes, setBuscadorClientes] = useState('');
+
   /**
    * Cargar sucursales al iniciar
    */
@@ -125,12 +148,15 @@ const Customers: React.FC = () => {
 
   /**
    * Auto-seleccionar sucursal según usuario
+   * ✅ Se ejecuta apenas el usuario esté disponible
    */
   useEffect(() => {
-    if (usuario && sucursales.length > 0) {
+    if (usuario && !sucursalSeleccionada) {
       if (usuario.esAdmin) {
-        setSucursalSeleccionada('pando'); // Admin selecciona por defecto
+        // Admin selecciona la primera sucursal disponible o 'pando' por defecto
+        setSucursalSeleccionada(sucursales.length > 0 ? sucursales[0] : 'pando');
       } else if (usuario.sucursal) {
+        // Usuario normal usa su sucursal
         setSucursalSeleccionada(usuario.sucursal.toLowerCase());
       }
     }
@@ -342,6 +368,142 @@ const Customers: React.FC = () => {
   };
 
   /**
+   * Abrir Drawer de Análisis del Cliente
+   */
+  const abrirAnalisisCliente = async (cliente: Cliente) => {
+    setClienteAnalisis(cliente);
+    setDrawerVisible(true);
+    setTabDrawer('1');
+    await cargarDatosDrawer(cliente.id);
+  };
+
+  /**
+   * Cargar todos los datos del cliente para el drawer
+   */
+  const cargarDatosDrawer = async (clienteId: number) => {
+    setLoadingDrawer(true);
+    try {
+      await Promise.all([
+        cargarVentasGlobalesCliente(clienteId),
+        cargarPagosCliente(clienteId),
+        cargarReemplazosCliente(clienteId),
+        cargarProductosCliente(clienteId),
+        cargarSaldoCuentaCorriente(clienteId)
+      ]);
+    } catch (error) {
+      console.error('Error al cargar datos del cliente:', error);
+      message.error('Error al cargar datos del cliente');
+    } finally {
+      setLoadingDrawer(false);
+    }
+  };
+
+  /**
+   * Cargar ventas globales del cliente
+   */
+  const cargarVentasGlobalesCliente = async (clienteId: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3456/api/ventas/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      setVentasGlobalesCliente(data.data || []);
+    } catch (error) {
+      console.error('Error al cargar ventas:', error);
+    }
+  };
+
+  /**
+   * Cargar pagos del cliente (contado + cuenta corriente)
+   */
+  const cargarPagosCliente = async (clienteId: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3456/api/ventas/cliente/${sucursalSeleccionada}/${clienteId}/pagos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      setPagosCliente(data.data || []);
+    } catch (error) {
+      console.error('Error al cargar pagos:', error);
+    }
+  };
+
+  /**
+   * Cargar reemplazos y devoluciones del cliente
+   */
+  const cargarReemplazosCliente = async (clienteId: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3456/api/devoluciones/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      setReemplazosCliente(data.data || []);
+    } catch (error) {
+      console.error('Error al cargar reemplazos:', error);
+    }
+  };
+
+  /**
+   * Cargar productos más vendidos al cliente
+   */
+  const cargarProductosCliente = async (clienteId: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3456/api/ventas/cliente/${sucursalSeleccionada}/${clienteId}/productos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      setProductosCliente(data.data || []);
+    } catch (error) {
+      console.error('Error al cargar productos:', error);
+    }
+  };
+
+  /**
+   * Cargar saldo de cuenta corriente del cliente
+   */
+  const cargarSaldoCuentaCorriente = async (clienteId: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3456/api/cuenta-corriente/${sucursalSeleccionada}/cliente/${clienteId}/saldo`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      setSaldoCuentaCorriente(data.data?.saldo || 0);
+    } catch (error) {
+      console.error('Error al cargar saldo:', error);
+    }
+  };
+
+  /**
    * Columnas de la tabla de clientes con ventas
    */
   const columnasClientes = [
@@ -378,29 +540,30 @@ const Customers: React.FC = () => {
       title: 'Acciones',
       key: 'acciones',
       render: (_: any, record: Cliente) => (
-        <Space>
-          <Button
-            size="small"
-            icon={<ShoppingOutlined />}
-            onClick={() => {
-              setClienteSeleccionado(record);
-              cargarVentasCliente(record.id);
-              setTabActiva('1');
-            }}
-          >
-            Ver Ventas
-          </Button>
-          <Button
-            size="small"
-            icon={<CreditCardOutlined />}
-            onClick={() => verEstadoCuenta(record.id, `${record.nombre} ${record.apellido}`)}
-          >
-            Cuenta Corriente
-          </Button>
-        </Space>
+        <Button
+          size="small"
+          icon={<EyeOutlined />}
+          type="primary"
+          onClick={() => abrirAnalisisCliente(record)}
+        >
+          Ver Ventas
+        </Button>
       )
     }
   ];
+
+  // Filtrar clientes según búsqueda
+  const clientesFiltrados = clientes.filter(cliente => {
+    const textoBusqueda = buscadorClientes.toLowerCase();
+    return (
+      cliente.nombre.toLowerCase().includes(textoBusqueda) ||
+      cliente.apellido.toLowerCase().includes(textoBusqueda) ||
+      (cliente.nombre_fantasia && cliente.nombre_fantasia.toLowerCase().includes(textoBusqueda)) ||
+      (cliente.email && cliente.email.toLowerCase().includes(textoBusqueda)) ||
+      (cliente.telefono && cliente.telefono.includes(textoBusqueda)) ||
+      (cliente.rut && cliente.rut.includes(textoBusqueda))
+    );
+  });
 
   /**
    * Columnas de la tabla de ventas
@@ -677,12 +840,25 @@ const Customers: React.FC = () => {
                 </Space>
               ) : (
                 <>
-                  <Title level={4}>Selecciona un cliente para ver sus ventas</Title>
+                  <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+                    <Title level={4}>Buscar Cliente</Title>
+                    <Input
+                      placeholder="Buscar por nombre, apellido, RUT, email o teléfono..."
+                      prefix={<SearchOutlined />}
+                      value={buscadorClientes}
+                      onChange={(e) => setBuscadorClientes(e.target.value)}
+                      size="large"
+                      allowClear
+                    />
+                  </Space>
                   <Table
-                    dataSource={clientes}
+                    dataSource={clientesFiltrados}
                     columns={columnasClientes}
                     rowKey="id"
-                    pagination={{ pageSize: 10 }}
+                    pagination={{ 
+                      pageSize: 10,
+                      showTotal: (total) => `Total: ${total} clientes`
+                    }}
                   />
                 </>
               )}
@@ -748,168 +924,6 @@ const Customers: React.FC = () => {
             </Spin>
           </Tabs.TabPane>
 
-          {/* Tab 3: Reportes */}
-          <Tabs.TabPane
-            tab={
-              <span>
-                <BarChartOutlined />
-                Reportes
-              </span>
-            }
-            key="3"
-          >
-            <Spin spinning={loading}>
-              <Space direction="vertical" style={{ width: '100%' }} size="large">
-                {/* Filtros de Fecha */}
-                <Card size="small">
-                  <Space>
-                    <Text strong>Período:</Text>
-                    <RangePicker
-                      value={fechasReporte}
-                      onChange={(dates) => dates && setFechasReporte(dates as [Dayjs, Dayjs])}
-                      format="DD/MM/YYYY"
-                    />
-                    <Button type="primary" onClick={cargarReportes}>
-                      Actualizar
-                    </Button>
-                  </Space>
-                </Card>
-
-                {reportes ? (
-                  <>
-                    {/* Estadísticas Generales */}
-                    <Row gutter={16}>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="Total Ventas"
-                            value={reportes.resumen.total_ventas}
-                            prefix={<ShoppingOutlined />}
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="Total Vendido"
-                            value={reportes.resumen.total_vendido}
-                            precision={2}
-                            prefix="$"
-                            valueStyle={{ color: '#3f8600' }}
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="Descuentos"
-                            value={reportes.resumen.total_descuentos}
-                            precision={2}
-                            prefix="$"
-                            valueStyle={{ color: '#cf1322' }}
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="Promedio Venta"
-                            value={reportes.resumen.promedio_venta}
-                            precision={2}
-                            prefix="$"
-                          />
-                        </Card>
-                      </Col>
-                    </Row>
-
-                    {/* Gráficas */}
-                    <Row gutter={16}>
-                      {/* Ventas por Día */}
-                      <Col span={12}>
-                        <Card title="Ventas por Día">
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={reportes.ventas_por_dia}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="fecha" tickFormatter={(value) => dayjs(value).format('DD/MM')} />
-                              <YAxis />
-                              <Tooltip
-                                formatter={(value: number) => `$${value.toFixed(2)}`}
-                                labelFormatter={(label) => dayjs(label).format('DD/MM/YYYY')}
-                              />
-                              <Legend />
-                              <Line type="monotone" dataKey="total" stroke="#8884d8" name="Total" strokeWidth={2} />
-                              <Line type="monotone" dataKey="cantidad" stroke="#82ca9d" name="Cantidad" strokeWidth={2} />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </Card>
-                      </Col>
-
-                      {/* Métodos de Pago */}
-                      <Col span={12}>
-                        <Card title="Métodos de Pago">
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={reportes.metodos_pago}
-                                dataKey="total"
-                                nameKey="metodo_pago"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={100}
-                                label={({ metodo_pago, total }) => `${metodo_pago}: $${total.toFixed(0)}`}
-                              >
-                                {reportes.metodos_pago.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </Card>
-                      </Col>
-                    </Row>
-
-                    <Row gutter={16}>
-                      {/* Top Productos */}
-                      <Col span={12}>
-                        <Card title="Top 10 Productos Más Vendidos">
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={reportes.top_productos}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="producto_nombre" angle={-45} textAnchor="end" height={100} />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend />
-                              <Bar dataKey="cantidad_vendida" fill="#8884d8" name="Cantidad" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </Card>
-                      </Col>
-
-                      {/* Top Clientes */}
-                      <Col span={12}>
-                        <Card title="Top 10 Clientes">
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={reportes.top_clientes}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="cliente_nombre" angle={-45} textAnchor="end" height={100} />
-                              <YAxis />
-                              <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                              <Legend />
-                              <Bar dataKey="total_gastado" fill="#82ca9d" name="Total Gastado" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </Card>
-                      </Col>
-                    </Row>
-                  </>
-                ) : (
-                  <Empty description="Selecciona un rango de fechas y haz clic en Actualizar para ver los reportes" />
-                )}
-              </Space>
-            </Spin>
-          </Tabs.TabPane>
         </Tabs>
       </Card>
 
@@ -1131,6 +1145,411 @@ const Customers: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Drawer de Análisis Completo del Cliente */}
+      <Drawer
+        title={
+          <Space>
+            <UserOutlined style={{ color: '#1890ff' }} />
+            <Text strong style={{ fontSize: 16 }}>
+              Análisis Completo - {clienteAnalisis?.nombre} {clienteAnalisis?.apellido}
+            </Text>
+          </Space>
+        }
+        placement="right"
+        onClose={() => setDrawerVisible(false)}
+        open={drawerVisible}
+        width="90%"
+      >
+        <Spin spinning={loadingDrawer}>
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            {/* Filtro de Fecha Global */}
+            <Alert
+              message="Filtro de Fecha Global"
+              description={
+                <Space>
+                  <Text>Período:</Text>
+                  <RangePicker
+                    value={fechasFiltro}
+                    onChange={(dates) => {
+                      if (dates) {
+                        setFechasFiltro(dates as [Dayjs, Dayjs]);
+                      }
+                    }}
+                    format="DD/MM/YYYY"
+                  />
+                  <Button 
+                    type="primary" 
+                    icon={<CalendarOutlined />}
+                    onClick={() => clienteAnalisis && cargarDatosDrawer(clienteAnalisis.id)}
+                  >
+                    Actualizar
+                  </Button>
+                </Space>
+              }
+              type="info"
+              showIcon
+            />
+
+            {/* Tabs del Drawer */}
+            <Tabs activeKey={tabDrawer} onChange={setTabDrawer}>
+              {/* TAB 1: VENTAS GLOBALES */}
+              <Tabs.TabPane
+                tab={
+                  <span>
+                    <ShoppingOutlined />
+                    Ventas Globales ({ventasGlobalesCliente.length})
+                  </span>
+                }
+                key="1"
+              >
+                <Card>
+                  <Row gutter={16} style={{ marginBottom: 16 }}>
+                    <Col span={8}>
+                      <Statistic
+                        title="Total Ventas"
+                        value={ventasGlobalesCliente.length}
+                        prefix={<ShoppingOutlined />}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <Statistic
+                        title="Monto Total"
+                        value={ventasGlobalesCliente.reduce((sum, v) => sum + Number(v.total || 0), 0)}
+                        precision={2}
+                        prefix="$"
+                        valueStyle={{ color: '#3f8600' }}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <Statistic
+                        title="Promedio Venta"
+                        value={ventasGlobalesCliente.length > 0 
+                          ? ventasGlobalesCliente.reduce((sum, v) => sum + Number(v.total || 0), 0) / ventasGlobalesCliente.length 
+                          : 0
+                        }
+                        precision={2}
+                        prefix="$"
+                      />
+                    </Col>
+                  </Row>
+
+                  <Table
+                    dataSource={ventasGlobalesCliente}
+                    columns={[
+                      {
+                        title: 'N° Venta',
+                        dataIndex: 'numero_venta',
+                        key: 'numero_venta',
+                        render: (numero: string) => <Text strong>{numero}</Text>
+                      },
+                      {
+                        title: 'Fecha',
+                        dataIndex: 'fecha_venta',
+                        key: 'fecha_venta',
+                        render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm')
+                      },
+                      {
+                        title: 'Método Pago',
+                        dataIndex: 'metodo_pago',
+                        key: 'metodo_pago',
+                        render: (metodo: string) => {
+                          const config: any = {
+                            efectivo: { color: 'success', text: '💰 Efectivo' },
+                            transferencia: { color: 'processing', text: '🏦 Transferencia' },
+                            cuenta_corriente: { color: 'warning', text: '💳 Cuenta Corriente' }
+                          };
+                          return <Tag color={config[metodo]?.color}>{config[metodo]?.text || metodo}</Tag>;
+                        }
+                      },
+                      {
+                        title: 'Total',
+                        dataIndex: 'total',
+                        key: 'total',
+                        render: (total: number) => <Text strong>${Number(total || 0).toFixed(2)}</Text>
+                      },
+                      {
+                        title: 'Estado',
+                        dataIndex: 'estado_pago',
+                        key: 'estado_pago',
+                        render: (estado: string) => {
+                          const config: any = {
+                            pagado: { color: 'success', text: '✅ Pagado' },
+                            pendiente: { color: 'error', text: '⏳ Pendiente' },
+                            parcial: { color: 'warning', text: '⚠️ Parcial' }
+                          };
+                          return <Tag color={config[estado]?.color}>{config[estado]?.text || estado}</Tag>;
+                        }
+                      },
+                      {
+                        title: 'Acciones',
+                        key: 'acciones',
+                        render: (_: any, record: any) => (
+                          <Button 
+                            size="small" 
+                            icon={<EyeOutlined />} 
+                            onClick={() => verDetalleVenta(record.id)}
+                          >
+                            Ver
+                          </Button>
+                        )
+                      }
+                    ]}
+                    rowKey="id"
+                    pagination={{ pageSize: 10, showTotal: (total) => `Total: ${total} ventas` }}
+                    size="small"
+                  />
+                </Card>
+              </Tabs.TabPane>
+
+              {/* TAB 2: PAGOS */}
+              <Tabs.TabPane
+                tab={
+                  <span>
+                    <CheckCircleOutlined />
+                    Pagos ({pagosCliente.length})
+                  </span>
+                }
+                key="2"
+              >
+                <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                  {/* Saldo de Cuenta Corriente */}
+                  {saldoCuentaCorriente > 0 && (
+                    <Alert
+                      message="Saldo de Cuenta Corriente"
+                      description={
+                        <Statistic
+                          value={saldoCuentaCorriente}
+                          precision={2}
+                          prefix="$"
+                          valueStyle={{ color: '#cf1322', fontSize: 24 }}
+                          suffix="adeudado"
+                        />
+                      }
+                      type="warning"
+                      showIcon
+                    />
+                  )}
+
+                  <Card title="Historial de Pagos">
+                    <Table
+                      dataSource={pagosCliente}
+                      columns={[
+                        {
+                          title: 'Fecha',
+                          dataIndex: 'fecha',
+                          key: 'fecha',
+                          render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm')
+                        },
+                        {
+                          title: 'Tipo',
+                          dataIndex: 'tipo',
+                          key: 'tipo',
+                          render: (tipo: string) => {
+                            const config: any = {
+                              venta_contado: { color: 'green', text: '💰 Venta Contado' },
+                              pago_cc: { color: 'blue', text: '💳 Pago C.C.' }
+                            };
+                            return <Tag color={config[tipo]?.color}>{config[tipo]?.text || tipo}</Tag>;
+                          }
+                        },
+                        {
+                          title: 'Monto',
+                          dataIndex: 'monto',
+                          key: 'monto',
+                          render: (monto: number) => <Text strong>${Number(monto || 0).toFixed(2)}</Text>
+                        },
+                        {
+                          title: 'Método',
+                          dataIndex: 'metodo_pago',
+                          key: 'metodo_pago',
+                          render: (metodo: string) => metodo || '-'
+                        },
+                        {
+                          title: 'Referencia',
+                          dataIndex: 'referencia',
+                          key: 'referencia'
+                        }
+                      ]}
+                      rowKey="id"
+                      pagination={{ pageSize: 10 }}
+                      size="small"
+                      summary={(pageData) => {
+                        const totalPagos = pageData.reduce((sum, record) => sum + Number(record.monto || 0), 0);
+                        return (
+                          <Table.Summary fixed>
+                            <Table.Summary.Row>
+                              <Table.Summary.Cell index={0} colSpan={2}>
+                                <Text strong>Total Pagado:</Text>
+                              </Table.Summary.Cell>
+                              <Table.Summary.Cell index={1}>
+                                <Text strong style={{ color: '#3f8600' }}>${totalPagos.toFixed(2)}</Text>
+                              </Table.Summary.Cell>
+                              <Table.Summary.Cell index={2} colSpan={2} />
+                            </Table.Summary.Row>
+                          </Table.Summary>
+                        );
+                      }}
+                    />
+                  </Card>
+                </Space>
+              </Tabs.TabPane>
+
+              {/* TAB 3: REEMPLAZOS Y DEVOLUCIONES */}
+              <Tabs.TabPane
+                tab={
+                  <span>
+                    <SwapOutlined />
+                    Reemplazos/Devoluciones ({reemplazosCliente.length})
+                  </span>
+                }
+                key="3"
+              >
+                <Card>
+                  <Table
+                    dataSource={reemplazosCliente}
+                    columns={[
+                      {
+                        title: 'Fecha',
+                        dataIndex: 'fecha_proceso',
+                        key: 'fecha_proceso',
+                        render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm')
+                      },
+                      {
+                        title: 'Tipo',
+                        dataIndex: 'tipo',
+                        key: 'tipo',
+                        render: (tipo: string) => {
+                          const config: any = {
+                            reemplazo: { color: 'blue', text: '🔄 Reemplazo' },
+                            devolucion: { color: 'orange', text: '↩️ Devolución' }
+                          };
+                          return <Tag color={config[tipo]?.color}>{config[tipo]?.text || tipo}</Tag>;
+                        }
+                      },
+                      {
+                        title: 'Producto',
+                        dataIndex: 'producto_nombre',
+                        key: 'producto_nombre'
+                      },
+                      {
+                        title: 'N° Venta',
+                        dataIndex: 'numero_venta',
+                        key: 'numero_venta',
+                        render: (numero: string) => <Text code>{numero}</Text>
+                      },
+                      {
+                        title: 'Cantidad',
+                        dataIndex: 'cantidad_reemplazada',
+                        key: 'cantidad_reemplazada',
+                        align: 'center',
+                        render: (cant: number) => <Badge count={cant || 1} showZero />
+                      },
+                      {
+                        title: 'Método Devolución',
+                        dataIndex: 'metodo_devolucion',
+                        key: 'metodo_devolucion',
+                        render: (metodo: string) => metodo ? (
+                          metodo === 'cuenta_corriente' ? 
+                            <Tag color="purple">💳 A Cuenta Corriente</Tag> : 
+                            <Tag color="green">💰 Efectivo</Tag>
+                        ) : '-'
+                      },
+                      {
+                        title: 'Observaciones',
+                        dataIndex: 'observaciones',
+                        key: 'observaciones',
+                        render: (obs: string) => obs || '-'
+                      }
+                    ]}
+                    rowKey="id"
+                    pagination={{ pageSize: 10, showTotal: (total) => `Total: ${total} registros` }}
+                    size="small"
+                  />
+                </Card>
+              </Tabs.TabPane>
+
+              {/* TAB 4: PRODUCTOS MÁS VENDIDOS */}
+              <Tabs.TabPane
+                tab={
+                  <span>
+                    <TagsOutlined />
+                    Productos ({productosCliente.length})
+                  </span>
+                }
+                key="4"
+              >
+                <Card title="Productos Más Vendidos">
+                  <Table
+                    dataSource={productosCliente}
+                    columns={[
+                      {
+                        title: '#',
+                        key: 'index',
+                        render: (_: any, __: any, index: number) => (
+                          <Badge 
+                            count={index + 1} 
+                            style={{ 
+                              backgroundColor: index < 3 ? '#faad14' : '#d9d9d9',
+                              fontWeight: 'bold'
+                            }} 
+                          />
+                        ),
+                        width: 60
+                      },
+                      {
+                        title: 'Producto',
+                        dataIndex: 'producto_nombre',
+                        key: 'producto_nombre',
+                        render: (nombre: string, record: any) => (
+                          <div>
+                            <Text strong>{nombre}</Text>
+                            <div>
+                              <Space size="small">
+                                {record.tipo && <Tag color="blue">{record.tipo}</Tag>}
+                                {record.marca && <Tag color="green">{record.marca}</Tag>}
+                              </Space>
+                            </div>
+                          </div>
+                        )
+                      },
+                      {
+                        title: 'Cantidad Vendida',
+                        dataIndex: 'cantidad_vendida',
+                        key: 'cantidad_vendida',
+                        align: 'center',
+                        render: (cant: number) => <Badge count={cant} showZero style={{ backgroundColor: '#52c41a' }} />
+                      },
+                      {
+                        title: 'Total Vendido',
+                        dataIndex: 'total_vendido',
+                        key: 'total_vendido',
+                        render: (total: number) => <Text strong>${Number(total || 0).toFixed(2)}</Text>
+                      },
+                      {
+                        title: 'Precio Promedio',
+                        key: 'precio_promedio',
+                        render: (_: any, record: any) => {
+                          const promedio = record.cantidad_vendida > 0 
+                            ? Number(record.total_vendido) / Number(record.cantidad_vendida)
+                            : 0;
+                          return <Text>${promedio.toFixed(2)}</Text>;
+                        }
+                      }
+                    ]}
+                    rowKey={(record) => `${record.producto_id}_${record.producto_nombre}`}
+                    pagination={{ 
+                      pageSize: 20, 
+                      showTotal: (total) => `Total: ${total} productos` 
+                    }}
+                    size="small"
+                  />
+                </Card>
+              </Tabs.TabPane>
+            </Tabs>
+          </Space>
+        </Spin>
+      </Drawer>
     </div>
   );
 };

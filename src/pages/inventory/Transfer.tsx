@@ -1232,6 +1232,7 @@ const Transfer: React.FC = () => {
         text: tipo,
         value: tipo
       })),
+      defaultFilteredValue: ['Display'],
       onFilter: (value: string | number | boolean, record: ProductoTransfer) => {
         return record.tipo === value;
       },
@@ -2478,7 +2479,7 @@ const Transfer: React.FC = () => {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <MinusOutlined style={{ color: '#ff4d4f' }} />
-            <span>🗑️ Limpiar Stock en Tránsito</span>
+            <span style={{ color: '#000' }}>🗑️ Limpiar Stock en Tránsito</span>
           </div>
         }
         open={isLimpiezaModalVisible}

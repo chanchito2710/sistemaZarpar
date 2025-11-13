@@ -84,3 +84,25 @@
   transform: scale(0.95);
 }
 
+/* Animación pulse para badge de recibidos */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
+  }
+}
+
+/* Estilos para el drawer de Stock de Fallas */
+.row-with-fallas {
+  background-color: #fff1f0 !important;
+  border-left: 3px solid #ff4d4f !important;
+}
+
+.row-with-fallas:hover {
+  background-color: #ffe7e6 !important;
+}
+

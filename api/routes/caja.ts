@@ -10,7 +10,8 @@ import {
   registrarEnvio,
   ajustarCaja,
   registrarIngreso,
-  registrarGasto
+  registrarGasto,
+  registrarTransferencia
 } from '../controllers/cajaController.js';
 import { verificarAutenticacion, verificarAdmin } from '../middleware/auth.js';
 
@@ -33,6 +34,9 @@ router.post('/envio', registrarEnvio);
 
 // Registrar gasto en efectivo (todos los usuarios)
 router.post('/gasto', registrarGasto);
+
+// Registrar transferencia entre sucursales (todos los usuarios)
+router.post('/transferencia', registrarTransferencia);
 
 // Registrar ingreso (uso interno desde ventas/pagos CC)
 router.post('/registrar-ingreso', registrarIngreso);

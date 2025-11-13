@@ -374,3 +374,7 @@ WHERE nombre LIKE '%Ã%'
 **Próxima revisión**: Solo si se presentan nuevos problemas de encoding
 
 
+
+
+
+

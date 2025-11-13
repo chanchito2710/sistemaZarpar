@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
   Card,
-  Input,
   Button,
   Row,
   Col,
   Typography,
   InputNumber,
-  notification,
+  Input,
+  message,
   Modal,
   Space,
   Tag,
   Divider,
-  List,
-  Avatar
+  Table,
+  Select,
+  DatePicker,
+  Statistic,
+  Spin,
+  Empty
 } from 'antd';
 import {
   DollarOutlined,
@@ -21,319 +25,515 @@ import {
   BankOutlined,
   CheckCircleOutlined,
   HistoryOutlined,
-  UserOutlined
+  SwapOutlined,
+  ArrowRightOutlined,
+  FilterOutlined
 } from '@ant-design/icons';
+import { useAuth } from '../../contexts/AuthContext';
+import dayjs, { Dayjs } from 'dayjs';
 import './MoneyTransfer.css';
 
 const { Title, Text } = Typography;
+const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 // Interfaces TypeScript
-interface Branch {
-  id: string;
-  name: string;
-  balance: number;
-  location: string;
+interface Caja {
+  sucursal: string;
+  monto_actual: number;
+  created_at: string;
+  updated_at: string;
 }
 
-interface User {
-  id: string;
-  name: string;
-  role: 'admin' | 'user';
-  branchId?: string;
+interface Movimiento {
+  id: number;
+  sucursal: string;
+  tipo_movimiento: string;
+  monto: number;
+  monto_anterior: number;
+  monto_nuevo: number;
+  concepto: string;
+  usuario_email: string;
+  created_at: string;
 }
 
-interface Transfer {
-  id: string;
-  fromBranch: string;
-  amount: number;
-  timestamp: Date;
-  status: 'completed' | 'pending';
-}
-
-import { BRANCHES } from '../../data/branches';
-
-// Datos mock con balances
-const mockBranches: Branch[] = BRANCHES.map(branch => ({
-  id: branch.id,
-  name: branch.name,
-  balance: Math.floor(Math.random() * 100000) + 30000, // Balance aleatorio entre 30k y 130k
-  location: branch.address.split(',')[1]?.trim() || branch.name
-}));
-
-const mockUser: User = {
-  id: '1',
-  name: 'Administrador Sistema',
-  role: 'admin', // Cambiar a 'user' para probar vista de usuario normal
-  branchId: '1' // Solo relevante si role es 'user'
-};
-
-const mockTransfers: Transfer[] = [
-  {
-    id: '1',
-    fromBranch: 'Casa Matriz',
-    amount: 15000,
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    status: 'completed'
-  },
-  {
-    id: '2',
-    fromBranch: 'Maldonado',
-    amount: 8500,
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-    status: 'completed'
-  },
-  {
-    id: '3',
-    fromBranch: 'Salto',
-    amount: 12000,
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    status: 'completed'
-  }
-];
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
 
 const MoneyTransfer: React.FC = () => {
-  const [branches, setBranches] = useState<Branch[]>(mockBranches);
-  const [user] = useState<User>(mockUser);
-  const [transfers, setTransfers] = useState<Transfer[]>(mockTransfers);
-  const [transferAmounts, setTransferAmounts] = useState<{ [key: string]: number }>({});
-  const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.esAdmin || false;
+
+  const [cajas, setCajas] = useState<Caja[]>([]);
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [loadingCajas, setLoadingCajas] = useState(false);
+  const [loadingMovimientos, setLoadingMovimientos] = useState(false);
+  const [loadingTransferencia, setLoadingTransferencia] = useState(false);
+
+  // Estados para transferencia
+  const [modalVisible, setModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
-  const [lastTransfer, setLastTransfer] = useState<{ branch: string; amount: number } | null>(null);
+  const [sucursalOrigen, setSucursalOrigen] = useState<string>('');
+  const [monto, setMonto] = useState<number>(0);
+  const [concepto, setConcepto] = useState<string>('');
 
-  // Filtrar sucursales según el rol del usuario
-  const visibleBranches = user.role === 'admin' 
-    ? branches 
-    : branches.filter(branch => branch.id === user.branchId);
+  // Estados para filtros
+  const [fechaFiltro, setFechaFiltro] = useState<[Dayjs, Dayjs] | null>(null);
+  const [sucursalFiltro, setSucursalFiltro] = useState<string>('todas');
 
-  // Manejar cambio de monto
-  const handleAmountChange = (branchId: string, value: number | null) => {
-    setTransferAmounts(prev => ({
-      ...prev,
-      [branchId]: value || 0
-    }));
-  };
-
-  // Validar monto
-  const validateAmount = (branchId: string, amount: number): string | null => {
-    const branch = branches.find(b => b.id === branchId);
-    if (!branch) return 'Sucursal no encontrada';
-    if (amount <= 0) return 'El monto debe ser mayor a 0';
-    if (amount > branch.balance) return 'Monto excede el saldo disponible';
-    return null;
-  };
-
-  // Procesar envío de dinero
-  const handleSendMoney = async (branchId: string) => {
-    const amount = transferAmounts[branchId] || 0;
-    const branch = branches.find(b => b.id === branchId);
-    
-    if (!branch) return;
-
-    const validationError = validateAmount(branchId, amount);
-    if (validationError) {
-      notification.error({
-        message: 'Error de validación',
-        description: validationError,
-        placement: 'topRight'
+  // Cargar cajas (Backend ya filtra según rol)
+  const cargarCajas = async () => {
+    setLoadingCajas(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/caja`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Filtrar "administrador" / "administracion" por si acaso
+        const cajasReales = (data.data || []).filter((c: Caja) => 
+          c.sucursal.toLowerCase() !== 'administrador' && 
+          c.sucursal.toLowerCase() !== 'administracion'
+        );
+        setCajas(cajasReales);
+        
+        // Si NO es admin y tiene una sola caja, establecerla como origen por defecto
+        if (!esAdmin && cajasReales.length === 1) {
+          setSucursalOrigen(cajasReales[0].sucursal);
+        }
+      } else {
+        message.error('Error al cargar cajas');
+      }
+    } catch (error) {
+      console.error('Error al cargar cajas:', error);
+      message.error('Error de conexión al cargar cajas');
+    } finally {
+      setLoadingCajas(false);
+    }
+  };
+
+  // Cargar movimientos (historial de transferencias)
+  const cargarMovimientos = async () => {
+    setLoadingMovimientos(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      let url = `${API_URL}/caja/movimientos/historial?tipo_movimiento=todos`;
+      
+      if (sucursalFiltro && sucursalFiltro !== 'todas') {
+        url += `&sucursal=${sucursalFiltro}`;
+      }
+      
+      if (fechaFiltro) {
+        const [inicio, fin] = fechaFiltro;
+        url += `&fecha_desde=${inicio.format('YYYY-MM-DD')}&fecha_hasta=${fin.format('YYYY-MM-DD')}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Filtrar solo envíos
+        const soloEnvios = (data.data || []).filter((m: Movimiento) => 
+          m.tipo_movimiento === 'envio'
+        );
+        setMovimientos(soloEnvios);
+      } else {
+        message.error('Error al cargar historial');
+      }
+    } catch (error) {
+      console.error('Error al cargar movimientos:', error);
+      message.error('Error de conexión al cargar historial');
+    } finally {
+      setLoadingMovimientos(false);
+    }
+  };
+
+  // Realizar envío de dinero
+  const realizarTransferencia = async () => {
+    if (!sucursalOrigen) {
+      message.error('Debes seleccionar sucursal de origen');
       return;
     }
 
-    setLoading(prev => ({ ...prev, [branchId]: true }));
+    if (monto <= 0) {
+      message.error('El monto debe ser mayor a 0');
+      return;
+    }
 
+    setLoadingTransferencia(true);
     try {
-      // Simular delay de procesamiento
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Actualizar saldo de la sucursal
-      setBranches(prev => prev.map(b => 
-        b.id === branchId 
-          ? { ...b, balance: b.balance - amount }
-          : b
-      ));
-
-      // Agregar transferencia al historial
-      const newTransfer: Transfer = {
-        id: Date.now().toString(),
-        fromBranch: branch.name,
-        amount,
-        timestamp: new Date(),
-        status: 'completed'
-      };
-      setTransfers(prev => [newTransfer, ...prev]);
-
-      // Limpiar monto
-      setTransferAmounts(prev => ({ ...prev, [branchId]: 0 }));
-
-      // Mostrar modal de éxito
-      setLastTransfer({ branch: branch.name, amount });
-      setSuccessModalVisible(true);
-
-    } catch (error) {
-      notification.error({
-        message: 'Error al enviar dinero',
-        description: 'Ocurrió un error durante el procesamiento',
-        placement: 'topRight'
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/caja/envio`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          sucursal: sucursalOrigen,
+          monto,
+          concepto: concepto.trim() || `Envío de $${monto}`,
+          usuario_id: usuario?.id || null,
+          usuario_email: usuario?.email || null
+        })
       });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        message.success('Envío realizado exitosamente');
+        setModalVisible(false);
+        setSuccessModalVisible(true);
+        
+        // Limpiar form
+        setSucursalOrigen('');
+        setMonto(0);
+        setConcepto('');
+        
+        // Recargar datos
+        cargarCajas();
+        cargarMovimientos();
+      } else {
+        message.error(data.message || 'Error al realizar envío');
+      }
+    } catch (error) {
+      console.error('Error al realizar envío:', error);
+      message.error('Error de conexión');
     } finally {
-      setLoading(prev => ({ ...prev, [branchId]: false }));
+      setLoadingTransferencia(false);
     }
   };
 
+  // Cargar inicial
+  useEffect(() => {
+    cargarCajas();
+    cargarMovimientos();
+  }, []);
+
+  // Recargar movimientos al cambiar filtros
+  useEffect(() => {
+    cargarMovimientos();
+  }, [fechaFiltro, sucursalFiltro]);
+
   // Formatear moneda
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-UY', {
-      style: 'currency',
-      currency: 'UYU'
-    }).format(amount);
+    return `$${amount.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // Formatear fecha
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('es-UY', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
-  };
+  // Columnas de la tabla de historial
+  const columns = [
+    {
+      title: 'Fecha',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm'),
+      sorter: (a: Movimiento, b: Movimiento) => 
+        dayjs(a.created_at).unix() - dayjs(b.created_at).unix(),
+      defaultSortOrder: 'descend' as const,
+    },
+    {
+      title: 'Tipo',
+      dataIndex: 'tipo_movimiento',
+      key: 'tipo_movimiento',
+      width: 150,
+      render: (tipo: string) => {
+        if (tipo === 'transferencia_salida') {
+          return <Tag color="orange" icon={<ArrowRightOutlined />}>SALIDA</Tag>;
+        } else if (tipo === 'transferencia_entrada') {
+          return <Tag color="green" icon={<ArrowRightOutlined />}>ENTRADA</Tag>;
+        }
+        return <Tag>{tipo}</Tag>;
+      },
+    },
+    {
+      title: 'Sucursal',
+      dataIndex: 'sucursal',
+      key: 'sucursal',
+      width: 120,
+      render: (suc: string) => <Tag color="blue">{suc.toUpperCase()}</Tag>,
+    },
+    {
+      title: 'Monto',
+      dataIndex: 'monto',
+      key: 'monto',
+      width: 120,
+      align: 'right' as const,
+      render: (monto: number) => (
+        <Text strong style={{ color: monto >= 0 ? '#52c41a' : '#ff4d4f' }}>
+          {formatCurrency(monto)}
+        </Text>
+      ),
+    },
+    {
+      title: 'Concepto',
+      dataIndex: 'concepto',
+      key: 'concepto',
+      ellipsis: true,
+    },
+    {
+      title: 'Usuario',
+      dataIndex: 'usuario_email',
+      key: 'usuario_email',
+      width: 180,
+      ellipsis: true,
+    },
+  ];
 
   return (
     <div className="money-transfer-container">
       <div className="money-transfer-header">
         <Title level={2}>
-          <BankOutlined /> Transferencia de Dinero
+          <SendOutlined /> Envíos de Dinero
         </Title>
         <Text type="secondary">
-          {user.role === 'admin' 
-            ? 'Vista de Administrador - Todas las Sucursales'
-            : `Vista de Usuario - ${visibleBranches[0]?.name || 'Su Sucursal'}`
+          {esAdmin 
+            ? 'Realiza envíos de efectivo desde todas las sucursales'
+            : `Realiza envíos de efectivo desde ${cajas[0]?.sucursal?.toUpperCase() || 'tu sucursal'}`
           }
         </Text>
       </div>
 
-      <Row gutter={[24, 24]}>
-        {/* Cards de Sucursales */}
-        <Col xs={24} lg={16}>
-          <Row gutter={[16, 16]}>
-            {visibleBranches.map(branch => {
-              const amount = transferAmounts[branch.id] || 0;
-              const isLoading = loading[branch.id] || false;
-              const validationError = amount > 0 ? validateAmount(branch.id, amount) : null;
-              
-              return (
-                <Col xs={24} md={12} key={branch.id}>
-                  <Card
-                    className="branch-card"
-                    title={
-                      <Space>
-                        <BankOutlined />
-                        <span>{branch.name}</span>
-                        <Tag color="blue">{branch.location}</Tag>
-                      </Space>
-                    }
-                    extra={
-                      <Text strong className="balance-text">
-                        {formatCurrency(branch.balance)}
-                      </Text>
-                    }
-                  >
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                      <div>
-                        <Text type="secondary">Saldo Disponible:</Text>
-                        <br />
-                        <Text strong style={{ fontSize: '18px', color: '#52c41a' }}>
-                          {formatCurrency(branch.balance)}
-                        </Text>
-                      </div>
-                      
-                      <Divider style={{ margin: '12px 0' }} />
-                      
-                      <div>
-                        <Text>Monto a Enviar:</Text>
-                        <InputNumber
-                          style={{ width: '100%', marginTop: '8px' }}
-                          placeholder="Ingrese el monto"
-                          value={amount || undefined}
-                          onChange={(value) => handleAmountChange(branch.id, value)}
-                          min={0}
-                          max={branch.balance}
-                          formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                          parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
-                          prefix={<DollarOutlined />}
-                          status={validationError ? 'error' : undefined}
-                        />
-                        {validationError && (
-                          <Text type="danger" style={{ fontSize: '12px' }}>
-                            {validationError}
-                          </Text>
-                        )}
-                      </div>
-                      
-                      <Button
-                        type="primary"
-                        icon={<SendOutlined />}
-                        loading={isLoading}
-                        disabled={!amount || amount <= 0 || !!validationError}
-                        onClick={() => handleSendMoney(branch.id)}
-                        style={{ width: '100%', marginTop: '12px' }}
-                        size="large"
-                      >
-                        {isLoading ? 'Enviando...' : 'Enviar Dinero'}
-                      </Button>
-                    </Space>
-                  </Card>
-                </Col>
-              );
-            })}
-          </Row>
-        </Col>
-
-        {/* Historial de Transferencias */}
-        <Col xs={24} lg={8}>
-          <Card
-            title={
-              <Space>
-                <HistoryOutlined />
-                <span>Historial Reciente</span>
-              </Space>
-            }
-            className="history-card"
+      {/* Saldos de Cajas */}
+      <Card 
+        title={
+          <>
+            <BankOutlined /> {esAdmin ? 'Saldos por Sucursal' : 'Saldo de tu Caja'}
+          </>
+        }
+        style={{ marginBottom: 24 }}
+        extra={
+          <Button 
+            type="primary" 
+            icon={<SendOutlined />} 
+            onClick={() => setModalVisible(true)}
+            size="large"
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none'
+            }}
           >
-            <List
-              dataSource={transfers.slice(0, 10)}
-              renderItem={(transfer) => (
-                <List.Item>
-                  <List.Item.Meta
-                    avatar={
-                      <Avatar 
-                        icon={<SendOutlined />} 
-                        style={{ backgroundColor: '#52c41a' }}
-                      />
-                    }
-                    title={
-                      <Space>
-                        <Text strong>{formatCurrency(transfer.amount)}</Text>
-                        <Tag color="green">Completado</Tag>
-                      </Space>
-                    }
-                    description={
-                      <div>
-                        <Text type="secondary">{transfer.fromBranch}</Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: '11px' }}>
-                          {formatDate(transfer.timestamp)}
-                        </Text>
-                      </div>
-                    }
+            Nuevo Envío
+          </Button>
+        }
+      >
+        {loadingCajas ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Spin size="large" />
+          </div>
+        ) : esAdmin ? (
+          // ADMIN: Mostrar todas las cajas en grid
+          <Row gutter={[16, 16]}>
+            {cajas.map((caja) => (
+              <Col xs={24} sm={12} md={8} lg={6} key={caja.sucursal}>
+                <Card
+                  size="small"
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+                    borderRadius: 8
+                  }}
+                >
+                  <Statistic
+                    title={<Text strong>{caja.sucursal.toUpperCase()}</Text>}
+                    value={caja.monto_actual}
+                    precision={2}
+                    prefix="$"
+                    valueStyle={{ color: '#3f8600', fontSize: 20 }}
                   />
-                </List.Item>
-              )}
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          // USUARIO NORMAL: Mostrar solo su caja, destacada
+          cajas.length > 0 ? (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              padding: '24px 0'
+            }}>
+              <Card
+                style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: 16,
+                  boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)',
+                  width: '100%',
+                  maxWidth: 500
+                }}
+                bodyStyle={{ padding: 32 }}
+              >
+                <Statistic
+                  title={
+                    <Text strong style={{ color: 'white', fontSize: 18 }}>
+                      {cajas[0].sucursal.toUpperCase()}
+                    </Text>
+                  }
+                  value={cajas[0].monto_actual}
+                  precision={2}
+                  prefix="$"
+                  valueStyle={{ color: 'white', fontSize: 48, fontWeight: 700 }}
+                  suffix={
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>
+                      disponible
+                    </Text>
+                  }
+                />
+              </Card>
+            </div>
+          ) : (
+            <Empty description="No hay datos de caja disponibles" />
+          )
+        )}
+      </Card>
+
+      {/* Historial de Envíos */}
+      <Card 
+        title={
+          <Space>
+            <HistoryOutlined />
+            <span>{esAdmin ? 'Historial de Envíos' : 'Mis Envíos'}</span>
+          </Space>
+        }
+        extra={
+          <Space>
+            {/* Solo admin puede filtrar por sucursal */}
+            {esAdmin && (
+              <Select
+                value={sucursalFiltro}
+                onChange={setSucursalFiltro}
+                style={{ width: 150 }}
+                placeholder="Sucursal"
+                suffixIcon={<FilterOutlined />}
+              >
+                <Option value="todas">Todas</Option>
+                {cajas.map((c) => (
+                  <Option key={c.sucursal} value={c.sucursal}>
+                    {c.sucursal.toUpperCase()}
+                  </Option>
+                ))}
+              </Select>
+            )}
+            <RangePicker
+              value={fechaFiltro}
+              onChange={(dates) => setFechaFiltro(dates as [Dayjs, Dayjs] | null)}
+              format="DD/MM/YYYY"
+              placeholder={['Desde', 'Hasta']}
             />
-          </Card>
-        </Col>
-      </Row>
+          </Space>
+        }
+      >
+        <Table
+          dataSource={movimientos}
+          columns={columns}
+          loading={loadingMovimientos}
+          rowKey="id"
+          pagination={{
+            pageSize: 10,
+            showTotal: (total) => `Total: ${total} envíos`,
+          }}
+          locale={{
+            emptyText: (
+              <Empty
+                description="No hay envíos registrados"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            )
+          }}
+        />
+      </Card>
+
+      {/* Modal de Nuevo Envío */}
+      <Modal
+        title={<><SendOutlined /> Nuevo Envío de Dinero</>}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <div>
+            <Text strong>Sucursal Origen:</Text>
+            <Select
+              value={sucursalOrigen}
+              onChange={setSucursalOrigen}
+              style={{ width: '100%', marginTop: 8 }}
+              placeholder="Selecciona la sucursal de origen"
+              size="large"
+              disabled={!esAdmin} // Usuario normal no puede cambiar su sucursal
+            >
+              {cajas.map((c) => (
+                <Option key={c.sucursal} value={c.sucursal}>
+                  {c.sucursal.toUpperCase()} - {formatCurrency(c.monto_actual)}
+                </Option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <Text strong>Monto a Enviar:</Text>
+            <InputNumber
+              value={monto}
+              onChange={(val) => setMonto(val || 0)}
+              style={{ width: '100%', marginTop: 8 }}
+              placeholder="0.00"
+              min={0}
+              max={
+                sucursalOrigen
+                  ? cajas.find((c) => c.sucursal === sucursalOrigen)?.monto_actual || 0
+                  : undefined
+              }
+              prefix="$"
+              size="large"
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+            />
+            {sucursalOrigen && (
+              <Text type="secondary" style={{ fontSize: 12, marginTop: 4 }}>
+                Disponible: {formatCurrency(
+                  cajas.find((c) => c.sucursal === sucursalOrigen)?.monto_actual || 0
+                )}
+              </Text>
+            )}
+          </div>
+
+          <div>
+            <Text strong>Concepto <Text type="secondary">(opcional)</Text>:</Text>
+            <Input
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+              style={{ width: '100%', marginTop: 8 }}
+              placeholder="Ej: Envío para gastos operativos (opcional)"
+              size="large"
+              maxLength={255}
+            />
+          </div>
+
+          <Divider />
+
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            loading={loadingTransferencia}
+            onClick={realizarTransferencia}
+            style={{ width: '100%' }}
+            size="large"
+            disabled={!sucursalOrigen || monto <= 0}
+          >
+            {loadingTransferencia ? 'Procesando...' : 'Realizar Envío'}
+          </Button>
+        </Space>
+      </Modal>
 
       {/* Modal de Éxito */}
       <Modal
@@ -341,34 +541,20 @@ const MoneyTransfer: React.FC = () => {
         onCancel={() => setSuccessModalVisible(false)}
         footer={null}
         centered
-        className="success-modal"
         closable={false}
         maskClosable={true}
+        width={400}
       >
-        <div className="success-content">
-          <div className="success-icon">
-            <CheckCircleOutlined />
-          </div>
-          <Title level={3} className="success-title">
-            ¡Dinero Enviado!
-          </Title>
-          {lastTransfer && (
-            <div className="success-details">
-              <Text className="success-amount">
-                {formatCurrency(lastTransfer.amount)}
-              </Text>
-              <Text type="secondary">
-                desde {lastTransfer.branch}
-              </Text>
-            </div>
-          )}
-          <div className="success-animation">
-            <div className="confetti"></div>
-            <div className="confetti"></div>
-            <div className="confetti"></div>
-            <div className="confetti"></div>
-            <div className="confetti"></div>
-          </div>
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <CheckCircleOutlined
+            style={{
+              fontSize: 72,
+              color: '#52c41a',
+              marginBottom: 16
+            }}
+          />
+          <Title level={3}>¡Envío Exitoso!</Title>
+          <Text type="secondary">El envío se realizó correctamente</Text>
         </div>
       </Modal>
     </div>
