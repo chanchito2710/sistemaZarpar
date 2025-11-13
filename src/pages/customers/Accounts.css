@@ -217,4 +217,42 @@
   background-color: #1890ff;
 }
 
+/* Fila oculta para PDF - Estilo visual */
+.row-oculta-pdf {
+  background-color: #fff1f0 !important;
+  opacity: 0.6;
+  position: relative;
+}
+
+.row-oculta-pdf::after {
+  content: '🚫 Oculto en PDF';
+  position: absolute;
+  right: 80px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #ff4d4f;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.row-oculta-pdf td {
+  text-decoration: line-through !important;
+  color: #ff4d4f !important;
+}
+
+/* Clase para no imprimir en PDF */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .row-oculta-pdf {
+    display: none !important;
+  }
+}
 

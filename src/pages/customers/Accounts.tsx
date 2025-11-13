@@ -147,6 +147,9 @@ const Accounts: React.FC = () => {
   );
   const [filtroFechaDesdeHistorial, setFiltroFechaDesdeHistorial] = useState<Dayjs | null>(null);
   const [filtroFechaHastaHistorial, setFiltroFechaHastaHistorial] = useState<Dayjs | null>(null);
+  
+  // Estado para trackear movimientos ocultos en el PDF
+  const [movimientosOcultosParaPDF, setMovimientosOcultosParaPDF] = useState<Set<number>>(new Set());
 
   /**
    * Efecto: cargar sucursales al montar
@@ -167,6 +170,21 @@ const Accounts: React.FC = () => {
       setMontoCaja(0);
     }
   }, [sucursalSeleccionada, sucursales]);
+
+  /**
+   * Toggle visibilidad de movimiento en PDF
+   */
+  const toggleMovimientoParaPDF = (movimientoId: number) => {
+    setMovimientosOcultosParaPDF((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(movimientoId)) {
+        newSet.delete(movimientoId); // Si estaba oculto, mostrarlo
+      } else {
+        newSet.add(movimientoId); // Si estaba visible, ocultarlo
+      }
+      return newSet;
+    });
+  };
 
   /**
    * Cargar sucursales disponibles
@@ -494,6 +512,9 @@ const Accounts: React.FC = () => {
     setModalDetalleVisible(true);
     setLoadingMovimientos(true);
     
+    // Limpiar movimientos ocultos al abrir nuevo detalle
+    setMovimientosOcultosParaPDF(new Set());
+    
     try {
       const data = await cuentaCorrienteService.obtenerEstadoCuenta(
         cliente.sucursal,
@@ -624,8 +645,12 @@ const Accounts: React.FC = () => {
         return dayjs(a.fecha_movimiento).diff(dayjs(b.fecha_movimiento));
       });
       
-      // Filtrar solo ventas y pagos visibles
+      // Filtrar solo ventas y pagos visibles (y no ocultos para PDF)
       const movimientosFiltrados = movimientosOrdenados.filter(mov => {
+        // Excluir movimientos que el usuario marcó como ocultos
+        if (movimientosOcultosParaPDF.has(mov.id)) {
+          return false;
+        }
         return mov.tipo === 'venta' || mov.tipo === 'pago';
       });
       
@@ -1109,17 +1134,31 @@ const Accounts: React.FC = () => {
       align: 'center',
       responsive: ['xs', 'sm', 'md', 'lg', 'xl'], // Siempre visible
       className: 'no-print', // Clase para no imprimir en PDF
-      render: (_: any, record: any) => (
-        <Tooltip title="Ver detalle completo">
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            size="small"
-            className="no-print" // Clase para no imprimir en PDF
-            style={{ color: '#1890ff' }}
-          />
-        </Tooltip>
-      ),
+      render: (_: any, record: any) => {
+        const estaOculto = movimientosOcultosParaPDF.has(record.id);
+        return (
+          <Tooltip 
+            title={
+              estaOculto 
+                ? "Movimiento oculto en PDF - Click para mostrar" 
+                : "Ocultar en PDF - Click para no incluir en el estado de cuenta"
+            }
+          >
+            <Button
+              type="link"
+              icon={<EyeOutlined />}
+              size="small"
+              className="no-print" // Clase para no imprimir en PDF
+              onClick={() => toggleMovimientoParaPDF(record.id)}
+              style={{ 
+                color: estaOculto ? '#ff4d4f' : '#1890ff',
+                textDecoration: estaOculto ? 'line-through' : 'none',
+                opacity: estaOculto ? 0.5 : 1
+              }}
+            />
+          </Tooltip>
+        );
+      },
     },
   ];
 
@@ -1536,6 +1575,9 @@ const Accounts: React.FC = () => {
                 loading={loadingMovimientos}
                 rowKey="id"
                 size="small"
+                rowClassName={(record) => 
+                  movimientosOcultosParaPDF.has(record.id) ? 'row-oculta-pdf' : ''
+                }
                 pagination={{
                   defaultPageSize: 10,
                   showTotal: (total) => `Total: ${total} movimientos`,
