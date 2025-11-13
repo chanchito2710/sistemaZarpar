@@ -58,17 +58,24 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // Estados para personalización de logo
   const [modalPersonalizarVisible, setModalPersonalizarVisible] = useState(false);
   const [logoEmpresa, setLogoEmpresa] = useState<string | null>(null);
+  const [faviconEmpresa, setFaviconEmpresa] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
   const { usuario, isAuthenticated, isLoading, logout } = useAuth();
 
-  // Cargar logo desde localStorage al iniciar
+  // Cargar logo y favicon desde localStorage al iniciar
   useEffect(() => {
     const logoGuardado = localStorage.getItem('logoEmpresa');
     if (logoGuardado) {
       setLogoEmpresa(logoGuardado);
+    }
+    
+    const faviconGuardado = localStorage.getItem('faviconEmpresa');
+    if (faviconGuardado) {
+      setFaviconEmpresa(faviconGuardado);
+      actualizarFavicon(faviconGuardado);
     }
   }, []);
 
@@ -507,6 +514,45 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     setLogoEmpresa(null);
     localStorage.removeItem('logoEmpresa');
     message.success('Logo eliminado correctamente');
+  };
+
+  // Función para actualizar el favicon dinámicamente
+  const actualizarFavicon = (base64: string) => {
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (link) {
+      link.href = base64;
+    } else {
+      const newLink = document.createElement('link');
+      newLink.rel = 'icon';
+      newLink.href = base64;
+      document.head.appendChild(newLink);
+    }
+  };
+
+  // Función para manejar la subida del favicon
+  const handleUploadFavicon = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setFaviconEmpresa(base64);
+      localStorage.setItem('faviconEmpresa', base64);
+      actualizarFavicon(base64);
+      message.success('Favicon actualizado correctamente');
+    };
+    reader.readAsDataURL(file);
+    return false; // Prevenir upload automático
+  };
+
+  // Función para eliminar el favicon
+  const handleEliminarFavicon = () => {
+    setFaviconEmpresa(null);
+    localStorage.removeItem('faviconEmpresa');
+    // Restaurar favicon original
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (link) {
+      link.href = '/favicon.svg';
+    }
+    message.success('Favicon eliminado correctamente');
   };
 
   // Verificar si el usuario es administrador
@@ -1187,87 +1233,207 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         open={modalPersonalizarVisible}
         onCancel={() => setModalPersonalizarVisible(false)}
         footer={null}
-        width={600}
+        width={900}
       >
         <div style={{ padding: '20px 0' }}>
-          {/* Vista previa del logo actual */}
-          {logoEmpresa && (
-            <div style={{ marginBottom: 24, textAlign: 'center' }}>
-              <Text strong style={{ display: 'block', marginBottom: 12 }}>
-                Logo Actual:
-              </Text>
-              <div
-                style={{
-                  padding: 20,
-                  background: '#f5f5f5',
-                  borderRadius: 8,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  minHeight: 100,
-                }}
-              >
-                <img
-                  src={logoEmpresa}
-                  alt="Logo actual"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '150px',
-                    objectFit: 'contain',
-                  }}
-                />
+          <Row gutter={24}>
+            {/* COLUMNA 1: LOGO */}
+            <Col xs={24} md={12}>
+              <div style={{ 
+                padding: 16, 
+                background: '#fafafa', 
+                borderRadius: 8,
+                height: '100%',
+                border: '1px solid #e8e8e8'
+              }}>
+                <Text strong style={{ 
+                  display: 'block', 
+                  marginBottom: 16, 
+                  fontSize: 16,
+                  color: '#1890ff'
+                }}>
+                  🖼️ Logo Empresarial
+                </Text>
+                
+                {/* Vista previa del logo actual */}
+                {logoEmpresa && (
+                  <div style={{ marginBottom: 16, textAlign: 'center' }}>
+                    <Text style={{ display: 'block', marginBottom: 8, fontSize: 12, color: '#666' }}>
+                      Logo Actual:
+                    </Text>
+                    <div
+                      style={{
+                        padding: 16,
+                        background: '#fff',
+                        borderRadius: 8,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: 80,
+                        border: '1px dashed #d9d9d9',
+                      }}
+                    >
+                      <img
+                        src={logoEmpresa}
+                        alt="Logo actual"
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100px',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    </div>
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={handleEliminarLogo}
+                      style={{ marginTop: 8 }}
+                      size="small"
+                    >
+                      Eliminar Logo
+                    </Button>
+                  </div>
+                )}
+
+                {/* Subir nuevo logo */}
+                <div style={{ marginTop: logoEmpresa ? 16 : 0 }}>
+                  <Text style={{ display: 'block', marginBottom: 8, fontSize: 12, color: '#666' }}>
+                    {logoEmpresa ? 'Cambiar Logo:' : 'Subir Logo:'}
+                  </Text>
+                  <Upload.Dragger
+                    name="logo"
+                    accept="image/*"
+                    beforeUpload={handleUploadLogo}
+                    showUploadList={false}
+                    style={{ padding: '24px 12px' }}
+                  >
+                    <p className="ant-upload-drag-icon">
+                      <UploadOutlined style={{ fontSize: 32, color: '#1890ff' }} />
+                    </p>
+                    <p className="ant-upload-text" style={{ fontSize: 13 }}>
+                      Haz clic o arrastra aquí
+                    </p>
+                    <p className="ant-upload-hint" style={{ color: '#999', fontSize: 11 }}>
+                      JPG, PNG, GIF, SVG
+                      <br />
+                      Recomendado: 300x100 px
+                    </p>
+                  </Upload.Dragger>
+                </div>
+
+                {/* Información del logo */}
+                <div style={{ marginTop: 16, padding: 12, background: '#e6f7ff', borderRadius: 6 }}>
+                  <Text strong style={{ color: '#1890ff', display: 'block', marginBottom: 6, fontSize: 12 }}>
+                    ℹ️ Uso:
+                  </Text>
+                  <ul style={{ margin: 0, paddingLeft: 16, color: '#666', fontSize: 11, lineHeight: 1.6 }}>
+                    <li>Sidebar de la aplicación</li>
+                    <li>Reportes PDF</li>
+                    <li>Imagen horizontal preferida</li>
+                  </ul>
+                </div>
               </div>
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                onClick={handleEliminarLogo}
-                style={{ marginTop: 12 }}
-              >
-                Eliminar Logo
-              </Button>
-            </div>
-          )}
+            </Col>
 
-          <Divider />
+            {/* COLUMNA 2: FAVICON */}
+            <Col xs={24} md={12}>
+              <div style={{ 
+                padding: 16, 
+                background: '#fafafa', 
+                borderRadius: 8,
+                height: '100%',
+                border: '1px solid #e8e8e8'
+              }}>
+                <Text strong style={{ 
+                  display: 'block', 
+                  marginBottom: 16, 
+                  fontSize: 16,
+                  color: '#52c41a'
+                }}>
+                  🌐 Favicon (Miniatura)
+                </Text>
+                
+                {/* Vista previa del favicon actual */}
+                {faviconEmpresa && (
+                  <div style={{ marginBottom: 16, textAlign: 'center' }}>
+                    <Text style={{ display: 'block', marginBottom: 8, fontSize: 12, color: '#666' }}>
+                      Favicon Actual:
+                    </Text>
+                    <div
+                      style={{
+                        padding: 16,
+                        background: '#fff',
+                        borderRadius: 8,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: 80,
+                        border: '1px dashed #d9d9d9',
+                      }}
+                    >
+                      <img
+                        src={faviconEmpresa}
+                        alt="Favicon actual"
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    </div>
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={handleEliminarFavicon}
+                      style={{ marginTop: 8 }}
+                      size="small"
+                    >
+                      Eliminar Favicon
+                    </Button>
+                  </div>
+                )}
 
-          {/* Subir nuevo logo */}
-          <div>
-            <Text strong style={{ display: 'block', marginBottom: 12 }}>
-              {logoEmpresa ? 'Cambiar Logo:' : 'Subir Logo:'}
-            </Text>
-            <Upload.Dragger
-              name="logo"
-              accept="image/*"
-              beforeUpload={handleUploadLogo}
-              showUploadList={false}
-              style={{ padding: '40px 20px' }}
-            >
-              <p className="ant-upload-drag-icon">
-                <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
-              </p>
-              <p className="ant-upload-text" style={{ fontSize: 16 }}>
-                Haz clic o arrastra una imagen aquí
-              </p>
-              <p className="ant-upload-hint" style={{ color: '#999' }}>
-                Formatos soportados: JPG, PNG, GIF, SVG
-                <br />
-                Tamaño recomendado: 300x100 px (máximo 2 MB)
-              </p>
-            </Upload.Dragger>
-          </div>
+                {/* Subir nuevo favicon */}
+                <div style={{ marginTop: faviconEmpresa ? 16 : 0 }}>
+                  <Text style={{ display: 'block', marginBottom: 8, fontSize: 12, color: '#666' }}>
+                    {faviconEmpresa ? 'Cambiar Favicon:' : 'Subir Favicon:'}
+                  </Text>
+                  <Upload.Dragger
+                    name="favicon"
+                    accept="image/*"
+                    beforeUpload={handleUploadFavicon}
+                    showUploadList={false}
+                    style={{ padding: '24px 12px' }}
+                  >
+                    <p className="ant-upload-drag-icon">
+                      <UploadOutlined style={{ fontSize: 32, color: '#52c41a' }} />
+                    </p>
+                    <p className="ant-upload-text" style={{ fontSize: 13 }}>
+                      Haz clic o arrastra aquí
+                    </p>
+                    <p className="ant-upload-hint" style={{ color: '#999', fontSize: 11 }}>
+                      ICO, PNG (cuadrado)
+                      <br />
+                      Recomendado: 64x64 px o 32x32 px
+                    </p>
+                  </Upload.Dragger>
+                </div>
 
-          {/* Información adicional */}
-          <div style={{ marginTop: 24, padding: 16, background: '#e6f7ff', borderRadius: 8 }}>
-            <Text strong style={{ color: '#1890ff', display: 'block', marginBottom: 8 }}>
-              ℹ️ Información:
-            </Text>
-            <ul style={{ margin: 0, paddingLeft: 20, color: '#666' }}>
-              <li>El logo se mostrará en el sidebar de la aplicación</li>
-              <li>También aparecerá en todos los reportes PDF</li>
-              <li>Se ajustará automáticamente al espacio disponible</li>
-              <li>Para mejores resultados, usa una imagen horizontal</li>
-            </ul>
-          </div>
+                {/* Información del favicon */}
+                <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 6 }}>
+                  <Text strong style={{ color: '#52c41a', display: 'block', marginBottom: 6, fontSize: 12 }}>
+                    ℹ️ Uso:
+                  </Text>
+                  <ul style={{ margin: 0, paddingLeft: 16, color: '#666', fontSize: 11, lineHeight: 1.6 }}>
+                    <li>Pestaña del navegador</li>
+                    <li>Favoritos/marcadores</li>
+                    <li>Barra de direcciones</li>
+                    <li>Usa imagen cuadrada</li>
+                  </ul>
+                </div>
+              </div>
+            </Col>
+          </Row>
         </div>
       </Modal>
     </Layout>
