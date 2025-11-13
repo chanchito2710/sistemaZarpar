@@ -17,7 +17,7 @@ import {
   eliminarColumna,
   eliminarTabla
 } from '../controllers/databaseController.js';
-import { limpiarDatos } from '../controllers/cleanupController.js';
+import { limpiarDatos, borradoMaestro } from '../controllers/cleanupController.js';
 
 const router = Router();
 
@@ -67,6 +67,9 @@ router.delete('/tables/:tableName/records/:id', eliminarRegistro);
 
 // Limpiar datos de prueba (⚠️ USO EXCLUSIVO PARA DESARROLLO)
 router.post('/cleanup', limpiarDatos);
+
+// 🔥 BORRADO MAESTRO - ELIMINA TODOS LOS DATOS (⚠️ IRREVERSIBLE)
+router.post('/borrado-maestro', borradoMaestro);
 
 export default router;
 
