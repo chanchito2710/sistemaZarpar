@@ -23,7 +23,8 @@ import {
   Descriptions,
   Statistic,
   Alert,
-  Radio
+  Radio,
+  Tooltip
 } from 'antd';
 import {
   DollarOutlined,
@@ -1101,6 +1102,24 @@ const Accounts: React.FC = () => {
         );
       },
     },
+    {
+      title: 'Acciones',
+      key: 'acciones',
+      width: 80,
+      align: 'center',
+      className: 'no-print', // Clase para no imprimir en PDF
+      render: (_: any, record: any) => (
+        <Tooltip title="Ver detalle completo">
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            size="small"
+            className="no-print" // Clase para no imprimir en PDF
+            style={{ color: '#1890ff' }}
+          />
+        </Tooltip>
+      ),
+    },
   ];
 
   /**
@@ -1451,7 +1470,7 @@ const Accounts: React.FC = () => {
         title={
           <Space>
             <EyeOutlined style={{ color: '#1890ff' }} />
-            <span>Detalle de Cuenta - {clienteSeleccionado?.cliente_nombre}</span>
+            <span style={{ color: '#000' }}>Detalle de Cuenta - {clienteSeleccionado?.cliente_nombre}</span>
           </Space>
         }
         open={modalDetalleVisible}
