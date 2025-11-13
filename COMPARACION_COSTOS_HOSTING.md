@@ -1,4 +1,4 @@
-# 💰 COMPARACIÓN DE COSTOS DE HOSTING
+o fu# 💰 COMPARACIÓN DE COSTOS DE HOSTING
 ## Sistema Zarpar - Análisis Económico Completo
 
 ---
