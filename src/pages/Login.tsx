@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Typography, Space, Divider, Spin } from 'antd';
+import { Card, Form, Input, Button, Typography } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -128,44 +128,7 @@ const Login: React.FC = () => {
           </Form.Item>
         </Form>
 
-        <Divider>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Acceso Rápido
-          </Text>
-        </Divider>
-
-        <Space direction="vertical" style={{ width: '100%' }} size="small">
-          <Button 
-            block 
-            size="small" 
-            type="text"
-            onClick={() => form.setFieldsValue({
-              email: 'admin@zarparuy.com',
-              password: 'admin123'
-            })}
-            disabled={loading}
-          >
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              👑 Admin: admin@zarparuy.com / admin123
-            </Text>
-          </Button>
-          <Button 
-            block 
-            size="small" 
-            type="text"
-            onClick={() => form.setFieldsValue({
-              email: 'pando@zarparuy.com',
-              password: 'pando123'
-            })}
-            disabled={loading}
-          >
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              💼 Vendedor Pando: pando@zarparuy.com / pando123
-            </Text>
-          </Button>
-        </Space>
-
-        <div style={{ textAlign: 'center', marginTop: 24 }}>
+        <div style={{ textAlign: 'center', marginTop: 32 }}>
           <Text type="secondary" style={{ fontSize: 11 }}>
             © 2024 Sistema Zarpar - Todos los derechos reservados
           </Text>
