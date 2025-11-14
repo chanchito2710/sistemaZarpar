@@ -448,7 +448,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
       title={
         <Space>
           <DeleteOutlined style={{ color: '#ff4d4f' }} />
-          <span>Limpieza de Datos de Prueba</span>
+          <span style={{ color: '#000', fontWeight: 500 }}>Limpieza de Datos de Prueba</span>
           <Tag color="red">PELIGRO</Tag>
         </Space>
       }
