@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "client:dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build --mode production",
     "build:api": "tsc --project tsconfig.api.json",
+    "build:all": "npm run build:api && npm run build",
     "start:api": "node api/dist/server.js",
     "lint": "eslint .",
     "preview": "vite preview --port 5678 --host",

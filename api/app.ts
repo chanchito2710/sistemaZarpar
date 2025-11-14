@@ -121,6 +121,22 @@ app.use(
 )
 
 /**
+ * Servir archivos estáticos del frontend (React build)
+ */
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '../../dist');
+  app.use(express.static(frontendPath));
+  
+  // Para SPA routing - todas las rutas no-API sirven index.html
+  app.get('*', (req: Request, res: Response) => {
+    // Solo para rutas que NO empiezan con /api
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    }
+  });
+}
+
+/**
  * error handler middleware
  */
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
@@ -133,9 +149,9 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
 })
 
 /**
- * 404 handler
+ * 404 handler - solo para rutas /api
  */
-app.use((req: Request, res: Response) => {
+app.use('/api/*', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: 'API not found',
