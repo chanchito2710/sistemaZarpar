@@ -1,5 +1,8 @@
 /**
- * This is a API server
+ * ====================================================
+ * SERVIDOR API - SISTEMA ZARPAR
+ * Sistema de Gestión Empresarial con Seguridad Máxima
+ * ====================================================
  */
 
 import express, {
@@ -11,6 +14,17 @@ import cors from 'cors'
 import path from 'path'
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
+
+// ========== MIDDLEWARES DE SEGURIDAD ==========
+import {
+  generalLimiter,
+  securityHeaders,
+  preventSQLInjection,
+  securityLogger,
+  validateOrigin,
+} from './middleware/security.js'
+
+// ========== RUTAS DE LA API ==========
 import authRoutes from './routes/auth.js'
 import vendedoresRoutes from './routes/vendedores.js'
 import clientesRoutes from './routes/clientes.js'
@@ -35,9 +49,41 @@ dotenv.config()
 
 const app: express.Application = express()
 
-app.use(cors())
+// ====================================================
+// MIDDLEWARES GLOBALES DE SEGURIDAD
+// ====================================================
+
+// 1. Headers de seguridad (Helmet)
+app.use(securityHeaders)
+
+// 2. CORS con configuración segura
+app.use(cors({
+  origin: [
+    'http://localhost:5678',
+    'http://localhost:3456',
+    'http://127.0.0.1:5678',
+    'http://127.0.0.1:3456',
+    // Agregar dominio de producción aquí
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+}))
+
+// 3. Body parsers con límites
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// 4. Logger de seguridad (registra todas las requests)
+app.use(securityLogger)
+
+// 5. Rate Limiting general (100 req/15min por IP)
+app.use('/api', generalLimiter)
+
+// 6. Protección contra SQL Injection
+app.use('/api', preventSQLInjection)
+
+// 7. Validación de origen (CSRF protection)
+app.use('/api', validateOrigin)
 
 /**
  * API Routes

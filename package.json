@@ -29,8 +29,13 @@
     "dayjs": "^1.11.18",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.0",
     "framer-motion": "^12.23.24",
+    "helmet": "^8.1.0",
+    "hpp": "^0.2.3",
     "html2canvas": "^1.4.1",
+    "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
@@ -45,6 +50,7 @@
     "recharts": "^2.15.4",
     "tailwind-merge": "^3.0.2",
     "xlsx": "^0.18.5",
+    "xss-clean": "^0.1.4",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
