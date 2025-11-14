@@ -53,7 +53,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   // URL base de la API
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456';
+  // En producción (hostname != localhost) usa URL relativa (mismo servidor)
+  // En desarrollo (localhost) usa http://localhost:3456
+  const API_URL = import.meta.env.VITE_API_URL || 
+    (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+      ? '' 
+      : 'http://localhost:3456');
 
   /**
    * Verificar si hay un token guardado al cargar la aplicación
