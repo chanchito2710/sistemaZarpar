@@ -21,7 +21,7 @@ dotenv.config();
  * - Contenedor: zarpar-mysql
  */
 export const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || '127.0.0.1', // CRÍTICO: Usar 127.0.0.1 en lugar de localhost (IPv4 explícito)
   port: parseInt(process.env.DB_PORT || '3307'),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'zarpar2025',
