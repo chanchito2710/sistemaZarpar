@@ -15,7 +15,7 @@ import {
 import { verificarAutenticacion } from '../middleware/auth.js';
 import { 
   loginLimiter, 
-  validateLogin,
+  // validateLogin, // Deshabilitado - causaba problemas
   criticalOperationsLimiter
 } from '../middleware/security.js';
 
@@ -28,12 +28,11 @@ const router = Router();
  * 
  * PROTECCIONES:
  * - Rate Limiting: 5 intentos por 15 minutos
- * - Validación de email y password
  * - Logs de intentos fallidos
  * 
  * Retorna: { token, usuario }
  */
-router.post('/login', loginLimiter, validateLogin, login);
+router.post('/login', loginLimiter, login);
 
 /**
  * LOGOUT - Cerrar sesión

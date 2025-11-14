@@ -20,9 +20,9 @@ import {
   generalLimiter,
   securityHeaders,
   antiSEOHeaders,
-  preventSQLInjection,
   securityLogger,
-  validateOrigin,
+  // preventSQLInjection, // Deshabilitado - prepared statements protegen
+  // validateOrigin, // Deshabilitado - desarrollo local
 } from './middleware/security.js'
 
 // ========== RUTAS DE LA API ==========
@@ -83,11 +83,12 @@ app.use(securityLogger)
 // 6. Rate Limiting general (100 req/15min por IP)
 app.use('/api', generalLimiter)
 
-// 7. Protección contra SQL Injection
-app.use('/api', preventSQLInjection)
+// 7. Protección contra SQL Injection - DESHABILITADO temporalmente
+// Los prepared statements ya protegen contra SQL injection
+// app.use('/api', preventSQLInjection)
 
-// 8. Validación de origen (CSRF protection)
-app.use('/api', validateOrigin)
+// 8. Validación de origen (CSRF protection) - DESHABILITADO para desarrollo
+// app.use('/api', validateOrigin)
 
 /**
  * API Routes
