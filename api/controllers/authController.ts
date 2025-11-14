@@ -8,7 +8,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { obtenerTodasLasTablas } from '../utils/database.js';
 
 // Interfaz para el usuario de la base de datos
 interface VendedorDB extends RowDataPacket {
@@ -128,11 +127,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Determinar tablas de clientes accesibles
     let tablasClientes: string[] = [];
     
-    console.log('📋 Obteniendo tablas de clientes...');
+    console.log('📋 Determinando acceso a clientes...');
     if (esAdmin) {
-      // Admin tiene acceso a TODAS las tablas de clientes (dinámico desde BD)
-      tablasClientes = await obtenerTodasLasTablas();
-      console.log(`🔑 Admin tiene acceso a ${tablasClientes.length} tablas de clientes:`, tablasClientes);
+      // Admin: marcar que tiene acceso a todas (se resuelve dinámicamente en cada endpoint)
+      tablasClientes = ['*']; // Indica acceso a todas las tablas
+      console.log(`🔑 Admin tiene acceso a TODAS las tablas de clientes`);
     } else {
       // Vendedor normal solo su tabla de clientes
       const sucursalLower = usuario.sucursal.toLowerCase();
