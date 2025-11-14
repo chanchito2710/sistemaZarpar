@@ -115,7 +115,6 @@ const Cash: React.FC = () => {
   // Estados
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modalEnvioVisible, setModalEnvioVisible] = useState(false);
   const [modalAjusteVisible, setModalAjusteVisible] = useState(false);
   const [modalHistorialVisible, setModalHistorialVisible] = useState(false);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
@@ -131,7 +130,6 @@ const Cash: React.FC = () => {
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   
   // Formularios
-  const [formEnvio] = Form.useForm();
   const [formAjuste] = Form.useForm();
 
   // Cargar cajas al montar
@@ -227,25 +225,6 @@ const Cash: React.FC = () => {
     }
   };
 
-  const handleEnviarDinero = async (values: any) => {
-    try {
-      await cajaService.registrarEnvio({
-        sucursal: values.sucursal,
-        monto: values.monto,
-        concepto: values.concepto,
-        usuario_id: usuario?.id || 0,
-        usuario_email: usuario?.email || '',
-      });
-      
-      antMessage.success('💸 Envío registrado exitosamente');
-      setModalEnvioVisible(false);
-      formEnvio.resetFields();
-      cargarCajas();
-    } catch (error: any) {
-      console.error('Error al enviar dinero:', error);
-      antMessage.error(error.response?.data?.message || 'Error al registrar envío');
-    }
-  };
 
   const handleAjustarCaja = async (values: any) => {
     try {
@@ -281,15 +260,6 @@ const Cash: React.FC = () => {
     }
   };
 
-  const abrirModalEnvio = () => {
-    // Pre-seleccionar sucursal del usuario si no es admin
-    if (!esAdmin && sucursalUsuario) {
-      formEnvio.setFieldsValue({
-        sucursal: sucursalUsuario,
-      });
-    }
-    setModalEnvioVisible(true);
-  };
 
   const abrirModalAjuste = (caja: Caja) => {
     setSucursalSeleccionada(caja.sucursal);
@@ -448,14 +418,6 @@ const Cash: React.FC = () => {
         </Col>
         <Col>
           <Space>
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={abrirModalEnvio}
-              size="large"
-            >
-              Enviar Dinero
-            </Button>
             <Button
               icon={<HistoryOutlined />}
               onClick={abrirModalHistorial}
@@ -650,70 +612,6 @@ const Cash: React.FC = () => {
         </Row>
       )}
 
-      {/* Modal de Envío de Dinero */}
-      <Modal
-        title={<Space><SendOutlined /> Enviar Dinero</Space>}
-        open={modalEnvioVisible}
-        onOk={() => formEnvio.submit()}
-        onCancel={() => {
-          setModalEnvioVisible(false);
-          formEnvio.resetFields();
-        }}
-        okText="Enviar"
-        cancelText="Cancelar"
-        width={500}
-      >
-        <Form
-          form={formEnvio}
-          layout="vertical"
-          onFinish={handleEnviarDinero}
-        >
-          <Form.Item
-            name="sucursal"
-            label="Sucursal"
-            rules={[{ required: true, message: 'Selecciona una sucursal' }]}
-          >
-            <Select
-              placeholder="Selecciona sucursal"
-              disabled={!esAdmin}
-            >
-              {cajas.map((c) => (
-                <Option key={c.sucursal} value={c.sucursal}>
-                  {c.sucursal.toUpperCase()} - Disponible: ${Number(c.monto_actual).toFixed(2)}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="monto"
-            label="Monto a Enviar"
-            rules={[
-              { required: true, message: 'Ingresa el monto' },
-              { type: 'number', min: 0.01, message: 'El monto debe ser mayor a 0' },
-            ]}
-          >
-            <InputNumber
-              prefix={<DollarOutlined />}
-              placeholder="0.00"
-              style={{ width: '100%' }}
-              precision={2}
-              step={100}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="concepto"
-            label="Concepto"
-            rules={[{ required: true, message: 'Describe el concepto del envío' }]}
-          >
-            <TextArea
-              placeholder="Ej: Envío a banco, pago de proveedor, etc."
-              rows={3}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       {/* Modal de Ajuste Manual (Solo Admin) */}
       <Modal
