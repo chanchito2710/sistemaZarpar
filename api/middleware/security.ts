@@ -166,12 +166,11 @@ export const sanitizeString = (str: string): string => {
  */
 export const validateEmail = [
   body('email')
-    .isEmail()
-    .withMessage('Email inválido')
-    .normalizeEmail()
     .trim()
     .isLength({ min: 5, max: 100 })
-    .withMessage('Email debe tener entre 5 y 100 caracteres'),
+    .withMessage('Email debe tener entre 5 y 100 caracteres')
+    .isEmail()
+    .withMessage('Email inválido'),
 ];
 
 /**
@@ -181,10 +180,9 @@ export const validatePassword = [
   body('password')
     .isString()
     .withMessage('Password debe ser un string')
-    .isLength({ min: 6, max: 100 })
-    .withMessage('Password debe tener entre 6 y 100 caracteres')
-    .matches(/^[a-zA-Z0-9@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]*$/)
-    .withMessage('Password contiene caracteres no permitidos'),
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Password debe tener entre 1 y 100 caracteres')
+    .trim(),
 ];
 
 /**
