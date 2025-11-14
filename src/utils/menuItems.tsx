@@ -188,7 +188,7 @@ export const moduleInfo = {
   },
   inventoryLog: {
     title: 'Movimientos Ventas',
-    description: 'Reportes',
+    description: 'Reportes Globales',
     path: '/inventory/log',
     color: moduleColors.inventory.color,
     gradient: moduleColors.inventory.gradient,
