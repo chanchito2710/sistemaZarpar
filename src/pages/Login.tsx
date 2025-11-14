@@ -130,7 +130,7 @@ const Login: React.FC = () => {
 
         <div style={{ textAlign: 'center', marginTop: 32 }}>
           <Text type="secondary" style={{ fontSize: 11 }}>
-            © 2024 Sistema Zarpar - Todos los derechos reservados
+            © 2025 Sistema Zarpar - Todos los derechos reservados
           </Text>
         </div>
       </Card>
