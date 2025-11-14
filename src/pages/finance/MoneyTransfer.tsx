@@ -37,6 +37,12 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
+// URL de la API - detecta automáticamente el entorno
+const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
+
 // Interfaces TypeScript
 interface Caja {
   sucursal: string;
@@ -56,8 +62,6 @@ interface Movimiento {
   usuario_email: string;
   created_at: string;
 }
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
 
 const MoneyTransfer: React.FC = () => {
   const { usuario } = useAuth();

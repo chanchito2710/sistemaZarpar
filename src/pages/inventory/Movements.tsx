@@ -43,6 +43,12 @@ const { RangePicker } = DatePicker;
 const { Option } = Select;
 const { Title, Text } = Typography;
 
+// URL de la API - detecta automáticamente el entorno
+const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
+
 /**
  * Interface para un movimiento de stock
  */
@@ -143,15 +149,15 @@ const Movements: React.FC = () => {
   /**
    * Cargar sucursales desde la API
    */
-  const cargarSucursales = async () => {
-    setLoadingSucursales(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3456/api/sucursales', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+   const cargarSucursales = async () => {
+     setLoadingSucursales(true);
+     try {
+       const token = localStorage.getItem('token');
+       const response = await fetch(`${API_URL}/sucursales`, {
+         headers: {
+           'Authorization': `Bearer ${token}`,
+         },
+       });
       const data = await response.json();
       
       if (data.success) {
@@ -211,10 +217,10 @@ const Movements: React.FC = () => {
 
       params.append('limit', '200'); // Aumentar límite a 200
 
-      console.log('📡 Filtros aplicados:', Object.fromEntries(params));
+       console.log('📡 Filtros aplicados:', Object.fromEntries(params));
 
-      const url = `http://localhost:3456/api/historial-stock?${params.toString()}`;
-      console.log('🌐 URL completa:', url);
+       const url = `${API_URL}/historial-stock?${params.toString()}`;
+       console.log('🌐 URL completa:', url);
       
       const response = await fetch(url, {
         headers: {

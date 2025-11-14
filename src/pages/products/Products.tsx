@@ -181,13 +181,17 @@ const Products: React.FC = () => {
     return orden[tipo] || 999; // Cualquier otro tipo va al final
   };
 
-  /**
-   * Cargar sucursales disponibles desde la base de datos
-   */
-  const cargarSucursales = async () => {
-    setLoadingSucursales(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3456/api'}/sucursales`);
+   /**
+    * Cargar sucursales disponibles desde la base de datos
+    */
+   const cargarSucursales = async () => {
+     setLoadingSucursales(true);
+     try {
+       const API_URL = import.meta.env.VITE_API_URL || 
+         (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+           ? '/api' 
+           : 'http://localhost:3456/api');
+       const response = await fetch(`${API_URL}/sucursales`);
       const data = await response.json();
       
       if (data.success && data.data) {
