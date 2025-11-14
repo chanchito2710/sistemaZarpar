@@ -27,22 +27,24 @@ export const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || 'zarpar2025',
   database: process.env.DB_NAME || 'zarparDataBase',
   waitForConnections: true,
-  connectionLimit: 10, // Máximo de conexiones simultáneas
+  connectionLimit: 5, // REDUCIDO: Menos conexiones simultáneas
   queueLimit: 0, // Sin límite de cola
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
+  keepAliveInitialDelay: 10000, // 10 segundos antes de keep-alive
   // Timeout para conectar
-  connectTimeout: 60000, // 60 segundos para establecer conexión inicial
-  // Configuración de encoding UTF-8 para soportar acentos y caracteres especiales
+  connectTimeout: 10000, // REDUCIDO: 10 segundos
+  // Configuración de encoding UTF-8
   charset: 'utf8mb4',
-  // ⚡ SOLUCIÓN AL ERROR "Connection lost":
-  maxIdle: 10, // Máximo de conexiones idle antes de cerrar
-  idleTimeout: 60000, // 60 segundos antes de cerrar conexión idle
+  // Manejo de conexiones idle
+  maxIdle: 3, // REDUCIDO: Máximo 3 conexiones idle
+  idleTimeout: 30000, // REDUCIDO: 30 segundos
   // Configuración avanzada
-  dateStrings: true, // Retornar fechas como strings
-  typeCast: true, // Conversión automática de tipos
+  dateStrings: true,
+  typeCast: true,
   supportBigNumbers: true,
-  bigNumberStrings: true
+  bigNumberStrings: true,
+  // CRÍTICO: Deshabilitar SSL para conexiones locales
+  ssl: false
 });
 
 /**
