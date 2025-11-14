@@ -49,6 +49,13 @@ dotenv.config()
 
 const app: express.Application = express()
 
+// ========================================
+// CONFIGURACIÓN DE TRUST PROXY (Railway/Producción)
+// ========================================
+// Railway usa un proxy inverso (Nginx) que agrega X-Forwarded-For
+// Express necesita confiar en este proxy para rate limiting y seguridad
+app.set('trust proxy', 1);
+
 // ====================================================
 // MIDDLEWARES GLOBALES DE SEGURIDAD
 // ====================================================
