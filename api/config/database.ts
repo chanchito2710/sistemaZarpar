@@ -21,31 +21,23 @@ dotenv.config();
  * - Contenedor: zarpar-mysql
  */
 export const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1', // CRÍTICO: Usar 127.0.0.1 en lugar de localhost (IPv4 explícito)
+  host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3307'),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'zarpar2025',
   database: process.env.DB_NAME || 'zarparDataBase',
   waitForConnections: true,
-  connectionLimit: 5, // REDUCIDO: Menos conexiones simultáneas
-  queueLimit: 0, // Sin límite de cola
+  connectionLimit: 10,
+  queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 10000, // 10 segundos antes de keep-alive
-  // Timeout para conectar
-  connectTimeout: 10000, // REDUCIDO: 10 segundos
-  // Configuración de encoding UTF-8
+  keepAliveInitialDelay: 10000,
+  connectTimeout: 10000,
   charset: 'utf8mb4',
-  // Manejo de conexiones idle
-  maxIdle: 3, // REDUCIDO: Máximo 3 conexiones idle
-  idleTimeout: 30000, // REDUCIDO: 30 segundos
-  // Configuración avanzada
   dateStrings: true,
   typeCast: true,
   supportBigNumbers: true,
-  bigNumberStrings: true,
-  // CRÍTICO: Deshabilitar SSL para conexiones locales
-  ssl: false
-});
+  bigNumberStrings: true
+} as any);
 
 /**
  * Función para verificar la conexión a la base de datos

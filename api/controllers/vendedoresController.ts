@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import { executeQuery } from '../config/database';
 import pool from '../config/database';
 import bcrypt from 'bcryptjs';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 /**
  * Interfaz para el tipo Vendedor

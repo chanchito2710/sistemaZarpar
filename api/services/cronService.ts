@@ -104,7 +104,6 @@ export const inicializarCronJobs = () => {
     console.log('\n🕐 [CRON] Ejecutando tarea programada: Guardar resumen diario');
     guardarResumenDiarioAutomatico();
   }, {
-    scheduled: true,
     timezone: 'America/Montevideo'
   });
 

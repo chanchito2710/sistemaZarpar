@@ -249,8 +249,8 @@ export const verificarToken = async (req: Request, res: Response): Promise<void>
     let tablasClientes: string[] = [];
     
     if (esAdmin) {
-      // Admin tiene acceso a TODAS las tablas de clientes (dinámico desde BD)
-      tablasClientes = await obtenerTodasLasTablas();
+      // Admin tiene acceso a TODAS las tablas de clientes
+      tablasClientes = ['*']; // Indica acceso total, se resuelve dinámicamente en endpoints
     } else {
       const sucursalLower = usuario.sucursal.toLowerCase();
       tablasClientes = [`clientes_${sucursalLower}`];
