@@ -40,7 +40,17 @@ export const pool = mysql.createPool({
   // Asegurar que la conexión use UTF-8
   connectAttributes: {
     charset: 'utf8mb4'
-  }
+  },
+  // ⚡ SOLUCIÓN AL ERROR "Connection lost":
+  // Eliminar y recrear conexiones perdidas automáticamente
+  maxIdle: 10, // Máximo de conexiones idle antes de cerrar
+  idleTimeout: 60000, // 60 segundos antes de cerrar conexión idle
+  
+  // Configuración avanzada para manejar conexiones perdidas
+  dateStrings: true, // Retornar fechas como strings
+  typeCast: true, // Conversión automática de tipos
+  supportBigNumbers: true,
+  bigNumberStrings: true
 });
 
 /**
@@ -70,6 +80,8 @@ export async function testConnection(): Promise<boolean> {
  * Función para ejecutar queries de forma segura
  * @param query - Query SQL a ejecutar
  * @param params - Parámetros para la query (previene SQL injection)
+ * 
+ * ⚡ Maneja automáticamente reconexión si se pierde la conexión
  */
 export async function executeQuery<T = any>(
   query: string,
@@ -78,7 +90,19 @@ export async function executeQuery<T = any>(
   try {
     const [rows] = await pool.execute(query, params);
     return rows as T;
-  } catch (error) {
+  } catch (error: any) {
+    // Si la conexión se perdió, intentar reconectar una vez
+    if (error.code === 'PROTOCOL_CONNECTION_LOST' || error.code === 'ETIMEDOUT') {
+      console.log('🔄 Conexión perdida, reintentando...');
+      try {
+        const [rows] = await pool.execute(query, params);
+        console.log('✅ Reconexión exitosa');
+        return rows as T;
+      } catch (retryError) {
+        console.error('❌ Error en reintento:', retryError);
+        throw retryError;
+      }
+    }
     console.error('Error ejecutando query:', error);
     throw error;
   }
