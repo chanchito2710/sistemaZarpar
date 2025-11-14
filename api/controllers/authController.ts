@@ -42,12 +42,17 @@ const JWT_EXPIRES_IN = '24h'; // Token válido por 24 horas
  */
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log('🔐 Intento de login:', req.body.email);
+    console.log('\n========================================');
+    console.log('🔐 INICIO LOGIN');
+    console.log('========================================');
+    console.log('📧 Email recibido:', req.body.email);
+    console.log('🔑 Password recibido:', req.body.password ? '***' : 'VACÍO');
+    
     const { email, password } = req.body;
 
     // Validar que se envíen email y password
     if (!email || !password) {
-      console.log('❌ Email o password faltante');
+      console.log('❌ FALLO: Email o password faltante');
       res.status(400).json({
         error: 'Email y contraseña son requeridos'
       });
@@ -55,16 +60,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Buscar usuario por email en la base de datos
-    console.log('🔍 Buscando usuario en BD...');
+    console.log('🔍 PASO 1: Buscando usuario en BD...');
+    console.log('📝 Query: SELECT * FROM vendedores WHERE email = ? AND activo = TRUE');
+    console.log('📝 Parámetro:', email);
+    
     const [usuarios] = await pool.execute<VendedorDB[]>(
       'SELECT * FROM `vendedores` WHERE `email` = ? AND `activo` = TRUE',
       [email]
     );
-    console.log(`📊 Usuarios encontrados: ${usuarios.length}`);
+    
+    console.log(`✅ PASO 1 COMPLETADO: ${usuarios.length} usuarios encontrados`);
 
     // Verificar si el usuario existe
     if (usuarios.length === 0) {
-      console.log('❌ Usuario no encontrado');
+      console.log('❌ FALLO: Usuario no encontrado en BD');
       res.status(401).json({
         error: 'Credenciales inválidas'
       });
@@ -72,11 +81,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const usuario = usuarios[0];
-    console.log('✅ Usuario encontrado:', usuario.email);
+    console.log('✅ PASO 2: Usuario encontrado');
+    console.log('   ID:', usuario.id);
+    console.log('   Email:', usuario.email);
+    console.log('   Nombre:', usuario.nombre);
+    console.log('   Cargo:', usuario.cargo);
+    console.log('   Sucursal:', usuario.sucursal);
 
     // Verificar que el usuario tenga contraseña configurada
     if (!usuario.password) {
-      console.log('❌ Usuario sin contraseña configurada');
+      console.log('❌ FALLO: Usuario sin contraseña configurada');
       res.status(500).json({
         error: 'Usuario sin contraseña configurada. Contacte al administrador.'
       });
@@ -84,12 +98,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Verificar la contraseña
-    console.log('🔒 Verificando contraseña...');
+    console.log('🔒 PASO 3: Verificando contraseña...');
+    console.log('   Password hash en BD:', usuario.password.substring(0, 20) + '...');
+    
     const passwordValida = await bcrypt.compare(password, usuario.password);
-    console.log(`🔓 Contraseña válida: ${passwordValida}`);
+    
+    console.log(`✅ PASO 3 COMPLETADO: Contraseña ${passwordValida ? 'CORRECTA' : 'INCORRECTA'}`);
 
     if (!passwordValida) {
-      console.log('❌ Contraseña incorrecta');
+      console.log('❌ FALLO: Contraseña incorrecta');
       res.status(401).json({
         error: 'Credenciales inválidas'
       });
@@ -97,10 +114,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Determinar si es administrador
+    console.log('🔍 PASO 4: Determinando permisos...');
     const esAdmin = usuario.email === 'admin@zarparuy.com';
-    console.log(`👑 Es admin: ${esAdmin}`);
+    console.log(`   Es admin: ${esAdmin ? 'SÍ ✅' : 'NO ❌'}`);
 
     // Preparar payload del token
+    console.log('📦 PASO 5: Preparando payload JWT...');
     const payload: JWTPayload = {
       id: usuario.id,
       email: usuario.email,
@@ -109,39 +128,42 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       sucursal: usuario.sucursal.toLowerCase(), // ✅ Normalizar a minúsculas
       esAdmin: esAdmin
     };
+    console.log('   Payload:', JSON.stringify(payload, null, 2));
 
     // Generar token JWT
-    console.log('🎫 Generando token JWT...');
+    console.log('🎫 PASO 6: Generando token JWT...');
     const token = jwt.sign(payload, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN
     });
-    console.log('✅ Token generado');
+    console.log('✅ PASO 6 COMPLETADO: Token generado (longitud:', token.length, 'caracteres)');
 
     // Actualizar último acceso
-    console.log('📝 Actualizando último acceso...');
+    console.log('📝 PASO 7: Actualizando último acceso en BD...');
     await pool.execute(
       'UPDATE `vendedores` SET `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?',
       [usuario.id]
     );
+    console.log('✅ PASO 7 COMPLETADO');
 
     // Determinar tablas de clientes accesibles
+    console.log('📋 PASO 8: Determinando acceso a clientes...');
     let tablasClientes: string[] = [];
     
-    console.log('📋 Determinando acceso a clientes...');
     if (esAdmin) {
       // Admin: marcar que tiene acceso a todas (se resuelve dinámicamente en cada endpoint)
       tablasClientes = ['*']; // Indica acceso a todas las tablas
-      console.log(`🔑 Admin tiene acceso a TODAS las tablas de clientes`);
+      console.log('   Admin tiene acceso a: TODAS las tablas (*)');
     } else {
       // Vendedor normal solo su tabla de clientes
       const sucursalLower = usuario.sucursal.toLowerCase();
       tablasClientes = [`clientes_${sucursalLower}`];
-      console.log(`🔑 Vendedor tiene acceso a:`, tablasClientes);
+      console.log('   Vendedor tiene acceso a:', tablasClientes[0]);
     }
+    console.log('✅ PASO 8 COMPLETADO');
 
     // Responder con token y datos del usuario
-    console.log('✅ Login exitoso, enviando respuesta');
-    res.json({
+    console.log('📤 PASO 9: Preparando respuesta final...');
+    const respuesta = {
       mensaje: 'Login exitoso',
       token,
       usuario: {
@@ -159,11 +181,27 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           gestionarBaseDatos: esAdmin
         }
       }
-    });
-    console.log('🎉 Respuesta enviada correctamente');
+    };
+    
+    console.log('✅ PASO 9 COMPLETADO: Respuesta preparada');
+    console.log('📤 PASO 10: Enviando respuesta al cliente...');
+    
+    res.json(respuesta);
+    
+    console.log('✅✅✅ LOGIN EXITOSO COMPLETO ✅✅✅');
+    console.log('========================================\n');
 
-  } catch (error) {
-    console.error('❌ Error en login:', error);
+  } catch (error: any) {
+    console.error('\n========================================');
+    console.error('❌❌❌ ERROR EN LOGIN ❌❌❌');
+    console.error('========================================');
+    console.error('Tipo de error:', error.name);
+    console.error('Mensaje:', error.message);
+    console.error('Código:', error.code);
+    console.error('Stack completo:');
+    console.error(error.stack);
+    console.error('========================================\n');
+    
     res.status(500).json({
       error: 'Error al procesar el login'
     });
