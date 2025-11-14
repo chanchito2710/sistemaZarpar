@@ -13,7 +13,7 @@ import express, {
 import cors from 'cors'
 import path from 'path'
 import dotenv from 'dotenv'
-import { fileURLToPath } from 'url'
+// import { fileURLToPath } from 'url' // No necesario en CommonJS
 
 // ========== MIDDLEWARES DE SEGURIDAD ==========
 import {
@@ -41,9 +41,8 @@ import devolucionesRoutes from './routes/devoluciones.js'
 import descuentosRoutes from './routes/descuentos.js'
 import historialStockRoutes from './routes/historialStock.js'
 
-// for esm mode
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+// En CommonJS, __filename y __dirname ya están disponibles globalmente
+// No necesitamos definirlos manualmente
 
 // load env
 dotenv.config()
