@@ -54,16 +54,12 @@ const Login: React.FC = () => {
       >
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{ 
-            width: 80, 
-            height: 80, 
-            borderRadius: '50%', 
-            background: 'linear-gradient(135deg, #1890ff, #722ed1)',
+            width: 104, 
+            height: 104, 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 16px',
-            padding: 8,
-            overflow: 'hidden'
+            margin: '0 auto 16px'
           }}>
             <img 
               src="/ZARPAR_ISOTIPO_COLOR_DEGRADE.png" 
