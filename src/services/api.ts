@@ -6,7 +6,12 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 // Configuración base de la API
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+// En producción (hostname != localhost) usa URL relativa (mismo servidor)
+// En desarrollo (localhost) usa http://localhost:3456/api
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
 
 /**
  * Instancia configurada de axios
