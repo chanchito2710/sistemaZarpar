@@ -31,6 +31,10 @@ export const pool = mysql.createPool({
   queueLimit: 0, // Sin límite de cola
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+  // Timeouts para evitar bloqueos
+  connectTimeout: 60000, // 60 segundos para conectar
+  acquireTimeout: 60000, // 60 segundos para adquirir conexión del pool
+  timeout: 60000, // 60 segundos para queries
   // Configuración de encoding UTF-8 para soportar acentos y caracteres especiales
   charset: 'utf8mb4',
   // Asegurar que la conexión use UTF-8
