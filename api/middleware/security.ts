@@ -278,16 +278,45 @@ export const preventSQLInjection = (
   res: Response,
   next: NextFunction
 ): void => {
+  // Patrones más específicos y menos falsos positivos
   const suspiciousPatterns = [
-    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|DECLARE)\b)/gi,
-    /(--|;|\/\*|\*\/|xp_|sp_)/gi,
-    /('|(--)|;|\/\*|\*\/|@@|@|char|nchar|varchar|nvarchar|alter|begin|cast|create|cursor|declare|delete|drop|end|exec|execute|fetch|insert|kill|select|sys|sysobjects|syscolumns|table|update)/gi
+    // Comandos SQL peligrosos (con espacios o al inicio/fin)
+    /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|DECLARE)\b.*\b(FROM|INTO|WHERE|SET|TABLE)\b)/gi,
+    // Comentarios SQL
+    /(--|\/\*|\*\/|#)/gi,
+    // Procedimientos almacenados peligrosos
+    /(xp_|sp_cmdshell)/gi,
+    // Múltiples statements
+    /;\s*(SELECT|INSERT|UPDATE|DELETE|DROP)/gi,
   ];
 
   const checkForInjection = (obj: any, path: string = ''): boolean => {
     for (const key in obj) {
       const value = obj[key];
       const currentPath = path ? `${path}.${key}` : key;
+      
+      // ⚠️ EXCEPCIÓN: No validar el campo 'email' con estos patrones
+      // Los emails legítimos contienen @ que puede generar falsos positivos
+      if (key === 'email' && typeof value === 'string') {
+        // Para emails, solo verificar patrones MUY obvios de SQL injection
+        const emailDangerousPatterns = [
+          /'\s+OR\s+'/gi,      // ' OR '
+          /--/gi,               // Comentarios SQL
+          /;\s*DROP/gi,         // ; DROP
+          /UNION\s+SELECT/gi    // UNION SELECT
+        ];
+        
+        for (const pattern of emailDangerousPatterns) {
+          if (pattern.test(value)) {
+            console.log(`🚨 SQL INJECTION en EMAIL detectado:`);
+            console.log(`   IP: ${req.ip}`);
+            console.log(`   Ruta: ${req.path}`);
+            console.log(`   Email: ${value}`);
+            return true;
+          }
+        }
+        continue; // Skip patrones normales para email
+      }
       
       if (typeof value === 'string') {
         for (const pattern of suspiciousPatterns) {
