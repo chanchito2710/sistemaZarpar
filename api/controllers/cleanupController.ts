@@ -430,14 +430,18 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     let totalClientesBorrados = 0;
     for (const suc of sucursales) {
       try {
+        const tablaClientes = `clientes_${suc}`;
+        console.log(`  🗑️ Borrando de tabla: ${tablaClientes}`);
+        
+        // CRÍTICO: Usar backticks para nombres de tabla dinámicos
         const [result] = await connection.execute<ResultSetHeader>(
-          `DELETE FROM ?? WHERE 1=1`,
-          [`clientes_${suc}`]
+          `DELETE FROM \`${tablaClientes}\``
         );
+        
         totalClientesBorrados += result.affectedRows;
-        console.log(`  - Clientes de ${suc.toUpperCase()}: ${result.affectedRows}`);
-      } catch (error) {
-        console.warn(`  ⚠️ No se pudo borrar clientes de ${suc}:`, error);
+        console.log(`  ✅ Clientes de ${suc.toUpperCase()}: ${result.affectedRows} eliminados`);
+      } catch (error: any) {
+        console.warn(`  ⚠️ No se pudo borrar clientes de ${suc}:`, error.message);
       }
     }
     resultados.push(`✅ CLIENTES eliminados de TODAS las sucursales: ${totalClientesBorrados}`);
