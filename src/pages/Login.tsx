@@ -62,10 +62,18 @@ const Login: React.FC = () => {
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 16px',
-            fontSize: 32,
-            color: 'white'
+            padding: 8,
+            overflow: 'hidden'
           }}>
-            🚢
+            <img 
+              src="/ZARPAR_ISOTIPO_COLOR_DEGRADE.png" 
+              alt="Zarpar Logo" 
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'contain' 
+              }} 
+            />
           </div>
           <Title level={2} style={{ margin: 0, color: '#1890ff' }}>
             Sistema Zarpar
