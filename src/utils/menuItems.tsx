@@ -187,7 +187,7 @@ export const moduleInfo = {
     icon: <TeamOutlined />,
   },
   inventoryLog: {
-    title: 'Movimientos',
+    title: 'Movimientos Ventas',
     description: 'Reportes',
     path: '/inventory/log',
     color: moduleColors.inventory.color,
