@@ -115,6 +115,29 @@ export const securityHeaders = helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
 });
 
+/**
+ * Middleware para BLOQUEAR SEO y Rastreadores
+ * Previene que el sitio sea indexado por motores de búsqueda
+ */
+export const antiSEOHeaders = (req: Request, res: Response, next: NextFunction) => {
+  // Headers para prevenir indexación por bots
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+  
+  // Cache control estricto
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  // Prevenir que aparezca en archives
+  res.setHeader('X-Archive', 'never');
+  
+  // Eliminar headers que revelan información
+  res.removeHeader('X-Powered-By');
+  res.removeHeader('Server');
+  
+  next();
+};
+
 // =====================================================
 // 3. VALIDACIÓN DE INPUTS
 // =====================================================

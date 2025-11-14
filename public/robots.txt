@@ -1,0 +1,73 @@
+# 🚫 robots.txt - BLOQUEAR TODO
+# Este sistema NO debe ser indexado por motores de búsqueda
+
+# ==========================================
+# BLOQUEAR TODOS LOS BOTS
+# ==========================================
+User-agent: *
+Disallow: /
+
+# ==========================================
+# BLOQUEAR ESPECÍFICAMENTE BOTS COMUNES
+# ==========================================
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Googlebot-Image
+Disallow: /
+
+User-agent: Googlebot-Mobile
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /
+
+User-agent: Slurp
+Disallow: /
+
+User-agent: DuckDuckBot
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: YandexBot
+Disallow: /
+
+User-agent: Sogou
+Disallow: /
+
+User-agent: Exabot
+Disallow: /
+
+User-agent: facebot
+Disallow: /
+
+User-agent: ia_archiver
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: dotbot
+Disallow: /
+
+User-agent: archive.org_bot
+Disallow: /
+
+# ==========================================
+# NO SITEMAP
+# ==========================================
+# Este sistema NO tiene sitemap
+
+# ==========================================
+# CRAWL-DELAY (Si algún bot ignora Disallow)
+# ==========================================
+Crawl-delay: 999999
+

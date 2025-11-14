@@ -19,6 +19,7 @@ import { fileURLToPath } from 'url'
 import {
   generalLimiter,
   securityHeaders,
+  antiSEOHeaders,
   preventSQLInjection,
   securityLogger,
   validateOrigin,
@@ -56,7 +57,10 @@ const app: express.Application = express()
 // 1. Headers de seguridad (Helmet)
 app.use(securityHeaders)
 
-// 2. CORS con configuración segura
+// 2. Anti-SEO Headers (Bloquear indexación por motores de búsqueda)
+app.use(antiSEOHeaders)
+
+// 3. CORS con configuración segura
 app.use(cors({
   origin: [
     'http://localhost:5678',
@@ -69,20 +73,20 @@ app.use(cors({
   optionsSuccessStatus: 200
 }))
 
-// 3. Body parsers con límites
+// 4. Body parsers con límites
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// 4. Logger de seguridad (registra todas las requests)
+// 5. Logger de seguridad (registra todas las requests)
 app.use(securityLogger)
 
-// 5. Rate Limiting general (100 req/15min por IP)
+// 6. Rate Limiting general (100 req/15min por IP)
 app.use('/api', generalLimiter)
 
-// 6. Protección contra SQL Injection
+// 7. Protección contra SQL Injection
 app.use('/api', preventSQLInjection)
 
-// 7. Validación de origen (CSRF protection)
+// 8. Validación de origen (CSRF protection)
 app.use('/api', validateOrigin)
 
 /**
