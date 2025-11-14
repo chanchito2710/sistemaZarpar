@@ -31,22 +31,14 @@ export const pool = mysql.createPool({
   queueLimit: 0, // Sin límite de cola
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
-  // Timeouts para evitar bloqueos
-  connectTimeout: 60000, // 60 segundos para conectar
-  acquireTimeout: 60000, // 60 segundos para adquirir conexión del pool
-  timeout: 60000, // 60 segundos para queries
+  // Timeout para conectar
+  connectTimeout: 60000, // 60 segundos para establecer conexión inicial
   // Configuración de encoding UTF-8 para soportar acentos y caracteres especiales
   charset: 'utf8mb4',
-  // Asegurar que la conexión use UTF-8
-  connectAttributes: {
-    charset: 'utf8mb4'
-  },
   // ⚡ SOLUCIÓN AL ERROR "Connection lost":
-  // Eliminar y recrear conexiones perdidas automáticamente
   maxIdle: 10, // Máximo de conexiones idle antes de cerrar
   idleTimeout: 60000, // 60 segundos antes de cerrar conexión idle
-  
-  // Configuración avanzada para manejar conexiones perdidas
+  // Configuración avanzada
   dateStrings: true, // Retornar fechas como strings
   typeCast: true, // Conversión automática de tipos
   supportBigNumbers: true,
@@ -56,24 +48,48 @@ export const pool = mysql.createPool({
 /**
  * Función para verificar la conexión a la base de datos
  * Intenta establecer una conexión y retorna el estado
+ * 
+ * ⚡ Reintenta hasta 5 veces con delay de 2s si falla
  */
 export async function testConnection(): Promise<boolean> {
-  try {
-    const connection = await pool.getConnection();
-    // Asegurar que la conexión use UTF-8
-    await connection.query("SET NAMES 'utf8mb4'");
-    await connection.query("SET CHARACTER SET utf8mb4");
-    await connection.query("SET character_set_connection=utf8mb4");
-    console.log('✅ Conexión exitosa a MySQL - Base de datos: zarparDataBase');
-    console.log('📦 Contenedor Docker: zarpar-mysql (Puerto 3307)');
-    console.log('🔤 Charset: utf8mb4 (soporta acentos y emojis)');
-    connection.release();
-    return true;
-  } catch (error) {
-    console.error('❌ Error al conectar con MySQL:', error);
-    console.error('💡 Verifica que el contenedor Docker esté corriendo: docker ps');
-    return false;
+  const maxRetries = 5;
+  const retryDelay = 2000; // 2 segundos
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Intento ${attempt}/${maxRetries} de conectar a MySQL...`);
+      
+      const connection = await pool.getConnection();
+      
+      // Asegurar que la conexión use UTF-8
+      await connection.query("SET NAMES 'utf8mb4'");
+      await connection.query("SET CHARACTER SET utf8mb4");
+      await connection.query("SET character_set_connection=utf8mb4");
+      
+      console.log('✅ Conexión exitosa a MySQL');
+      console.log('📦 Base de datos: zarparDataBase');
+      console.log('🐳 Contenedor: zarpar-mysql (Puerto 3307)');
+      console.log('🔤 Charset: utf8mb4');
+      
+      connection.release();
+      return true;
+      
+    } catch (error: any) {
+      console.log(`❌ Intento ${attempt} falló:`, error.code || error.message);
+      
+      if (attempt < maxRetries) {
+        console.log(`⏳ Esperando ${retryDelay/1000}s antes de reintentar...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else {
+        console.error('\n❌ Error: No se pudo conectar a MySQL después de', maxRetries, 'intentos');
+        console.error('💡 Verifica que el contenedor Docker esté corriendo: docker ps');
+        console.error('💡 O espera unos segundos más a que MySQL termine de iniciar\n');
+        return false;
+      }
+    }
   }
+  
+  return false;
 }
 
 /**
