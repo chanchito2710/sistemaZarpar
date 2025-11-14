@@ -21,7 +21,6 @@ import sucursalesRoutes from './routes/sucursales.js'
 import transferenciasRoutes from './routes/transferencias.js'
 import comisionesRoutes from './routes/comisiones.js'
 import cajaRoutes from './routes/caja.js'
-import carritoTransferenciasRoutes from './routes/carritoTransferencias.js'
 import sueldosRoutes from './routes/sueldos.js'
 import devolucionesRoutes from './routes/devoluciones.js'
 import descuentosRoutes from './routes/descuentos.js'
@@ -53,7 +52,6 @@ app.use('/api/ventas', ventasRoutes)
 app.use('/api/transferencias', transferenciasRoutes)
 app.use('/api/comisiones', comisionesRoutes)
 app.use('/api/caja', cajaRoutes)
-app.use('/api/carrito-transferencias', carritoTransferenciasRoutes)
 app.use('/api/sueldos', sueldosRoutes)
 app.use('/api/devoluciones', devolucionesRoutes)
 app.use('/api/descuentos', descuentosRoutes)
