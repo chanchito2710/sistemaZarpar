@@ -35,6 +35,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/es';
 import * as XLSX from 'xlsx';
+
+// URL de la API - detecta automáticamente el entorno
+const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
 dayjs.locale('es');
 
 const { Title, Text } = Typography;
@@ -88,7 +94,7 @@ const Payroll: React.FC = () => {
     if (!esAdmin) return;
     
     try {
-      const response = await fetch('http://localhost:3456/api/sucursales');
+      const response = await fetch(`${API_URL}/sucursales`);
       const data = await response.json();
       setSucursales(data.data || []);
     } catch (error) {

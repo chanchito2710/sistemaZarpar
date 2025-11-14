@@ -33,7 +33,10 @@ import axios from 'axios';
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
 
 interface DataCleanupModalProps {
   visible: boolean;

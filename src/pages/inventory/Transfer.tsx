@@ -395,7 +395,7 @@ const Transfer: React.FC = () => {
         params.append('sucursal_destino', historialSucursal);
       }
       
-      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3456/api'}/productos/historial-transferencias?${params.toString()}`;
+      const url = `${API_URL}/productos/historial-transferencias?${params.toString()}`;
       console.log('📡 URL:', url);
       
       const response = await fetch(url, {
@@ -996,7 +996,10 @@ const Transfer: React.FC = () => {
     
     try {
       // Obtener todos los productos con stock_en_transito > 0
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+      const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
       const response = await fetch(`${API_URL}/productos/stock-en-transito`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -1050,7 +1053,10 @@ const Transfer: React.FC = () => {
       onOk: async () => {
         setLoadingLimpieza(true);
         try {
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+          const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
           const response = await fetch(`${API_URL}/productos/limpiar-stock-transito`, {
             method: 'POST',
             headers: {

@@ -74,6 +74,12 @@ import {
 } from 'recharts';
 import dayjs, { Dayjs } from 'dayjs';
 
+// URL de la API - detecta automáticamente el entorno
+const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
+
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -404,7 +410,7 @@ const Customers: React.FC = () => {
   const cargarVentasGlobalesCliente = async (clienteId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:3456/api/ventas/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -425,7 +431,7 @@ const Customers: React.FC = () => {
   const cargarPagosCliente = async (clienteId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:3456/api/ventas/cliente/${sucursalSeleccionada}/${clienteId}/pagos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/pagos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -446,7 +452,7 @@ const Customers: React.FC = () => {
   const cargarReemplazosCliente = async (clienteId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:3456/api/devoluciones/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/devoluciones/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -467,7 +473,7 @@ const Customers: React.FC = () => {
   const cargarProductosCliente = async (clienteId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:3456/api/ventas/cliente/${sucursalSeleccionada}/${clienteId}/productos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/productos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -488,7 +494,7 @@ const Customers: React.FC = () => {
   const cargarSaldoCuentaCorriente = async (clienteId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:3456/api/cuenta-corriente/${sucursalSeleccionada}/cliente/${clienteId}/saldo`,
+        `${API_URL}/cuenta-corriente/${sucursalSeleccionada}/cliente/${clienteId}/saldo`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,

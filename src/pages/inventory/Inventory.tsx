@@ -129,7 +129,7 @@ const Inventory: React.FC = () => {
   // Cargar sucursales disponibles
   const cargarSucursales = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3456/api'}/sucursales`);
+      const response = await fetch(`${API_URL}/sucursales`);
       const data = await response.json();
       if (data.success && data.data) {
         const nombresSucursales = data.data.map((s: any) => s.sucursal);
@@ -143,7 +143,7 @@ const Inventory: React.FC = () => {
   // Cargar sucursal principal
   const cargarSucursalPrincipal = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3456/api'}/vendedores/sucursales`);
+      const response = await fetch(`${API_URL}/vendedores/sucursales`);
       const data = await response.json();
       if (data.success && data.data) {
         const principal = data.data.find((s: any) => s.es_principal === 1 || s.es_principal === true);
@@ -166,7 +166,10 @@ const Inventory: React.FC = () => {
   // Cargar filtros dinámicos (marcas y modelos)
   const cargarFiltros = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+      const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
       const url = new URL(`${API_URL}/productos/filtros`);
       
       // Filtrar por sucursal si está seleccionada
@@ -443,7 +446,10 @@ const Inventory: React.FC = () => {
         recibidos: record.recibidos 
       });
       
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+      const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
       const response = await fetch(`${API_URL}/productos/confirmar-recepcion-manual`, {
         method: 'POST',
         headers: {

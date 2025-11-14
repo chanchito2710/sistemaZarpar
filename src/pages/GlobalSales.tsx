@@ -52,6 +52,12 @@ import dayjs, { Dayjs } from 'dayjs';
 import { ventasService, vendedoresService } from '../services/api';
 import './GlobalSales.css';
 
+// URL de la API - detecta automáticamente el entorno
+const API_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
+
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -189,7 +195,7 @@ const GlobalSales: React.FC = () => {
       const token = localStorage.getItem('token');
       
       // Construir URL con parámetros
-      let url = `http://localhost:3456/api/caja/movimientos/historial?tipo_movimiento=gasto`;
+      let url = `${API_URL}/caja/movimientos/historial?tipo_movimiento=gasto`;
       
       if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
         url += `&sucursal=${sucursalSeleccionada.toLowerCase()}`;
@@ -263,7 +269,7 @@ const GlobalSales: React.FC = () => {
       }
       
       const response = await fetch(
-        `http://localhost:3456/api/caja/movimientos/historial?${new URLSearchParams(filtros)}`,
+        `${API_URL}/caja/movimientos/historial?${new URLSearchParams(filtros)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -306,7 +312,7 @@ const GlobalSales: React.FC = () => {
       }
       
       const response = await fetch(
-        `http://localhost:3456/api/sueldos?${new URLSearchParams(filtros)}`,
+        `${API_URL}/sueldos?${new URLSearchParams(filtros)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
