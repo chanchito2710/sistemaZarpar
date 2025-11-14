@@ -1,0 +1,35 @@
+# ========================================
+# VARIABLES DE ENTORNO PARA PRODUCCIÓN
+# ========================================
+# Configura estas variables en Railway/Render según la guía
+
+# ========================================
+# BACKEND (Railway/Render)
+# ========================================
+
+# Base de Datos
+# En Railway, usar: ${{MySQL.MYSQL_HOST}}
+DB_HOST=tu-mysql-host.railway.app
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=tu_password_seguro
+DB_NAME=zarparDataBase
+
+# Backend
+PORT=3456
+NODE_ENV=production
+
+# JWT - CAMBIAR EN PRODUCCIÓN
+JWT_SECRET=produccion_ultra_secreto_2025_cambiar_cada_6_meses
+JWT_EXPIRES_IN=7d
+
+# Frontend URL (para CORS)
+FRONTEND_URL=https://tu-dominio.up.railway.app
+
+# ========================================
+# FRONTEND (Railway/Render)
+# ========================================
+
+# API URL del backend
+VITE_API_URL=https://tu-backend.up.railway.app/api
+

@@ -6,8 +6,10 @@
   "scripts": {
     "client:dev": "vite",
     "build": "tsc -b && vite build",
+    "build:api": "tsc --project tsconfig.api.json",
+    "start:api": "node api/dist/server.js",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "vite preview --port 5678 --host",
     "check": "tsc --noEmit",
     "server:dev": "nodemon",
     "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\"",
