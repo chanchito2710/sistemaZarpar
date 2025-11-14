@@ -5,6 +5,7 @@ import { zarparTheme } from './utils/theme';
 import { AuthProvider } from './contexts/AuthContext';
 import { CajaProvider } from './contexts/CajaContext';
 import MainLayout from './components/layout/MainLayout';
+import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/dashboard/Dashboard';
 import POS from './pages/pos/POS';
@@ -48,10 +49,10 @@ function App() {
               
               {/* Rutas protegidas con layout */}
               <Route path="/" element={<MainLayout />}>
-                {/* Dashboard */}
+                {/* Dashboard - Acceso para todos */}
                 <Route index element={<Dashboard />} />
                 
-                {/* Módulo de Ventas */}
+                {/* ==================== MÓDULO DE VENTAS ==================== */}
                 <Route path="pos" element={<POS />} />
                 <Route path="pos/cart" element={<Cart />} />
                 <Route path="sales" element={<Sales />} />
@@ -59,48 +60,67 @@ function App() {
                 <Route path="comprobante/:id" element={<Comprobante />} />
                 <Route path="global-sales" element={<GlobalSales />} />
                 
-                {/* Módulo de Inventario */}
+                {/* ==================== MÓDULO DE INVENTARIO ==================== */}
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="inventory/log" element={<InventoryLog />} />
                 <Route path="inventory/movements" element={<Movements />} />
+                
+                {/* Solo Admin: Transferencias de Inventario */}
                 <Route path="inventory/transfer" element={
-                  <ProtectedAdminRoute>
+                  <ProtectedRoute requireAdmin={true}>
                     <Transfer />
-                  </ProtectedAdminRoute>
+                  </ProtectedRoute>
                 } />
                 <Route path="inventory/receive" element={<ReceiveTransfers />} />
                 
-                {/* Módulo de Productos */}
+                {/* ==================== MÓDULO DE PRODUCTOS ==================== */}
+                {/* Solo Admin: Gestión de Productos */}
                 <Route path="products" element={
-                  <ProtectedAdminRoute>
+                  <ProtectedRoute requireAdmin={true}>
                     <Products />
-                  </ProtectedAdminRoute>
+                  </ProtectedRoute>
                 } />
+                
+                {/* Todos: Ver lista de precios */}
                 <Route path="products/prices" element={<ProductPrices />} />
                 
-                {/* Módulo de Clientes */}
+                {/* ==================== MÓDULO DE CLIENTES ==================== */}
                 <Route path="customers" element={<Customers />} />
                 <Route path="customers/accounts" element={<CustomerAccounts />} />
                 
-                {/* Módulo de Finanzas */}
+                {/* ==================== MÓDULO DE FINANZAS ==================== */}
                 <Route path="finance/cash" element={<Cash />} />
                 <Route path="finance/expenses" element={<Expenses />} />
                 <Route path="finance/payroll" element={<Payroll />} />
                 <Route path="finance/money-transfer" element={<MoneyTransfer />} />
                 
-                {/* Módulo de Administración */}
-                <Route path="admin/database" element={<ProtectedDatabaseRoute />} />
-                
-                {/* Módulo de Personal (Solo Admin) */}
-                <Route path="staff/sellers" element={
-                  <ProtectedAdminRoute>
-                    <StaffSellers />
-                  </ProtectedAdminRoute>
+                {/* ==================== MÓDULO DE ADMINISTRACIÓN ==================== */}
+                {/* Solo Admin: Base de Datos */}
+                <Route path="admin/database" element={
+                  <ProtectedRoute requireAdmin={true} requirePermisos={['gestionarBaseDatos']}>
+                    <DatabaseManager />
+                  </ProtectedRoute>
                 } />
                 
-                {/* Rutas adicionales */}
+                {/* ==================== MÓDULO DE PERSONAL ==================== */}
+                {/* Solo Admin: Gestión de Vendedores */}
+                <Route path="staff/sellers" element={
+                  <ProtectedRoute requireAdmin={true}>
+                    <StaffSellers />
+                  </ProtectedRoute>
+                } />
+                
+                {/* ==================== RUTAS ADICIONALES ==================== */}
                 <Route path="profile" element={<Profile />} />
                 <Route path="settings" element={<Settings />} />
+                
+                {/* Ruta 404 dentro del layout */}
+                <Route path="*" element={
+                  <div style={{ padding: 48, textAlign: 'center' }}>
+                    <h1>404 - Página no encontrada</h1>
+                    <p>La ruta que buscas no existe.</p>
+                  </div>
+                } />
               </Route>
             </Routes>
           </Router>
