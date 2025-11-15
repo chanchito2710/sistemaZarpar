@@ -2075,6 +2075,84 @@ export const obtenerDevolucionesCliente = async (req: Request, res: Response): P
   }
 };
 
+/**
+ * Obtener productos vendidos con información de garantía
+ * GET /api/devoluciones/productos-vendidos
+ * Query params: sucursal, fecha_desde, fecha_hasta
+ */
+export const obtenerProductosVendidos = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, fecha_desde, fecha_hasta } = req.query;
+
+    // Construir query base
+    let query = `
+      SELECT 
+        vd.id as detalle_id,
+        v.id as venta_id,
+        v.numero_venta,
+        v.sucursal,
+        v.cliente_id,
+        v.cliente_nombre,
+        v.fecha_venta,
+        v.metodo_pago,
+        vd.producto_id,
+        p.nombre as nombre_producto,
+        p.marca,
+        p.tipo as tipo_producto,
+        vd.cantidad,
+        vd.precio_unitario,
+        vd.subtotal,
+        DATEDIFF(NOW(), v.fecha_venta) as dias_desde_venta,
+        CASE 
+          WHEN DATEDIFF(NOW(), v.fecha_venta) <= 30 THEN 'vigente'
+          ELSE 'vencida'
+        END as estado_garantia
+      FROM ventas v
+      INNER JOIN ventas_detalle vd ON v.id = vd.venta_id
+      INNER JOIN productos p ON vd.producto_id = p.id
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+
+    // Filtro de sucursal
+    if (sucursal && sucursal !== 'todas') {
+      query += ' AND v.sucursal = ?';
+      params.push(sucursal);
+    }
+
+    // Filtro de fechas
+    if (fecha_desde) {
+      query += ' AND v.fecha_venta >= ?';
+      params.push(fecha_desde);
+    }
+
+    if (fecha_hasta) {
+      query += ' AND v.fecha_venta <= ?';
+      params.push(fecha_hasta);
+    }
+
+    // Ordenar por fecha más reciente primero
+    query += ' ORDER BY v.fecha_venta DESC, v.id DESC';
+
+    const productosVendidos = await executeQuery<RowDataPacket[]>(query, params);
+
+    res.status(200).json({
+      success: true,
+      data: productosVendidos,
+      count: productosVendidos.length
+    });
+
+  } catch (error) {
+    console.error('Error al obtener productos vendidos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener productos vendidos',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
 
 
 
