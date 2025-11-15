@@ -34,32 +34,50 @@ body {
   background-color: var(--background-color);
   color: var(--text-color);
   overflow-x: hidden;
+  /* Mejorar velocidad de scroll */
+  scroll-behavior: auto;
 }
 
 #root {
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
+  /* Mejorar velocidad de scroll */
+  scroll-behavior: auto;
 }
 
 /* Estilos para scrollbar personalizado */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px; /* Aumentado de 6px a 10px para mejor visibilidad */
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
   background: #f1f1f1;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #c1c1c1;
-  border-radius: 3px;
+  border-radius: 5px;
+  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: #888;
+  cursor: pointer;
+}
+
+/* FIX: Mejorar la velocidad del scroll con la rueda del mouse */
+html {
+  scroll-behavior: auto;
+  /* Optimizar scroll para mejor rendimiento */
+  -webkit-overflow-scrolling: touch;
+}
+
+* {
+  /* Mejorar el scroll en todos los elementos */
+  scroll-behavior: auto;
 }
 
 /* Utilidades responsivas */
@@ -176,6 +194,36 @@ body {
 
 .ant-select-selector {
   border-radius: 8px !important;
+}
+
+/* FIX: Asegurar que los dropdowns de Select funcionen correctamente */
+.ant-select-dropdown {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* FIX: Asegurar que el virtual scroll de Select funcione */
+.ant-select-dropdown .rc-virtual-list-holder {
+  max-height: 256px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* FIX: Mejorar el scroll del dropdown */
+.ant-select-dropdown .rc-virtual-list-scrollbar {
+  width: 8px !important;
+}
+
+/* FIX: Evitar pantalla blanca en Select con búsqueda */
+.ant-select-dropdown-hidden {
+  display: none !important;
+}
+
+/* FIX: Asegurar que el input de búsqueda funcione */
+.ant-select-selection-search-input {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
 }
 
 /* Estilos para el loading */
