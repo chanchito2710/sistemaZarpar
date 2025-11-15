@@ -43,7 +43,8 @@ import {
   SwapOutlined,
   CheckCircleOutlined,
   TagsOutlined,
-  SearchOutlined
+  SearchOutlined,
+  EditOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -144,6 +145,11 @@ const Customers: React.FC = () => {
   ]);
   const [loadingDrawer, setLoadingDrawer] = useState(false);
   const [buscadorClientes, setBuscadorClientes] = useState('');
+
+  // Estados para edición de cliente
+  const [modalEditarCliente, setModalEditarCliente] = useState(false);
+  const [clienteParaEditar, setClienteParaEditar] = useState<Cliente | null>(null);
+  const [formEditarCliente] = Form.useForm();
 
   /**
    * Cargar sucursales al iniciar
@@ -510,6 +516,59 @@ const Customers: React.FC = () => {
   };
 
   /**
+   * Abrir modal de edición de cliente
+   */
+  const abrirModalEditarCliente = (cliente: Cliente) => {
+    setClienteParaEditar(cliente);
+    formEditarCliente.setFieldsValue({
+      nombre: cliente.nombre,
+      apellido: cliente.apellido,
+      email: cliente.email,
+      telefono: cliente.telefono,
+      direccion: cliente.direccion,
+      razon_social: cliente.razon_social,
+      rut: cliente.rut,
+      nombre_fantasia: cliente.nombre_fantasia
+    });
+    setModalEditarCliente(true);
+  };
+
+  /**
+   * Actualizar datos del cliente
+   */
+  const handleActualizarCliente = async () => {
+    try {
+      const values = await formEditarCliente.validateFields();
+      
+      if (!clienteParaEditar) return;
+
+      setLoading(true);
+
+      await clientesService.actualizar(
+        sucursalSeleccionada,
+        clienteParaEditar.id,
+        values
+      );
+
+      message.success('✅ Cliente actualizado exitosamente');
+      
+      // Recargar clientes
+      await cargarClientes();
+      
+      // Cerrar modal
+      setModalEditarCliente(false);
+      formEditarCliente.resetFields();
+      setClienteParaEditar(null);
+
+    } catch (error: any) {
+      console.error('Error al actualizar cliente:', error);
+      message.error(error.message || 'Error al actualizar cliente');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Columnas de la tabla de clientes con ventas
    */
   const columnasClientes = [
@@ -546,14 +605,21 @@ const Customers: React.FC = () => {
       title: 'Acciones',
       key: 'acciones',
       render: (_: any, record: Cliente) => (
-        <Button
-          size="small"
-          icon={<EyeOutlined />}
-          type="primary"
-          onClick={() => abrirAnalisisCliente(record)}
-        >
-          Ver Ventas
-        </Button>
+        <Space>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => abrirModalEditarCliente(record)}
+          />
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            type="primary"
+            onClick={() => abrirAnalisisCliente(record)}
+          >
+            Ver Ventas
+          </Button>
+        </Space>
       )
     }
   ];
@@ -1556,6 +1622,96 @@ const Customers: React.FC = () => {
           </Space>
         </Spin>
       </Drawer>
+
+      {/* MODAL DE EDICIÓN DE CLIENTE */}
+      <Modal
+        title="✏️ Editar Cliente"
+        open={modalEditarCliente}
+        onCancel={() => {
+          setModalEditarCliente(false);
+          formEditarCliente.resetFields();
+          setClienteParaEditar(null);
+        }}
+        onOk={handleActualizarCliente}
+        okText="💾 Guardar Cambios"
+        cancelText="❌ Cancelar"
+        width={600}
+        confirmLoading={loading}
+      >
+        <Form
+          form={formEditarCliente}
+          layout="vertical"
+          style={{ marginTop: 24 }}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="nombre"
+                label="Nombre"
+                rules={[{ required: true, message: 'El nombre es obligatorio' }]}
+              >
+                <Input placeholder="Nombre del cliente" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="apellido"
+                label="Apellido"
+                rules={[{ required: true, message: 'El apellido es obligatorio' }]}
+              >
+                <Input placeholder="Apellido del cliente" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: 'El email es obligatorio' },
+              { type: 'email', message: 'Ingresa un email válido' }
+            ]}
+          >
+            <Input placeholder="cliente@ejemplo.com" />
+          </Form.Item>
+
+          <Form.Item
+            name="telefono"
+            label="Teléfono"
+            rules={[{ required: true, message: 'El teléfono es obligatorio' }]}
+          >
+            <Input placeholder="099 123 456" />
+          </Form.Item>
+
+          <Form.Item
+            name="direccion"
+            label="Dirección"
+          >
+            <Input placeholder="Calle y número" />
+          </Form.Item>
+
+          <Form.Item
+            name="razon_social"
+            label="Razón Social (Opcional)"
+          >
+            <Input placeholder="Razón social de la empresa" />
+          </Form.Item>
+
+          <Form.Item
+            name="rut"
+            label="RUT (Opcional)"
+          >
+            <Input placeholder="12-345678-9" />
+          </Form.Item>
+
+          <Form.Item
+            name="nombre_fantasia"
+            label="Nombre de Fantasía (Opcional)"
+          >
+            <Input placeholder="Nombre comercial" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
