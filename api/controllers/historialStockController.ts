@@ -29,7 +29,7 @@ export const obtenerHistorialStock = async (req: Request, res: Response) => {
     console.log('📊 Tipo movimiento:', tipo_movimiento);
     console.log('======================================');
 
-    // Construir query base con JOIN a productos_sucursal para obtener valores actuales
+    // Construir query base - stock_actual muestra el stock que quedó después del movimiento
     let query = `
       SELECT 
         h.id,
@@ -47,12 +47,9 @@ export const obtenerHistorialStock = async (req: Request, res: Response) => {
         h.usuario_email,
         h.observaciones,
         h.created_at,
-        COALESCE(ps.stock, 0) as stock_actual,
-        COALESCE(ps.stock_fallas, 0) as stock_fallas_actual
+        h.stock_nuevo as stock_actual,
+        h.stock_fallas_nuevo as stock_fallas_actual
       FROM historial_stock h
-      LEFT JOIN productos_sucursal ps 
-        ON h.producto_id = ps.producto_id 
-        AND h.sucursal = ps.sucursal
       WHERE 1=1
     `;
 

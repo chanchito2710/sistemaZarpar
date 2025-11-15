@@ -1222,7 +1222,7 @@ const StaffSellers: React.FC = () => {
                         block
                         size="large"
                       >
-                        Nuevo Personal
+                        Nombre de Usuario
                       </Button>
                     </Col>
                   </Row>
@@ -2178,7 +2178,7 @@ const StaffSellers: React.FC = () => {
         title={
           <Space>
             {editingVendedor ? <EditOutlined /> : <PlusOutlined />}
-            {editingVendedor ? 'Editar Personal' : 'Nuevo Personal'}
+            {editingVendedor ? 'Editar Personal' : 'Nombre de Usuario'}
           </Space>
         }
         open={vendedorModalVisible}

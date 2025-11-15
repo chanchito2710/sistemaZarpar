@@ -170,6 +170,10 @@ export const crearVendedor = async (req: Request, res: Response): Promise<void> 
 
     console.log('✅ Email disponible');
 
+    // Hashear la contraseña antes de guardar
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('🔐 Contraseña hasheada correctamente');
+
     // Crear vendedor
     const datosVendedor = {
       nombre,
@@ -177,15 +181,15 @@ export const crearVendedor = async (req: Request, res: Response): Promise<void> 
       sucursal: sucursal.toLowerCase(),
       telefono: telefono || null,
       email,
-      password
+      password: hashedPassword
     };
     
-    console.log('💾 Insertando vendedor con datos:', datosVendedor);
+    console.log('💾 Insertando vendedor con datos:', { ...datosVendedor, password: '***HASHEADA***' });
     
     const resultado = await executeQuery(
       `INSERT INTO vendedores (nombre, cargo, sucursal, telefono, email, password, activo) 
        VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [nombre, cargo, sucursal.toLowerCase(), telefono || null, email, password]
+      [nombre, cargo, sucursal.toLowerCase(), telefono || null, email, hashedPassword]
     );
 
     const vendedorCreado = {

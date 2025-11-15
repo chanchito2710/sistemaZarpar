@@ -1197,18 +1197,23 @@ export const obtenerClientesCuentaCorriente = async (req: Request, res: Response
   try {
     const { sucursal } = req.params;
 
+    // Construir nombre de tabla de clientes dinámicamente
+    const tablaClientes = `clientes_${sucursal.toLowerCase()}`;
+
     const query = `
       SELECT 
-        sucursal,
-        cliente_id,
-        cliente_nombre,
-        SUM(debe) as total_debe,
-        SUM(haber) as total_haber,
-        (SUM(debe) - SUM(haber)) as saldo_actual,
-        MAX(fecha_movimiento) as ultimo_movimiento
-      FROM cuenta_corriente_movimientos
-      WHERE sucursal = ?
-      GROUP BY sucursal, cliente_id, cliente_nombre
+        cc.sucursal,
+        cc.cliente_id,
+        cc.cliente_nombre,
+        c.nombre_fantasia,
+        SUM(cc.debe) as total_debe,
+        SUM(cc.haber) as total_haber,
+        (SUM(cc.debe) - SUM(cc.haber)) as saldo_actual,
+        MAX(cc.fecha_movimiento) as ultimo_movimiento
+      FROM cuenta_corriente_movimientos cc
+      LEFT JOIN \`${tablaClientes}\` c ON cc.cliente_id = c.id
+      WHERE cc.sucursal = ?
+      GROUP BY cc.sucursal, cc.cliente_id, cc.cliente_nombre, c.nombre_fantasia
       HAVING saldo_actual != 0
       ORDER BY saldo_actual DESC
     `;
@@ -1837,6 +1842,234 @@ export const obtenerVentasDetalladas = async (req: Request, res: Response): Prom
     res.status(500).json({
       success: false,
       message: 'Error al obtener ventas detalladas',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener pagos de un cliente (efectivo desde ventas + pagos de cuenta corriente)
+ * GET /api/ventas/cliente/:sucursal/:cliente_id/pagos
+ */
+export const obtenerPagosCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, cliente_id } = req.params;
+    const { fecha_desde, fecha_hasta } = req.query;
+
+    // 1. Pagos en efectivo desde ventas
+    let queryVentas = `
+      SELECT 
+        v.id,
+        v.numero_venta,
+        v.fecha_venta as fecha,
+        v.total as monto,
+        'Venta en efectivo' as tipo,
+        v.metodo_pago,
+        v.observaciones
+      FROM ventas v
+      WHERE v.sucursal = ?
+        AND v.cliente_id = ?
+        AND v.metodo_pago IN ('efectivo', 'transferencia')
+        AND v.estado_pago = 'pagado'
+    `;
+
+    const paramsVentas: any[] = [sucursal, cliente_id];
+
+    if (fecha_desde) {
+      queryVentas += ' AND v.fecha_venta >= ?';
+      paramsVentas.push(fecha_desde);
+    }
+
+    if (fecha_hasta) {
+      queryVentas += ' AND v.fecha_venta <= ?';
+      paramsVentas.push(fecha_hasta);
+    }
+
+    queryVentas += ' ORDER BY v.fecha_venta DESC';
+
+    // 2. Pagos de cuenta corriente
+    let queryPagosCC = `
+      SELECT 
+        p.id,
+        CONCAT('PAGO-', p.id) as numero_venta,
+        p.fecha_pago as fecha,
+        p.monto as monto,
+        'Pago Cuenta Corriente' as tipo,
+        p.metodo_pago,
+        p.observaciones
+      FROM pagos_cuenta_corriente p
+      WHERE p.sucursal = ?
+        AND p.cliente_id = ?
+    `;
+
+    const paramsPagosCC: any[] = [sucursal, cliente_id];
+
+    if (fecha_desde) {
+      queryPagosCC += ' AND p.fecha_pago >= ?';
+      paramsPagosCC.push(fecha_desde);
+    }
+
+    if (fecha_hasta) {
+      queryPagosCC += ' AND p.fecha_pago <= ?';
+      paramsPagosCC.push(fecha_hasta);
+    }
+
+    queryPagosCC += ' ORDER BY p.fecha_pago DESC';
+
+    // Ejecutar ambas queries
+    const [pagosVentas, pagosCuentaCorriente] = await Promise.all([
+      executeQuery<RowDataPacket[]>(queryVentas, paramsVentas),
+      executeQuery<RowDataPacket[]>(queryPagosCC, paramsPagosCC)
+    ]);
+
+    // Combinar y ordenar todos los pagos
+    const todosPagos = [...pagosVentas, ...pagosCuentaCorriente]
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+    res.status(200).json({
+      success: true,
+      data: todosPagos,
+      count: todosPagos.length
+    });
+
+  } catch (error) {
+    console.error('Error al obtener pagos del cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener pagos del cliente',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener productos más comprados por un cliente
+ * GET /api/ventas/cliente/:sucursal/:cliente_id/productos
+ */
+export const obtenerProductosCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, cliente_id } = req.params;
+    const { fecha_desde, fecha_hasta } = req.query;
+
+    let query = `
+      SELECT 
+        p.id as producto_id,
+        p.nombre as producto_nombre,
+        p.marca as producto_marca,
+        p.tipo as producto_tipo,
+        SUM(vd.cantidad) as total_cantidad,
+        COUNT(DISTINCT v.id) as total_ventas,
+        SUM(vd.subtotal) as total_vendido,
+        AVG(vd.precio_unitario) as precio_promedio,
+        MAX(v.fecha_venta) as ultima_compra
+      FROM ventas v
+      INNER JOIN ventas_detalle vd ON v.id = vd.venta_id
+      INNER JOIN productos p ON vd.producto_id = p.id
+      WHERE v.sucursal = ?
+        AND v.cliente_id = ?
+    `;
+
+    const params: any[] = [sucursal, cliente_id];
+
+    if (fecha_desde) {
+      query += ' AND v.fecha_venta >= ?';
+      params.push(fecha_desde);
+    }
+
+    if (fecha_hasta) {
+      query += ' AND v.fecha_venta <= ?';
+      params.push(fecha_hasta);
+    }
+
+    query += `
+      GROUP BY p.id, p.nombre, p.marca, p.tipo
+      ORDER BY total_cantidad DESC
+    `;
+
+    const productos = await executeQuery<RowDataPacket[]>(query, params);
+
+    res.status(200).json({
+      success: true,
+      data: productos,
+      count: productos.length
+    });
+
+  } catch (error) {
+    console.error('Error al obtener productos del cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener productos del cliente',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener saldo de cuenta corriente de un cliente
+ * GET /api/cuenta-corriente/:sucursal/cliente/:cliente_id/saldo
+ */
+export const obtenerSaldoCuentaCorrienteCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, cliente_id } = req.params;
+
+    const query = `
+      SELECT 
+        sucursal,
+        cliente_id,
+        cliente_nombre,
+        saldo_actual as saldo,
+        total_debe,
+        total_haber,
+        ultimo_movimiento
+      FROM resumen_cuenta_corriente
+      WHERE sucursal = ?
+        AND cliente_id = ?
+      LIMIT 1
+    `;
+
+    const [saldo] = await executeQuery<RowDataPacket[]>(query, [sucursal, cliente_id]);
+
+    res.status(200).json({
+      success: true,
+      data: saldo || { saldo: 0, total_debe: 0, total_haber: 0 }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener saldo de cuenta corriente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener saldo de cuenta corriente',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
+ * Obtener devoluciones/reemplazos de un cliente
+ * GET /api/devoluciones/cliente/:sucursal/:cliente_id
+ * 
+ * NOTA: Por ahora devuelve un array vacío. En el futuro se implementará
+ * una tabla de devoluciones con su lógica completa.
+ */
+export const obtenerDevolucionesCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, cliente_id } = req.params;
+
+    // TODO: Implementar tabla de devoluciones y su lógica
+    // Por ahora devolver array vacío para que no falle el frontend
+    
+    res.status(200).json({
+      success: true,
+      data: [],
+      count: 0,
+      message: 'Funcionalidad de devoluciones en desarrollo'
+    });
+
+  } catch (error) {
+    console.error('Error al obtener devoluciones del cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener devoluciones del cliente',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
   }

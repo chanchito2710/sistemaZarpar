@@ -13,6 +13,7 @@ const Dashboard: React.FC = () => {
   const { usuario } = useAuth();
   
   const esAdmin = usuario?.esAdmin || usuario?.email === 'admin@zarparuy.com';
+  const esGerente = usuario?.cargo?.toLowerCase() === 'gerente';
 
   const handleModuleClick = (path: string) => {
     navigate(path);
@@ -22,6 +23,9 @@ const Dashboard: React.FC = () => {
   const dashboardModules = useMemo(() => {
     // Módulos que solo el admin puede ver
     const adminOnlyPaths = ['/products', '/staff/sellers', '/inventory/transfer'];
+    
+    // Módulos que el gerente NO puede ver
+    const gerenteRestrictedPaths = ['/staff/sellers'];
     
     // Configuración base
     const allModules = [
@@ -60,11 +64,18 @@ const Dashboard: React.FC = () => {
       return allModules;
     }
 
-    // Si es usuario normal, filtrar módulos restringidos
+    // Si es gerente, filtrar módulos restringidos para gerentes
+    if (esGerente) {
+      return allModules.map(row => 
+        row.filter(module => !gerenteRestrictedPaths.includes(module.path))
+      );
+    }
+
+    // Si es usuario normal (vendedor), filtrar módulos solo de admin
     return allModules.map(row => 
       row.filter(module => !adminOnlyPaths.includes(module.path))
     );
-  }, [esAdmin]);
+  }, [esAdmin, esGerente]);
 
   return (
     <div style={{ padding: '0' }}>

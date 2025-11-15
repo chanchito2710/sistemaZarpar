@@ -18,7 +18,11 @@ import {
   obtenerVentasDelDia,
   guardarResumenDiario,
   obtenerVentasGlobales,
-  obtenerVentasDetalladas
+  obtenerVentasDetalladas,
+  obtenerPagosCliente,
+  obtenerProductosCliente,
+  obtenerSaldoCuentaCorrienteCliente,
+  obtenerDevolucionesCliente
 } from '../controllers/ventasController';
 
 const router = Router();
@@ -96,10 +100,18 @@ router.get('/ventas-detalladas', obtenerVentasDetalladas);
 router.get('/sucursal/:sucursal', obtenerVentasPorSucursal);
 
 /**
- * GET /api/ventas/:id
- * Obtener detalle completo de una venta
+ * GET /api/ventas/cliente/:sucursal/:cliente_id/pagos
+ * Obtener todos los pagos de un cliente (efectivo desde ventas + cuenta corriente)
+ * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /cliente/:sucursal/:cliente_id
  */
-router.get('/:id', obtenerDetalleVenta);
+router.get('/cliente/:sucursal/:cliente_id/pagos', obtenerPagosCliente);
+
+/**
+ * GET /api/ventas/cliente/:sucursal/:cliente_id/productos
+ * Obtener productos más comprados por un cliente
+ * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /cliente/:sucursal/:cliente_id
+ */
+router.get('/cliente/:sucursal/:cliente_id/productos', obtenerProductosCliente);
 
 /**
  * GET /api/ventas/cliente/:sucursal/:cliente_id
@@ -107,9 +119,22 @@ router.get('/:id', obtenerDetalleVenta);
  */
 router.get('/cliente/:sucursal/:cliente_id', obtenerVentasPorCliente);
 
+/**
+ * GET /api/ventas/:id
+ * Obtener detalle completo de una venta
+ */
+router.get('/:id', obtenerDetalleVenta);
+
 // ============================================================
 // RUTAS DE CUENTA CORRIENTE
 // ============================================================
+
+/**
+ * GET /api/cuenta-corriente/:sucursal/cliente/:cliente_id/saldo
+ * Obtener solo el saldo de cuenta corriente de un cliente
+ * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /cuenta-corriente/:sucursal/:cliente_id
+ */
+router.get('/cuenta-corriente/:sucursal/cliente/:cliente_id/saldo', obtenerSaldoCuentaCorrienteCliente);
 
 /**
  * GET /api/ventas/cuenta-corriente/:sucursal/:cliente_id

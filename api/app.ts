@@ -86,8 +86,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // 5. Logger de seguridad (registra todas las requests)
 app.use(securityLogger)
 
-// 6. Rate Limiting general (100 req/15min por IP)
-app.use('/api', generalLimiter)
+// 6. Rate Limiting general (100 req/15min por IP) - ❌ DESHABILITADO
+// app.use('/api', generalLimiter)
 
 // 7. Protección contra SQL Injection - DESHABILITADO temporalmente
 // Los prepared statements ya protegen contra SQL injection

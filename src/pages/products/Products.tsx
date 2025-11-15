@@ -563,7 +563,7 @@ const Products: React.FC = () => {
         const datos: Partial<ProductoSucursalInput> = {
           stock: values[`stock_${sucursal}`] || 0,
           precio: values[`precio_${sucursal}`] || 0,
-          stock_minimo: values[`stock_minimo_${sucursal}`] || 10
+          stock_minimo: 0
         };
 
         await productosService.actualizarSucursal(
@@ -595,7 +595,7 @@ const Products: React.FC = () => {
       const datos: Partial<ProductoSucursalInput> = {
         stock: values.stock,
         precio: values.precio,
-        stock_minimo: values.stock_minimo
+        stock_minimo: 0
       };
 
       await productosService.actualizarSucursal(
@@ -643,7 +643,6 @@ const Products: React.FC = () => {
           const sucursalData = productoCompleto.sucursales?.find(s => s.sucursal === sucursal);
           sucursalesData[`stock_${sucursal}`] = sucursalData?.stock || 0;
           sucursalesData[`precio_${sucursal}`] = sucursalData?.precio || 0;
-          sucursalesData[`stock_minimo_${sucursal}`] = sucursalData?.stock_minimo || 10;
         });
         
         formEditar.setFieldsValue(sucursalesData);
@@ -665,8 +664,7 @@ const Products: React.FC = () => {
     setProductoEditando(producto);
     formStock.setFieldsValue({
       stock: producto.stock || 0,
-      precio: producto.precio || 0,
-      stock_minimo: producto.stock_minimo || 10
+      precio: producto.precio || 0
     });
     setModalStockVisible(true);
   };
@@ -903,17 +901,6 @@ const Products: React.FC = () => {
           </Text>
         );
       }
-    },
-    {
-      title: 'Stock Mín.',
-      dataIndex: 'stock_minimo',
-      key: 'stock_minimo',
-      width: 90,
-      align: 'center',
-      responsive: ['lg'] as any,
-      render: (stock_minimo: number) => (
-        <Text type="secondary">{stock_minimo || 0}</Text>
-      )
     },
     {
       title: 'Código',
@@ -1234,7 +1221,7 @@ const Products: React.FC = () => {
             <Space>
               <TagOutlined style={{ color: '#52c41a' }} />
               <Text type="secondary" style={{ fontSize: 12 }}>
-                El producto se creará en <Text strong>TODAS las sucursales</Text> con stock inicial de 100 unidades
+                El producto se creará en <Text strong>TODAS las sucursales</Text> con stock inicial de 0 unidades
               </Text>
             </Space>
           </Card>
@@ -1500,17 +1487,6 @@ const Products: React.FC = () => {
               placeholder="Precio en pesos"
             />
           </Form.Item>
-
-          <Form.Item
-            label="Stock Mínimo (Alerta)"
-            name="stock_minimo"
-          >
-            <InputNumber
-                      min={0}
-              style={{ width: '100%' }}
-              placeholder="Cantidad mínima antes de alerta"
-                    />
-                  </Form.Item>
 
           <Divider />
 
@@ -1892,7 +1868,7 @@ const Products: React.FC = () => {
                   precio: Number(precio),
                   // Mantener el stock actual sin cambios
                   stock: productoEditandoPrecios.sucursales?.find(s => s.sucursal === sucursal)?.stock || 0,
-                  stock_minimo: productoEditandoPrecios.sucursales?.find(s => s.sucursal === sucursal)?.stock_minimo || 10
+                  stock_minimo: 0
                 }
               );
             });
@@ -2143,7 +2119,7 @@ const Products: React.FC = () => {
                   stock: Number(stock),
                   // Mantener el precio actual sin cambios
                   precio: productoEditandoStock.sucursales?.find(s => s.sucursal === sucursal)?.precio || 0,
-                  stock_minimo: productoEditandoStock.sucursales?.find(s => s.sucursal === sucursal)?.stock_minimo || 10
+                  stock_minimo: 0
                 }
               );
             });

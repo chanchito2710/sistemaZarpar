@@ -103,9 +103,9 @@ function App() {
                 } />
                 
                 {/* ==================== MÓDULO DE PERSONAL ==================== */}
-                {/* Solo Admin: Gestión de Vendedores */}
+                {/* Solo Admin: Gestión de Vendedores - Excluye Gerentes */}
                 <Route path="staff/sellers" element={
-                  <ProtectedRoute requireAdmin={true}>
+                  <ProtectedRoute requireAdmin={true} excludeRoles={['Gerente']}>
                     <StaffSellers />
                   </ProtectedRoute>
                 } />

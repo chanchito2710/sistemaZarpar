@@ -426,21 +426,21 @@ export const crearProducto = async (req: Request, res: Response): Promise<void> 
     // Obtener sucursal principal dinámica
     const sucursalPrincipal = await obtenerSucursalPrincipal();
     
-    // Insertar en cada sucursal con stock inicial de 100 y precio inicial de 0
+    // Insertar en cada sucursal con stock inicial de 0 y precio inicial de 0
     for (const sucursal of sucursales) {
       const esStockPrincipal = sucursalPrincipal ? sucursal === sucursalPrincipal : false;
       await executeQuery(querySucursal, [
         productoId, 
         sucursal, 
-        100, // Stock inicial de 100 unidades
+        0, // Stock inicial de 0 unidades
         0, // Precio inicial de 0 (se debe configurar después)
-        10, // Stock mínimo
+        0, // Stock mínimo de 0 (sin alertas)
         esStockPrincipal, 
         1 // Activo
       ]);
     }
     
-    console.log(`✅ Producto creado y agregado a ${sucursales.length} sucursales con stock de 100 unidades cada una`);
+    console.log(`✅ Producto creado y agregado a ${sucursales.length} sucursales con stock inicial de 0 unidades`);
 
     // Obtener el producto recién creado
     const productoNuevo = await executeQuery<Producto[]>(

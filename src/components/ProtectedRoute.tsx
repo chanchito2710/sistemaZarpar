@@ -27,6 +27,7 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
   requirePermisos?: string[];
+  excludeRoles?: string[]; // Roles que NO pueden acceder
   redirectTo?: string;
 }
 
@@ -34,6 +35,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requireAdmin = false,
   requirePermisos = [],
+  excludeRoles = [],
   redirectTo = '/login'
 }) => {
   const { usuario, isAuthenticated, isLoading } = useAuth();
@@ -82,7 +84,71 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // ========================================
-  // 3. VERIFICAR PERMISO DE ADMIN
+  // 3. VERIFICAR ROLES EXCLUIDOS
+  // ========================================
+  if (excludeRoles.length > 0 && usuario.cargo) {
+    const cargoUsuario = usuario.cargo.toLowerCase();
+    const esRolExcluido = excludeRoles.some(rol => rol.toLowerCase() === cargoUsuario);
+    
+    if (esRolExcluido) {
+      console.warn('🚫 Acceso denegado: Rol excluido');
+      console.warn(`   Usuario: ${usuario.email}`);
+      console.warn(`   Cargo: ${usuario.cargo}`);
+      console.warn(`   Ruta: ${location.pathname}`);
+      
+      return (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '70vh',
+          padding: 24
+        }}>
+          <Result
+            status="403"
+            icon={<LockOutlined style={{ color: '#ff4d4f', fontSize: 72 }} />}
+            title={<span style={{ fontSize: 24, fontWeight: 600 }}>Acceso Restringido</span>}
+            subTitle={
+              <div style={{ fontSize: 16, color: '#666', marginTop: 16 }}>
+                <p style={{ margin: 0 }}>
+                  Esta página no está disponible para tu rol actual.
+                </p>
+                <p style={{ margin: '8px 0 0 0' }}>
+                  Tu cuenta (<strong>{usuario.email}</strong>) con rol de <strong>{usuario.cargo}</strong> no tiene acceso a este recurso.
+                </p>
+              </div>
+            }
+            extra={[
+              <Button 
+                type="primary" 
+                key="dashboard" 
+                onClick={() => window.location.href = '/'}
+                size="large"
+              >
+                Volver al Dashboard
+              </Button>,
+              <Button 
+                key="back" 
+                onClick={() => window.history.back()}
+                size="large"
+              >
+                Regresar
+              </Button>
+            ]}
+            style={{
+              background: 'white',
+              borderRadius: 12,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              padding: '48px 24px'
+            }}
+          />
+        </div>
+      );
+    }
+  }
+
+  // ========================================
+  // 4. VERIFICAR PERMISO DE ADMIN
   // ========================================
   if (requireAdmin && !usuario.esAdmin) {
     console.warn('🚫 Acceso denegado: Requiere permisos de administrador');
@@ -141,7 +207,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // ========================================
-  // 4. VERIFICAR PERMISOS ESPECÍFICOS
+  // 5. VERIFICAR PERMISOS ESPECÍFICOS
   // ========================================
   if (requirePermisos.length > 0) {
     const tienePermisos = requirePermisos.every(permiso => {
@@ -207,7 +273,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // ========================================
-  // 5. ACCESO PERMITIDO: Renderizar componente
+  // 6. ACCESO PERMITIDO: Renderizar componente
   // ========================================
   console.log('✅ Acceso permitido a:', location.pathname);
   console.log(`   Usuario: ${usuario.email}`);

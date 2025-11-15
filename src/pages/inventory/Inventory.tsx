@@ -85,10 +85,16 @@ const Inventory: React.FC = () => {
   const esAdmin = usuario?.esAdmin || false;
   const sucursalUsuario = usuario?.sucursal?.toLowerCase() || 'pando';
   
+  // API URL
+  const API_URL = import.meta.env.VITE_API_URL || 
+    (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+      ? '/api' 
+      : 'http://localhost:3456/api');
+  
   const [searchText, setSearchText] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedSucursal, setSelectedSucursal] = useState<string>(esAdmin ? 'maldonado' : sucursalUsuario);
+  const [selectedSucursal, setSelectedSucursal] = useState<string>(esAdmin ? 'all' : sucursalUsuario);
   const [sucursales, setSucursales] = useState<string[]>([]);
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -166,10 +172,6 @@ const Inventory: React.FC = () => {
   // Cargar filtros dinámicos (marcas y modelos)
   const cargarFiltros = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? '/api' 
-    : 'http://localhost:3456/api');
       const url = new URL(`${API_URL}/productos/filtros`);
       
       // Filtrar por sucursal si está seleccionada
@@ -220,7 +222,7 @@ const Inventory: React.FC = () => {
         producto: item.producto,
         stock: item.stock || 0,
         recibidos: item.recibidos || 0,
-        categoria: item.modelo || 'Sin categoría' // Usar tipo/modelo como categoría
+        categoria: item.tipo || 'Sin tipo' // Usar TIPO como categoría
       }));
       
       console.log('✅ [DEBUG] Productos transformados en tránsito:', datosTransformados.filter((d: any) => d.recibidos > 0));
@@ -397,7 +399,8 @@ const Inventory: React.FC = () => {
       const matchesSearch = searchText === '' || 
         item.producto.toLowerCase().includes(searchText.toLowerCase()) ||
         item.marca.toLowerCase().includes(searchText.toLowerCase()) ||
-        item.modelo.toLowerCase().includes(searchText.toLowerCase());
+        item.modelo.toLowerCase().includes(searchText.toLowerCase()) ||
+        item.tipo.toLowerCase().includes(searchText.toLowerCase());
       
       const matchesBrand = selectedBrand === 'all' || item.marca === selectedBrand;
       const matchesCategory = selectedCategory === 'all' || item.categoria === selectedCategory;
@@ -446,10 +449,6 @@ const Inventory: React.FC = () => {
         recibidos: record.recibidos 
       });
       
-      const API_URL = import.meta.env.VITE_API_URL || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? '/api' 
-    : 'http://localhost:3456/api');
       const response = await fetch(`${API_URL}/productos/confirmar-recepcion-manual`, {
         method: 'POST',
         headers: {
@@ -801,7 +800,10 @@ const Inventory: React.FC = () => {
                 {esAdmin ? (
                 <Select
                   value={selectedSucursal}
-                  onChange={setSelectedSucursal}
+                  onChange={(value) => {
+                    console.log('🔄 Cambiando sucursal a:', value);
+                    setSelectedSucursal(value);
+                  }}
                     style={{ width: '100%' }}
                   size="large"
                   showSearch
@@ -942,7 +944,7 @@ const Inventory: React.FC = () => {
               ) : (
                 <Input
                   autoFocus
-                  placeholder="🔍 Buscar producto, marca o modelo..."
+                  placeholder="🔍 Buscar producto, marca, modelo o tipo..."
                   prefix={<SearchOutlined style={{ color: '#3b82f6' }} />}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
@@ -1017,10 +1019,10 @@ const Inventory: React.FC = () => {
                   color: '#6b7280',
                   fontSize: 13
                 }}>
-                  📦 Producto
+                  🏷️ Tipo
                 </Text>
                 <Select
-                  placeholder="Modelo"
+                  placeholder="Tipo"
                   value={selectedCategory}
                   onChange={setSelectedCategory}
                   style={{ width: '100%' }}
@@ -1031,9 +1033,9 @@ const Inventory: React.FC = () => {
                   <Option value="all">
                     <span style={{ fontWeight: 500 }}>✨ Todos</span>
                   </Option>
-                  {modelosDisponibles.map(modelo => (
-                    <Option key={modelo} value={modelo}>
-                      📦 {modelo}
+                  {tiposDisponibles.map(tipo => (
+                    <Option key={tipo} value={tipo}>
+                      🏷️ {tipo}
                     </Option>
                   ))}
                 </Select>

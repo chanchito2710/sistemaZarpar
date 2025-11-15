@@ -60,6 +60,7 @@ const { TextArea } = Input;
 interface ClienteCuentaCorriente {
   cliente_id: number;
   cliente_nombre: string;
+  nombre_fantasia?: string; // Nombre de fantasía del cliente
   sucursal: string;
   total_debe: number;
   total_haber: number;
@@ -150,6 +151,10 @@ const Accounts: React.FC = () => {
   
   // Estado para trackear movimientos ocultos en el PDF
   const [movimientosOcultosParaPDF, setMovimientosOcultosParaPDF] = useState<Set<number>>(new Set());
+  
+  // Filtros de fecha para el PDF
+  const [filtroFechaPDFDesde, setFiltroFechaPDFDesde] = useState<Dayjs | null>(null);
+  const [filtroFechaPDFHasta, setFiltroFechaPDFHasta] = useState<Dayjs | null>(null);
 
   /**
    * Efecto: cargar sucursales al montar
@@ -643,11 +648,12 @@ const Accounts: React.FC = () => {
       // 2. INFORMACIÓN DEL CLIENTE
       // ========================================
       
-      // Nombre del cliente
-      doc.setFontSize(9);
+      // Nombre del cliente - MEJORA 1: Color AZUL y usar nombre fantasía si existe
+      const nombreMostrar = cliente.nombre_fantasia || cliente.cliente_nombre;
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text(cliente.cliente_nombre, 14, yPos);
+      doc.setTextColor(0, 102, 204); // Azul
+      doc.text(nombreMostrar, 14, yPos);
       
       // Información adicional en gris
       doc.setFontSize(7);
@@ -673,13 +679,28 @@ const Accounts: React.FC = () => {
         return dayjs(a.fecha_movimiento).diff(dayjs(b.fecha_movimiento));
       });
       
-      // Filtrar solo ventas y pagos visibles (y no ocultos para PDF)
+      // MEJORA 4: Filtrar solo ventas y pagos visibles (y no ocultos para PDF) + filtro de fechas
       const movimientosFiltrados = movimientosOrdenados.filter(mov => {
         // Excluir movimientos que el usuario marcó como ocultos
         if (movimientosOcultosParaPDF.has(mov.id)) {
           return false;
         }
-        return mov.tipo === 'venta' || mov.tipo === 'pago';
+        
+        // Filtro de tipo
+        if (mov.tipo !== 'venta' && mov.tipo !== 'pago') {
+          return false;
+        }
+        
+        // Filtro de fechas si están seleccionadas
+        const fechaMov = dayjs(mov.fecha_movimiento);
+        if (filtroFechaPDFDesde && fechaMov.isBefore(filtroFechaPDFDesde, 'day')) {
+          return false;
+        }
+        if (filtroFechaPDFHasta && fechaMov.isAfter(filtroFechaPDFHasta, 'day')) {
+          return false;
+        }
+        
+        return true;
       });
       
       // Procesar cada movimiento de forma minimalista
@@ -724,8 +745,8 @@ const Accounts: React.FC = () => {
           
           yPos += 3;
           
-          // Lista de productos - COMPACTA
-          doc.setFontSize(6);
+          // MEJORA 2: Lista de productos - 50% MÁS GRANDE con cantidad en negrita
+          doc.setFontSize(9); // Era 6, ahora 9 (50% más grande)
           doc.setTextColor(60, 60, 60);
           for (const prod of mov.productos) {
             const cantidad = prod.cantidad;
@@ -733,11 +754,19 @@ const Accounts: React.FC = () => {
             const precio = `($${parseFloat(String(prod.precio_unitario || 0)).toFixed(2)})`;
             const subtotal = `$${parseFloat(String(prod.subtotal || 0)).toFixed(2)}`;
             
-            doc.text(`${cantidad}x ${nombre} ${precio}`, 20, yPos);
-          doc.setFont('helvetica', 'bold');
+            // Cantidad en NEGRITA
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${cantidad}x`, 20, yPos);
+            
+            // Resto normal
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${nombre} ${precio}`, 29, yPos);
+            
+            // Subtotal en negrita
+            doc.setFont('helvetica', 'bold');
             doc.text(subtotal, 194, yPos, { align: 'right' });
             doc.setFont('helvetica', 'normal');
-            yPos += 3;
+            yPos += 4.5; // Era 3, ahora 4.5 (50% más espacio)
           }
           
           // Cálculos
@@ -765,13 +794,22 @@ const Accounts: React.FC = () => {
           doc.setFontSize(7);
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(220, 38, 38);
-          doc.text('Saldo:', 155, yPos);
+          doc.text('Total:', 155, yPos);
           doc.text(`$${totalVenta.toFixed(2)}`, 194, yPos, { align: 'right' });
           
           saldoAcumulado += totalVenta;
           
+          // MEJORA 3: Mostrar saldo acumulado al lado de cada venta
+          yPos += 4;
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
           doc.setTextColor(0, 0, 0);
-          yPos += 3;
+          doc.text('Saldo Acumulado:', 155, yPos);
+          doc.setTextColor(59, 130, 246); // Azul
+          doc.text(`$${saldoAcumulado.toFixed(2)}`, 194, yPos, { align: 'right' });
+          
+          doc.setTextColor(0, 0, 0);
+          yPos += 2;
           
         } else if (mov.tipo === 'pago') {
           // ========================================
@@ -798,11 +836,20 @@ const Accounts: React.FC = () => {
           doc.setFontSize(7);
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(34, 197, 94);
-          doc.text('Saldo:', 155, yPos);
+          doc.text('Pago:', 155, yPos);
           doc.text(`-$${montoPago.toFixed(2)}`, 194, yPos, { align: 'right' });
           
+          // MEJORA 3: Mostrar saldo acumulado después del pago
+          yPos += 4;
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
           doc.setTextColor(0, 0, 0);
-          yPos += 3;
+          doc.text('Saldo Acumulado:', 155, yPos);
+          doc.setTextColor(59, 130, 246); // Azul
+          doc.text(`$${saldoAcumulado.toFixed(2)}`, 194, yPos, { align: 'right' });
+          
+          doc.setTextColor(0, 0, 0);
+          yPos += 2;
         }
         
         // Línea separadora muy fina
@@ -1537,7 +1584,9 @@ const Accounts: React.FC = () => {
         title={
           <Space>
             <EyeOutlined style={{ color: '#1890ff' }} />
-            <span style={{ color: '#000' }}>Detalle de Cuenta - {clienteSeleccionado?.cliente_nombre}</span>
+            <span style={{ color: '#000' }}>
+              Detalle de Cuenta - {clienteSeleccionado?.nombre_fantasia || clienteSeleccionado?.cliente_nombre}
+            </span>
           </Space>
         }
         open={modalDetalleVisible}
@@ -1593,6 +1642,52 @@ const Accounts: React.FC = () => {
                 </Text>
               </Descriptions.Item>
             </Descriptions>
+
+            {/* MEJORA 4: Filtros de fecha para PDF */}
+            <Card size="small" style={{ background: '#f0f7ff', border: '1px solid #91caff' }}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Text strong>📅 Filtro de Fechas para PDF</Text>
+                <Space wrap>
+                  <Space>
+                    <Text type="secondary">Desde:</Text>
+                    <DatePicker
+                      placeholder="Fecha inicial"
+                      value={filtroFechaPDFDesde}
+                      onChange={(date) => setFiltroFechaPDFDesde(date)}
+                      format="DD/MM/YYYY"
+                      style={{ width: 150 }}
+                    />
+                  </Space>
+                  <Space>
+                    <Text type="secondary">Hasta:</Text>
+                    <DatePicker
+                      placeholder="Fecha final"
+                      value={filtroFechaPDFHasta}
+                      onChange={(date) => setFiltroFechaPDFHasta(date)}
+                      format="DD/MM/YYYY"
+                      style={{ width: 150 }}
+                    />
+                  </Space>
+                  {(filtroFechaPDFDesde || filtroFechaPDFHasta) && (
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setFiltroFechaPDFDesde(null);
+                        setFiltroFechaPDFHasta(null);
+                      }}
+                    >
+                      Limpiar Filtros
+                    </Button>
+                  )}
+                </Space>
+                <Alert
+                  message="Estos filtros solo afectan el PDF generado, no la tabla mostrada aquí."
+                  type="info"
+                  showIcon
+                  style={{ marginTop: 8 }}
+                />
+              </Space>
+            </Card>
 
             {/* Tabla de movimientos */}
             <div>
