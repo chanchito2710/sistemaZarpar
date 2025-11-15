@@ -1047,36 +1047,6 @@ const Inventory: React.FC = () => {
               lg={searchExpanded ? 2 : 3}
             >
               <Button 
-                type="primary" 
-                danger
-                icon={<FilterOutlined />}
-                onClick={() => {
-                  setSearchText('');
-                  setSelectedBrand('all');
-                  setSelectedCategory('all');
-                  setSelectedSucursal('pando');
-                  setSearchExpanded(false);
-                }}
-                block
-                size="large"
-                style={{
-                  borderRadius: '8px',
-                  height: '48px',
-                  fontWeight: 600,
-                  marginTop: 24
-                }}
-              >
-                Limpiar
-              </Button>
-            </Col>
-            
-            <Col 
-              xs={12} 
-              sm={searchExpanded ? 4 : 5} 
-              md={searchExpanded ? 3 : 4} 
-              lg={searchExpanded ? 2 : 3}
-            >
-              <Button 
                 type="default" 
                 icon={<FilePdfOutlined />}
                 onClick={generatePDF}
