@@ -1035,65 +1035,6 @@ const Customers: React.FC = () => {
             </Spin>
           </Tabs.TabPane>
 
-          {/* Tab 2: Cuenta Corriente */}
-          <Tabs.TabPane
-            tab={
-              <span>
-                <CreditCardOutlined />
-                Cuenta Corriente
-                {clientesCuentaCorriente.length > 0 && (
-                  <Badge count={clientesCuentaCorriente.length} style={{ marginLeft: 8 }} />
-                )}
-              </span>
-            }
-            key="2"
-          >
-            <Spin spinning={loading}>
-              <Space direction="vertical" style={{ width: '100%' }} size="large">
-                <Row gutter={16}>
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="Clientes con Deuda"
-                        value={clientesCuentaCorriente.length}
-                        prefix={<UserOutlined />}
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="Total Adeudado"
-                        value={clientesCuentaCorriente.reduce((sum, c) => sum + parseFloat(c.saldo_actual), 0)}
-                        precision={2}
-                        prefix="$"
-                        valueStyle={{ color: '#cf1322' }}
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="Total Pagado"
-                        value={clientesCuentaCorriente.reduce((sum, c) => sum + parseFloat(c.total_haber), 0)}
-                        precision={2}
-                        prefix="$"
-                        valueStyle={{ color: '#3f8600' }}
-                      />
-                    </Card>
-                  </Col>
-                </Row>
-
-                <Table
-                  dataSource={clientesCuentaCorriente}
-                  columns={columnasClientesDeuda}
-                  rowKey="cliente_id"
-                  pagination={{ pageSize: 10 }}
-                />
-              </Space>
-            </Spin>
-          </Tabs.TabPane>
-
         </Tabs>
       </Card>
 
