@@ -62,7 +62,8 @@ const customSelectStyles: StylesConfig = {
     borderRadius: '12px',
     boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
     overflow: 'hidden',
-    marginTop: '4px'
+    marginTop: '4px',
+    zIndex: 9999  // Asegurar que aparezca por encima de todos los elementos
   }),
   menuList: (provided) => ({
     ...provided,
@@ -95,6 +96,10 @@ const customSelectStyles: StylesConfig = {
       color: '#1890ff'
     },
     transition: 'all 0.2s ease'
+  }),
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: 9999  // Portal también con z-index alto
   })
 };
 
@@ -440,6 +445,8 @@ const POS: React.FC = () => {
                       isSearchable={true}
                       noOptionsMessage={() => 'No hay sucursales disponibles'}
                       loadingMessage={() => 'Cargando...'}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
                     />
                   </Space>
                 </Card>
@@ -488,6 +495,8 @@ const POS: React.FC = () => {
                       filterOption={(option, inputValue) => 
                         option.label.toLowerCase().includes(inputValue.toLowerCase())
                       }
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
                     />
                     <Button
                       type="dashed"
@@ -546,6 +555,8 @@ const POS: React.FC = () => {
                       isSearchable={true}
                       noOptionsMessage={() => loadingVendedores ? 'Cargando...' : 'No hay vendedores disponibles'}
                       loadingMessage={() => 'Cargando vendedores...'}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
                     />
                     {!usuario?.esAdmin && selectedSeller && (
                       <Text type="secondary" style={{ fontSize: '12px', marginTop: '8px', display: 'block' }}>
