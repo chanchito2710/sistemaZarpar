@@ -6,7 +6,6 @@ import {
   Button,
   Typography,
   Space,
-  Select,
   Form,
   Modal,
   Input,
@@ -20,12 +19,84 @@ import {
   ArrowRightOutlined,
   PlusOutlined
 } from '@ant-design/icons';
+import ReactSelect, { StylesConfig } from 'react-select';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { vendedoresService, clientesService, type Cliente, type Vendedor } from '../../services/api';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
+
+/**
+ * ESTILOS PERSONALIZADOS PARA REACT-SELECT
+ */
+const customSelectStyles: StylesConfig = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: '48px',
+    borderRadius: '12px',
+    border: state.isFocused ? '2px solid #1890ff' : '2px solid #d9d9d9',
+    boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+    '&:hover': {
+      borderColor: '#1890ff'
+    },
+    cursor: 'pointer',
+    transition: 'all 0.3s ease'
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected 
+      ? '#1890ff' 
+      : state.isFocused 
+      ? '#e6f7ff' 
+      : 'white',
+    color: state.isSelected ? 'white' : '#000',
+    cursor: 'pointer',
+    padding: '12px 16px',
+    transition: 'all 0.2s ease',
+    '&:active': {
+      backgroundColor: '#1890ff'
+    }
+  }),
+  menu: (provided) => ({
+    ...provided,
+    borderRadius: '12px',
+    boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+    overflow: 'hidden',
+    marginTop: '4px'
+  }),
+  menuList: (provided) => ({
+    ...provided,
+    padding: '4px',
+    maxHeight: '300px'
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    color: '#000',
+    fontSize: '15px',
+    fontWeight: 500
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: '#bfbfbf',
+    fontSize: '15px'
+  }),
+  input: (provided) => ({
+    ...provided,
+    color: '#000',
+    fontSize: '15px'
+  }),
+  indicatorSeparator: () => ({
+    display: 'none'
+  }),
+  dropdownIndicator: (provided, state) => ({
+    ...provided,
+    color: state.isFocused ? '#1890ff' : '#bfbfbf',
+    '&:hover': {
+      color: '#1890ff'
+    },
+    transition: 'all 0.2s ease'
+  })
+};
 
 /**
  * UTILIDADES PARA NOMBRES DE SUCURSALES
@@ -354,21 +425,22 @@ const POS: React.FC = () => {
                     <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
                       Sucursal
                     </Title>
-                    <Select
+                    <ReactSelect
                       placeholder="Seleccionar sucursal"
-                      style={{ width: '100%' }}
-                      value={selectedBranch}
-                      onChange={setSelectedBranch}
-                      size="large"
-                      loading={loadingSucursales}
-                      disabled={!usuario?.esAdmin && !!selectedBranch}
-                    >
-                      {sucursales.map(sucursal => (
-                        <Option key={sucursal} value={sucursal.toLowerCase()}>
-                          {formatearNombreSucursal(sucursal)}
-                        </Option>
-                      ))}
-                    </Select>
+                      value={selectedBranch ? { value: selectedBranch, label: formatearNombreSucursal(selectedBranch) } : null}
+                      onChange={(option) => setSelectedBranch(option?.value || undefined)}
+                      options={sucursales.map(sucursal => ({
+                        value: sucursal.toLowerCase(),
+                        label: formatearNombreSucursal(sucursal)
+                      }))}
+                      styles={customSelectStyles}
+                      isLoading={loadingSucursales}
+                      isDisabled={!usuario?.esAdmin && !!selectedBranch}
+                      isClearable={false}
+                      isSearchable={true}
+                      noOptionsMessage={() => 'No hay sucursales disponibles'}
+                      loadingMessage={() => 'Cargando...'}
+                    />
                   </Space>
                 </Card>
               </Col>
@@ -394,29 +466,29 @@ const POS: React.FC = () => {
                     <Title level={4} style={{ margin: 0, color: '#52c41a' }}>
                       Cliente
                     </Title>
-                    <Select
+                    <ReactSelect
                       key={`clientes-${selectedBranch}`}
-                      placeholder={!selectedBranch ? "Primero selecciona una sucursal" : "Seleccionar cliente"}
-                      style={{ width: '100%' }}
-                      value={selectedClient}
-                      onChange={setSelectedClient}
-                      size="large"
-                      showSearch
-                      disabled={!selectedBranch || loadingClientes}
-                      loading={loadingClientes}
-                      filterOption={(input, option) => {
-                        const label = option?.children as unknown as string;
-                        return label.toLowerCase().includes(input.toLowerCase());
-                      }}
-                      notFoundContent={loadingClientes ? <Spin size="small" /> : "No hay clientes disponibles"}
-                    >
-                      {clientes.map(cliente => (
-                        <Option key={cliente.id} value={cliente.id}>
-                          {`${cliente.nombre} ${cliente.apellido}`}
-                          {cliente.nombre_fantasia && ` - ${cliente.nombre_fantasia}`}
-                        </Option>
-                      ))}
-                    </Select>
+                      placeholder={!selectedBranch ? "Primero selecciona una sucursal" : "Buscar cliente..."}
+                      value={selectedClient ? clientes.find(c => c.id === selectedClient) ? {
+                        value: selectedClient,
+                        label: `${clientes.find(c => c.id === selectedClient)?.nombre} ${clientes.find(c => c.id === selectedClient)?.apellido}${clientes.find(c => c.id === selectedClient)?.nombre_fantasia ? ` - ${clientes.find(c => c.id === selectedClient)?.nombre_fantasia}` : ''}`
+                      } : null : null}
+                      onChange={(option) => setSelectedClient(option?.value || undefined)}
+                      options={clientes.map(cliente => ({
+                        value: cliente.id,
+                        label: `${cliente.nombre} ${cliente.apellido}${cliente.nombre_fantasia ? ` - ${cliente.nombre_fantasia}` : ''}`
+                      }))}
+                      styles={customSelectStyles}
+                      isDisabled={!selectedBranch || loadingClientes}
+                      isLoading={loadingClientes}
+                      isClearable={false}
+                      isSearchable={true}
+                      noOptionsMessage={() => loadingClientes ? 'Cargando...' : 'No hay clientes disponibles'}
+                      loadingMessage={() => 'Cargando clientes...'}
+                      filterOption={(option, inputValue) => 
+                        option.label.toLowerCase().includes(inputValue.toLowerCase())
+                      }
+                    />
                     <Button
                       type="dashed"
                       icon={<PlusOutlined />}
@@ -455,23 +527,26 @@ const POS: React.FC = () => {
                     <Title level={4} style={{ margin: 0, color: '#fa8c16' }}>
                       Vendedor
                     </Title>
-                    <Select
+                    <ReactSelect
                       key={`vendedores-${selectedBranch}`}
                       placeholder={!selectedBranch ? "Primero selecciona una sucursal" : "Seleccionar vendedor"}
-                      style={{ width: '100%' }}
-                      value={selectedSeller}
-                      onChange={setSelectedSeller}
-                      size="large"
-                      disabled={!selectedBranch || loadingVendedores || (!usuario?.esAdmin && !!selectedSeller)}
-                      loading={loadingVendedores}
-                      notFoundContent={loadingVendedores ? <Spin size="small" /> : "No hay vendedores disponibles"}
-                    >
-                      {vendedores.map(vendedor => (
-                        <Option key={vendedor.id} value={vendedor.id}>
-                          {vendedor.nombre} - {vendedor.cargo}
-                        </Option>
-                      ))}
-                    </Select>
+                      value={selectedSeller ? vendedores.find(v => v.id === selectedSeller) ? {
+                        value: selectedSeller,
+                        label: `${vendedores.find(v => v.id === selectedSeller)?.nombre} - ${vendedores.find(v => v.id === selectedSeller)?.cargo}`
+                      } : null : null}
+                      onChange={(option) => setSelectedSeller(option?.value || undefined)}
+                      options={vendedores.map(vendedor => ({
+                        value: vendedor.id,
+                        label: `${vendedor.nombre} - ${vendedor.cargo}`
+                      }))}
+                      styles={customSelectStyles}
+                      isDisabled={!selectedBranch || loadingVendedores || (!usuario?.esAdmin && !!selectedSeller)}
+                      isLoading={loadingVendedores}
+                      isClearable={false}
+                      isSearchable={true}
+                      noOptionsMessage={() => loadingVendedores ? 'Cargando...' : 'No hay vendedores disponibles'}
+                      loadingMessage={() => 'Cargando vendedores...'}
+                    />
                     {!usuario?.esAdmin && selectedSeller && (
                       <Text type="secondary" style={{ fontSize: '12px', marginTop: '8px', display: 'block' }}>
                         Auto-seleccionado según tu usuario
