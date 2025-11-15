@@ -417,6 +417,73 @@ export const actualizarCliente = async (req: Request, res: Response): Promise<vo
 };
 
 /**
+ * Eliminar un cliente
+ * DELETE /api/clientes/sucursal/:sucursal/:id
+ */
+export const eliminarCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, id } = req.params;
+
+    // Validar sucursal
+    const nombreTabla = await obtenerNombreTabla(sucursal);
+
+    if (!nombreTabla) {
+      res.status(400).json({
+        success: false,
+        message: 'Sucursal inválida'
+      });
+      return;
+    }
+
+    if (isNaN(Number(id))) {
+      res.status(400).json({
+        success: false,
+        message: 'ID de cliente inválido'
+      });
+      return;
+    }
+
+    // Verificar que el cliente existe
+    const clienteExistente = await executeQuery<Cliente[]>(
+      `SELECT * FROM ${nombreTabla} WHERE id = ?`,
+      [id]
+    );
+
+    if (clienteExistente.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Cliente no encontrado'
+      });
+      return;
+    }
+
+    // Eliminar el cliente permanentemente
+    await executeQuery(
+      `DELETE FROM ${nombreTabla} WHERE id = ?`,
+      [id]
+    );
+
+    console.log(`✅ Cliente ${id} eliminado permanentemente de ${nombreTabla}`);
+
+    res.json({
+      success: true,
+      message: 'Cliente eliminado permanentemente',
+      data: {
+        id: Number(id),
+        eliminado_permanentemente: true
+      }
+    });
+  } catch (error) {
+    console.error('Error al eliminar cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar cliente',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
  * Buscar clientes por nombre, apellido, RUT o email
  * GET /api/clientes/sucursal/:sucursal/buscar?q=termino
  */

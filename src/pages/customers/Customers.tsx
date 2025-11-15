@@ -28,7 +28,8 @@ import {
   Empty,
   Drawer,
   Alert,
-  Descriptions
+  Descriptions,
+  Popconfirm
 } from 'antd';
 import {
   UserOutlined,
@@ -44,7 +45,8 @@ import {
   CheckCircleOutlined,
   TagsOutlined,
   SearchOutlined,
-  EditOutlined
+  EditOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -569,6 +571,28 @@ const Customers: React.FC = () => {
   };
 
   /**
+   * Eliminar cliente permanentemente
+   */
+  const handleEliminarCliente = async (cliente: Cliente) => {
+    try {
+      setLoading(true);
+
+      await clientesService.eliminar(sucursalSeleccionada, cliente.id);
+
+      message.success(`🗑️ Cliente "${cliente.nombre} ${cliente.apellido}" eliminado permanentemente`);
+      
+      // Recargar clientes
+      await cargarClientes();
+
+    } catch (error: any) {
+      console.error('Error al eliminar cliente:', error);
+      message.error(error.message || 'Error al eliminar cliente');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Columnas de la tabla de clientes con ventas
    */
   const columnasClientes = [
@@ -611,6 +635,43 @@ const Customers: React.FC = () => {
             icon={<EditOutlined />}
             onClick={() => abrirModalEditarCliente(record)}
           />
+          <Popconfirm
+            title={
+              <div style={{ maxWidth: 300 }}>
+                <div style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+                  ⚠️ ¡ELIMINAR PERMANENTEMENTE!
+                </div>
+                <div>
+                  ¿Estás seguro de eliminar a <strong>"{record.nombre} {record.apellido}"</strong>?
+                </div>
+              </div>
+            }
+            description={
+              <Alert
+                message="ADVERTENCIA: Esta acción es IRREVERSIBLE"
+                description="El cliente será BORRADO PERMANENTEMENTE de la base de datos y NO SE PUEDE RECUPERAR. Todas sus ventas y datos asociados se mantendrán, pero el cliente será eliminado."
+                type="error"
+                showIcon
+                style={{ marginTop: 12 }}
+              />
+            }
+            onConfirm={() => handleEliminarCliente(record)}
+            okText="🗑️ SÍ, ELIMINAR PERMANENTEMENTE"
+            cancelText="❌ Cancelar"
+            okButtonProps={{ 
+              danger: true,
+              size: 'large'
+            }}
+            cancelButtonProps={{
+              size: 'large'
+            }}
+          >
+            <Button
+              size="small"
+              icon={<DeleteOutlined />}
+              danger
+            />
+          </Popconfirm>
           <Button
             size="small"
             icon={<EyeOutlined />}

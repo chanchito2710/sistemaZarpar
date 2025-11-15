@@ -10,6 +10,7 @@ import {
   obtenerClientePorId,
   crearCliente,
   actualizarCliente,
+  eliminarCliente,
   buscarClientes
 } from '../controllers/clientesController.js';
 import { 
@@ -77,6 +78,18 @@ router.put(
   verificarAutenticacion,
   verificarAccesoSucursal,
   actualizarCliente
+);
+
+/**
+ * @route   DELETE /api/clientes/sucursal/:sucursal/:id
+ * @desc    Eliminar un cliente permanentemente
+ * @access  Private (requiere autenticación y permiso de sucursal)
+ */
+router.delete(
+  '/sucursal/:sucursal/:id',
+  verificarAutenticacion,
+  verificarAccesoSucursal,
+  eliminarCliente
 );
 
 export default router;

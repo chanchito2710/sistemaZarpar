@@ -370,6 +370,20 @@ export const clientesService = {
       throw error;
     }
   },
+
+  /**
+   * Eliminar un cliente permanentemente
+   * @param sucursal - Nombre de la sucursal
+   * @param id - ID del cliente
+   */
+  eliminar: async (sucursal: string, id: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/clientes/sucursal/${sucursal.toLowerCase()}/${id}`);
+    } catch (error) {
+      console.error('Error al eliminar cliente:', error);
+      throw error;
+    }
+  },
 };
 
 /**
