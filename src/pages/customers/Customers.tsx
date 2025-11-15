@@ -153,6 +153,9 @@ const Customers: React.FC = () => {
   const [clienteParaEditar, setClienteParaEditar] = useState<Cliente | null>(null);
   const [formEditarCliente] = Form.useForm();
 
+  // Cache para evitar recargar datos ya cargados
+  const [tabsCargadas, setTabsCargadas] = useState<Set<string>>(new Set());
+
   /**
    * Cargar sucursales al iniciar
    */
@@ -388,27 +391,61 @@ const Customers: React.FC = () => {
     setClienteAnalisis(cliente);
     setDrawerVisible(true);
     setTabDrawer('1');
-    await cargarDatosDrawer(cliente.id);
+    // Reiniciar cache cuando se abre un nuevo cliente
+    setTabsCargadas(new Set());
+    // Limpiar datos anteriores
+    setVentasGlobalesCliente([]);
+    setPagosCliente([]);
+    setReemplazosCliente([]);
+    setProductosCliente([]);
+    setSaldoCuentaCorriente(0);
+    // Solo cargar los datos de la primera pestaña (Ventas Globales)
+    await cargarDatosTabActiva('1', cliente.id);
   };
 
   /**
-   * Cargar todos los datos del cliente para el drawer
+   * Cargar datos solo de la pestaña activa (lazy loading con cache)
    */
-  const cargarDatosDrawer = async (clienteId: number) => {
+  const cargarDatosTabActiva = async (tab: string, clienteId: number) => {
+    // Si ya cargamos esta pestaña, no volver a cargar
+    if (tabsCargadas.has(tab)) {
+      return;
+    }
+
     setLoadingDrawer(true);
     try {
-      await Promise.all([
-        cargarVentasGlobalesCliente(clienteId),
-        cargarPagosCliente(clienteId),
-        cargarReemplazosCliente(clienteId),
-        cargarProductosCliente(clienteId),
-        cargarSaldoCuentaCorriente(clienteId)
-      ]);
+      switch (tab) {
+        case '1': // Ventas Globales
+          await cargarVentasGlobalesCliente(clienteId);
+          break;
+        case '2': // Pagos
+          await cargarPagosCliente(clienteId);
+          break;
+        case '3': // Reemplazos/Devoluciones
+          await cargarReemplazosCliente(clienteId);
+          break;
+        case '4': // Productos
+          await cargarProductosCliente(clienteId);
+          await cargarSaldoCuentaCorriente(clienteId);
+          break;
+      }
+      // Marcar esta pestaña como cargada
+      setTabsCargadas(prev => new Set(prev).add(tab));
     } catch (error) {
       console.error('Error al cargar datos del cliente:', error);
       message.error('Error al cargar datos del cliente');
     } finally {
       setLoadingDrawer(false);
+    }
+  };
+
+  /**
+   * Manejar cambio de pestaña en el drawer
+   */
+  const handleCambioTab = async (tab: string) => {
+    setTabDrawer(tab);
+    if (clienteAnalisis) {
+      await cargarDatosTabActiva(tab, clienteAnalisis.id);
     }
   };
 
@@ -1325,7 +1362,7 @@ const Customers: React.FC = () => {
             />
 
             {/* Tabs del Drawer */}
-            <Tabs activeKey={tabDrawer} onChange={setTabDrawer}>
+            <Tabs activeKey={tabDrawer} onChange={handleCambioTab}>
               {/* TAB 1: VENTAS GLOBALES */}
               <Tabs.TabPane
                 tab={
