@@ -598,17 +598,24 @@ const Products: React.FC = () => {
       };
 
       console.log('📦 Creando producto:', nuevoProducto);
-      await productosService.crear(nuevoProducto);
-      message.success('✅ Producto creado exitosamente en todas las sucursales');
+      const response = await productosService.crear(nuevoProducto);
+      console.log('✅ Respuesta del backend:', response);
+      
+      message.success('✅ Producto creado con stock inicial de 0 en todas las sucursales');
       setModalCrearVisible(false);
       formCrear.resetFields();
       
-      // Pequeño delay para asegurar que la BD terminó de procesar
-      console.log('⏳ Esperando 500ms antes de recargar productos...');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Delay más largo y reload completo para asegurar que se vea el stock correcto
+      console.log('⏳ Esperando 1 segundo antes de recargar productos...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       console.log('🔄 Recargando productos de sucursal:', sucursalSeleccionada);
+      
+      // Forzar recarga completa limpiando la lista primero
+      setProductos([]);
       await cargarProductos();
+      
+      console.log('✅ Productos recargados. Stock debe estar en 0 para el nuevo producto.');
     } catch (error) {
       console.error('❌ Error al crear producto:', error);
       message.error('Error al crear producto');
@@ -1315,7 +1322,7 @@ const Products: React.FC = () => {
         title={
           <Space>
             <PlusOutlined style={{ color: '#52c41a', fontSize: 20 }} />
-            <span style={{ fontSize: 18, fontWeight: 600 }}>Crear Nuevo Producto</span>
+            <span style={{ fontSize: 18, fontWeight: 600, color: '#000' }}>Crear Nuevo Producto</span>
           </Space>
         }
         open={modalCrearVisible}
