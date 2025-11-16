@@ -1164,41 +1164,34 @@ const Transfer: React.FC = () => {
       producto.tipo?.toLowerCase().includes(searchText.toLowerCase())
     );
     
-    // Luego ordenar: PRIORIDAD a productos con stock en tránsito
+    // Luego ordenar
     return filtered.sort((a, b) => {
-      // Obtener stock en tránsito de la sucursal del usuario (si es sucursal simple) o cualquier sucursal (si es admin)
-      const getStockEnTransito = (producto: ProductoTransfer): number => {
-        if (!producto.sucursales) return 0;
-        
-        // Si es sucursal simple, solo buscar en su sucursal
-        if (!esAdmin && sucursalUsuario) {
+      // ⭐ SOLO ordenar por stock_en_transito para USUARIOS NORMALES (no admin)
+      // Los admins NO quieren que se reordene mientras envían mercadería
+      if (!esAdmin && sucursalUsuario) {
+        // Obtener stock en tránsito de la sucursal del usuario
+        const getStockEnTransito = (producto: ProductoTransfer): number => {
+          if (!producto.sucursales) return 0;
           return producto.sucursales[sucursalUsuario]?.stock_en_transito || 0;
-        }
+        };
         
-        // Si es admin, buscar en todas las sucursales
-        let totalEnTransito = 0;
-        Object.values(producto.sucursales).forEach(sucursal => {
-          totalEnTransito += sucursal.stock_en_transito || 0;
-        });
-        return totalEnTransito;
-      };
-      
-      const stockEnTransitoA = getStockEnTransito(a);
-      const stockEnTransitoB = getStockEnTransito(b);
-      
-      // 1. PRIORIDAD: Productos con stock en tránsito van primero (descendente)
-      if (stockEnTransitoA !== stockEnTransitoB) {
-        return stockEnTransitoB - stockEnTransitoA; // Mayor stock en tránsito primero
+        const stockEnTransitoA = getStockEnTransito(a);
+        const stockEnTransitoB = getStockEnTransito(b);
+        
+        // 1. PRIORIDAD: Productos con stock en tránsito van primero (descendente)
+        if (stockEnTransitoA !== stockEnTransitoB) {
+          return stockEnTransitoB - stockEnTransitoA; // Mayor stock en tránsito primero
+        }
       }
       
-      // 2. SEGUNDO ORDEN: Por tipo (alfabético)
+      // 2. ORDEN: Por tipo (alfabético)
       const tipoA = (a.tipo || '').toLowerCase();
       const tipoB = (b.tipo || '').toLowerCase();
       if (tipoA !== tipoB) {
         return tipoA.localeCompare(tipoB, 'es');
       }
       
-      // 3. TERCER ORDEN: Por nombre (alfabético)
+      // 3. ORDEN: Por nombre (alfabético)
       const nombreA = (a.nombre || '').toLowerCase();
       const nombreB = (b.nombre || '').toLowerCase();
       return nombreA.localeCompare(nombreB, 'es');
