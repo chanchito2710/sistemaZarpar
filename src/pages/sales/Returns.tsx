@@ -82,6 +82,236 @@ interface SaldoFavor {
   updated_at: string;
 }
 
+/**
+ * ========================================
+ * COMPONENTE PERSONALIZADO: Selector de Destino de Stock
+ * ========================================
+ * Selector elegante tipo card con animaciones y hover effects
+ */
+interface StockDestinationSelectorProps {
+  value?: 'principal' | 'mermas';
+  onChange?: (value: 'principal' | 'mermas') => void;
+}
+
+const StockDestinationSelector: React.FC<StockDestinationSelectorProps> = ({ value, onChange }) => {
+  const [selected, setSelected] = useState<'principal' | 'mermas' | undefined>(value);
+  const [hoveredCard, setHoveredCard] = useState<'principal' | 'mermas' | null>(null);
+
+  useEffect(() => {
+    setSelected(value);
+  }, [value]);
+
+  const handleSelect = (option: 'principal' | 'mermas') => {
+    setSelected(option);
+    if (onChange) {
+      onChange(option);
+    }
+  };
+
+  const cardBaseStyle: React.CSSProperties = {
+    padding: '20px',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    position: 'relative',
+    overflow: 'hidden',
+    marginBottom: '12px',
+    border: '2px solid transparent',
+  };
+
+  const getCardStyle = (option: 'principal' | 'mermas'): React.CSSProperties => {
+    const isSelected = selected === option;
+    const isHovered = hoveredCard === option;
+
+    if (option === 'principal') {
+      return {
+        ...cardBaseStyle,
+        background: isSelected 
+          ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' 
+          : isHovered 
+          ? 'linear-gradient(135deg, #f1f8f4 0%, #e8f5e9 100%)'
+          : '#f9fafb',
+        borderColor: isSelected ? '#4caf50' : isHovered ? '#81c784' : '#e5e7eb',
+        transform: isHovered ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
+        boxShadow: isSelected 
+          ? '0 8px 24px rgba(76, 175, 80, 0.25), 0 0 0 3px rgba(76, 175, 80, 0.1)' 
+          : isHovered 
+          ? '0 12px 32px rgba(76, 175, 80, 0.15)'
+          : '0 2px 8px rgba(0, 0, 0, 0.05)',
+      };
+    } else {
+      return {
+        ...cardBaseStyle,
+        background: isSelected 
+          ? 'linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%)' 
+          : isHovered 
+          ? 'linear-gradient(135deg, #fff5f5 0%, #ffebee 100%)'
+          : '#f9fafb',
+        borderColor: isSelected ? '#f44336' : isHovered ? '#e57373' : '#e5e7eb',
+        transform: isHovered ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
+        boxShadow: isSelected 
+          ? '0 8px 24px rgba(244, 67, 54, 0.25), 0 0 0 3px rgba(244, 67, 54, 0.1)' 
+          : isHovered 
+          ? '0 12px 32px rgba(244, 67, 54, 0.15)'
+          : '0 2px 8px rgba(0, 0, 0, 0.05)',
+      };
+    }
+  };
+
+  const iconStyle: React.CSSProperties = {
+    fontSize: '32px',
+    marginBottom: '8px',
+    transition: 'transform 0.3s ease',
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      {/* OPCIÓN 1: Stock Principal */}
+      <div
+        style={getCardStyle('principal')}
+        onClick={() => handleSelect('principal')}
+        onMouseEnter={() => setHoveredCard('principal')}
+        onMouseLeave={() => setHoveredCard(null)}
+      >
+        {/* Checkmark animado */}
+        {selected === 'principal' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              background: '#4caf50',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              animation: 'bounceIn 0.4s ease',
+            }}
+          >
+            <CheckCircleOutlined style={{ color: '#fff', fontSize: '16px' }} />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div
+            style={{
+              ...iconStyle,
+              transform: hoveredCard === 'principal' ? 'scale(1.15) rotate(5deg)' : 'scale(1) rotate(0)',
+              color: selected === 'principal' ? '#2e7d32' : '#4caf50',
+            }}
+          >
+            ✅
+          </div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: '16px',
+                color: selected === 'principal' ? '#1b5e20' : '#2e7d32',
+                marginBottom: '4px',
+              }}
+            >
+              Stock Principal
+            </div>
+            <div
+              style={{
+                fontSize: '13px',
+                color: selected === 'principal' ? '#388e3c' : '#6b7280',
+                lineHeight: '1.4',
+              }}
+            >
+              El producto está en <strong>buen estado</strong> y puede revenderse normalmente
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* OPCIÓN 2: Stock de Mermas */}
+      <div
+        style={getCardStyle('mermas')}
+        onClick={() => handleSelect('mermas')}
+        onMouseEnter={() => setHoveredCard('mermas')}
+        onMouseLeave={() => setHoveredCard(null)}
+      >
+        {/* Checkmark animado */}
+        {selected === 'mermas' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              background: '#f44336',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              animation: 'bounceIn 0.4s ease',
+            }}
+          >
+            <CheckCircleOutlined style={{ color: '#fff', fontSize: '16px' }} />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div
+            style={{
+              ...iconStyle,
+              transform: hoveredCard === 'mermas' ? 'scale(1.15) rotate(-5deg)' : 'scale(1) rotate(0)',
+              color: selected === 'mermas' ? '#c62828' : '#f44336',
+            }}
+          >
+            ❌
+          </div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: '16px',
+                color: selected === 'mermas' ? '#b71c1c' : '#c62828',
+                marginBottom: '4px',
+              }}
+            >
+              Stock de Mermas (Fallas)
+            </div>
+            <div
+              style={{
+                fontSize: '13px',
+                color: selected === 'mermas' ? '#d32f2f' : '#6b7280',
+                lineHeight: '1.4',
+              }}
+            >
+              El producto tiene <strong>defectos o daños</strong> y no puede revenderse
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Agregar animación CSS */}
+      <style>
+        {`
+          @keyframes bounceIn {
+            0% {
+              transform: scale(0);
+              opacity: 0;
+            }
+            50% {
+              transform: scale(1.2);
+            }
+            100% {
+              transform: scale(1);
+              opacity: 1;
+            }
+          }
+        `}
+      </style>
+    </div>
+  );
+};
+
 const Returns: React.FC = () => {
   const { usuario } = useAuth();
   const esAdmin = usuario?.esAdmin || false;
@@ -629,49 +859,10 @@ const Returns: React.FC = () => {
                 name="tipo_stock"
                 rules={[{ required: true, message: 'Selecciona el destino del producto' }]}
               >
-                <Radio.Group style={{ width: '100%' }}>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Radio 
-                      value="principal" 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        padding: '12px',
-                        border: '1px solid #d9d9d9',
-                        borderRadius: '8px',
-                        marginBottom: '8px'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 'bold', color: '#52c41a' }}>
-                          ✅ Devolver a Stock Principal
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                          El producto está en buen estado y puede revenderse
-                        </div>
-                      </div>
-                    </Radio>
-                    <Radio 
-                      value="mermas" 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        padding: '12px',
-                        border: '1px solid #d9d9d9',
-                        borderRadius: '8px'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 'bold', color: '#ff4d4f' }}>
-                          ❌ Enviar a Stock de Mermas (Fallas)
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                          El producto tiene defectos o daños y no puede revenderse
-                        </div>
-                      </div>
-                    </Radio>
-                  </Space>
-                </Radio.Group>
+                <StockDestinationSelector
+                  value={formDevolucion.getFieldValue('tipo_stock')}
+                  onChange={(value) => formDevolucion.setFieldValue('tipo_stock', value)}
+                />
               </Form.Item>
 
               <Form.Item>
