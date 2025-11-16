@@ -1218,14 +1218,7 @@ const Transfer: React.FC = () => {
       fixed: 'left' as const,
       width: 100,
       render: (nombre: string, record: ProductoTransfer) => (
-        <div>
-          <div style={{ fontWeight: 'bold' }}>{nombre}</div>
-          {record.marca && (
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {record.marca}
-            </div>
-          )}
-        </div>
+        <div style={{ fontWeight: 'bold' }}>{nombre}</div>
       )
     },
     {
@@ -1243,6 +1236,24 @@ const Transfer: React.FC = () => {
         return record.tipo === value;
       },
       render: (tipo: string) => tipo ? <Tag color="blue">{tipo}</Tag> : '-'
+    },
+    // ✅ NUEVA COLUMNA: MARCA (con filtro)
+    {
+      title: 'Marca',
+      dataIndex: 'marca',
+      key: 'marca',
+      fixed: 'left' as const,
+      width: 80,
+      filters: Array.from(new Set(productos.map(p => p.marca).filter(Boolean))).map(marca => ({
+        text: marca,
+        value: marca
+      })),
+      onFilter: (value: string | number | boolean, record: ProductoTransfer) => {
+        return record.marca === value;
+      },
+      render: (marca: string) => marca ? (
+        <Tag color="purple" style={{ fontSize: '11px' }}>{marca}</Tag>
+      ) : '-'
     },
     // Columna Sucursal Principal (Casa Central) - SOLO VISIBLE PARA ADMIN
     ...(esAdmin ? [{
@@ -1908,7 +1919,7 @@ const Transfer: React.FC = () => {
             columns={columns}
             dataSource={filteredProducts}
             rowKey="id"
-            scroll={{ x: 875, y: 600 }}
+            scroll={{ x: 955, y: 600 }}
             sticky={{ offsetHeader: 0 }}
             pagination={{
               pageSize: 20,
