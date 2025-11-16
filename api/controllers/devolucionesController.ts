@@ -257,7 +257,7 @@ export const procesarDevolucion = async (req: Request, res: Response): Promise<v
       await connection.execute(
         `INSERT INTO cuenta_corriente_movimientos 
          (sucursal, cliente_id, cliente_nombre, tipo, debe, haber, saldo, descripcion, fecha_movimiento)
-         VALUES (?, ?, ?, 'pago', 0, ?, 0, ?, NOW())`,
+         VALUES (?, ?, ?, 'devolucion', 0, ?, 0, ?, NOW())`,
         [sucursal, cliente_id, cliente_nombre, monto_devuelto, `DEVOLUCIÓN - ${producto_nombre}${observaciones ? ' - ' + observaciones : ''}`]
       );
       

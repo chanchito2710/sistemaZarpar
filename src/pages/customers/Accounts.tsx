@@ -80,7 +80,7 @@ interface ProductoVenta {
 
 interface MovimientoCuentaCorriente {
   id: number;
-  tipo: 'venta' | 'pago' | 'ajuste';
+  tipo: 'venta' | 'pago' | 'devolucion' | 'ajuste';
   debe: number;
   haber: number;
   saldo: number;
@@ -543,7 +543,267 @@ const Accounts: React.FC = () => {
   };
 
   /**
-   * Imprimir estado de cuenta - DISEÑO MINIMALISTA
+   * Imprimir estado de cuenta - DISEÑO TABLA CON DEBE/HABER/SALDO
+   */
+  const handleImprimirEstadoTabla = (cliente: ClienteCuentaCorriente) => {
+    if (!movimientos || movimientos.length === 0) {
+      message.warning('Primero debes ver el detalle de la cuenta');
+      return;
+    }
+    
+    try {
+      const doc = new jsPDF();
+      const fechaActual = dayjs().format('DD/MM/YYYY HH:mm');
+      let yPos = 20;
+      
+      // ========================================
+      // 1. HEADER PROFESIONAL
+      // ========================================
+      const logoEmpresa = localStorage.getItem('logoEmpresa');
+      
+      if (logoEmpresa) {
+        try {
+          const img = new Image();
+          img.src = logoEmpresa;
+          const maxWidth = 50;
+          const maxHeight = 20;
+          let width = img.width;
+          let height = img.height;
+          const scaleX = maxWidth / width;
+          const scaleY = maxHeight / height;
+          const scale = Math.min(scaleX, scaleY);
+          width = width * scale;
+          height = height * scale;
+          const yOffset = (maxHeight - height) / 2;
+          doc.addImage(logoEmpresa, 'PNG', 14, 10 + yOffset, width, height);
+          yPos = 10 + maxHeight + 5;
+        } catch (error) {
+          console.error('Error al cargar logo en PDF:', error);
+          doc.setFontSize(16);
+          doc.setFont('helvetica', 'bold');
+          doc.text('ZARPAR', 14, 18);
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 100, 100);
+          doc.text('Repuestos de Celulares', 14, 24);
+          yPos = 20;
+        }
+      } else {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ZARPAR', 14, 18);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text('Repuestos de Celulares', 14, 24);
+        yPos = 20;
+      }
+      
+      // Título documento
+      const tituloY = logoEmpresa ? 18 : 18;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('ESTADO DE CUENTA', 196, tituloY, { align: 'right' });
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(fechaActual, 196, tituloY + 6, { align: 'right' });
+      
+      if (yPos < tituloY + 10) {
+        yPos = tituloY + 10;
+      }
+      
+      // Línea separadora
+      const lineaY = yPos + 2;
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(14, lineaY, 196, lineaY);
+      yPos = lineaY + 8;
+      
+      // ========================================
+      // 2. INFORMACIÓN DEL CLIENTE
+      // ========================================
+      const nombreMostrar = cliente.nombre_fantasia || cliente.cliente_nombre;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 102, 204);
+      doc.text(nombreMostrar, 14, yPos);
+      
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120, 120, 120);
+      doc.text(`ID: ${cliente.cliente_id}`, 14, yPos + 5);
+      doc.text(`${cliente.sucursal ? cliente.sucursal.toUpperCase() : 'N/A'}`, 60, yPos + 5);
+      doc.text(`Último mov: ${dayjs(cliente.ultimo_movimiento).format('DD/MM/YYYY')}`, 110, yPos + 5);
+      yPos += 15;
+      
+      // ========================================
+      // 3. TABLA DE MOVIMIENTOS CON DEBE/HABER/SALDO
+      // ========================================
+      
+      // Ordenar y filtrar movimientos
+      const movimientosOrdenados = [...movimientos].sort((a, b) => {
+        return dayjs(a.fecha_movimiento).diff(dayjs(b.fecha_movimiento));
+      });
+      
+      const movimientosFiltrados = movimientosOrdenados.filter(mov => {
+        if (movimientosOcultosParaPDF.has(mov.id)) return false;
+        if (mov.tipo !== 'venta' && mov.tipo !== 'pago' && mov.tipo !== 'devolucion') return false;
+        const fechaMov = dayjs(mov.fecha_movimiento);
+        if (filtroFechaPDFDesde && fechaMov.isBefore(filtroFechaPDFDesde, 'day')) return false;
+        if (filtroFechaPDFHasta && fechaMov.isAfter(filtroFechaPDFHasta, 'day')) return false;
+        return true;
+      });
+      
+      // Preparar datos para la tabla
+      const datosTabla: any[] = [];
+      let saldoAcumulado = 0;
+      
+      movimientosFiltrados.forEach(mov => {
+        const fecha = dayjs(mov.fecha_movimiento).format('DD/MM/YYYY');
+        let tipo = '';
+        let detalle = mov.descripcion || '';
+        let debe = '';
+        let haber = '';
+        
+        if (mov.tipo === 'venta') {
+          tipo = 'Venta';
+          if (mov.productos && mov.productos.length > 0) {
+            detalle = mov.productos.map((p: any) => 
+              `${p.cantidad}x ${p.producto_nombre}`
+            ).join(', ');
+          }
+          const totalVenta = parseFloat(String(mov.total_venta || mov.debe || 0));
+          debe = `$${totalVenta.toFixed(2)}`;
+          saldoAcumulado += totalVenta;
+        } else if (mov.tipo === 'pago') {
+          tipo = 'Pago';
+          const montoPago = parseFloat(String(mov.haber || 0));
+          haber = `$${montoPago.toFixed(2)}`;
+          saldoAcumulado -= montoPago;
+        } else if (mov.tipo === 'devolucion') {
+          tipo = 'Devolución';
+          const montoDevolucion = parseFloat(String(mov.haber || 0));
+          haber = `$${montoDevolucion.toFixed(2)}`;
+          saldoAcumulado -= montoDevolucion;
+        }
+        
+        datosTabla.push([
+          fecha,
+          tipo,
+          detalle,
+          debe,
+          haber,
+          `$${saldoAcumulado.toFixed(2)}`
+        ]);
+      });
+      
+      // Generar tabla con autoTable
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Fecha', 'Tipo', 'Detalle', 'DEBE', 'HABER', 'SALDO']],
+        body: datosTabla,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          cellPadding: 3
+        },
+        columnStyles: {
+          0: { cellWidth: 25, halign: 'center' },  // Fecha
+          1: { cellWidth: 25, halign: 'center' },  // Tipo
+          2: { cellWidth: 60 },                     // Detalle
+          3: { cellWidth: 25, halign: 'right' },   // DEBE
+          4: { cellWidth: 25, halign: 'right' },   // HABER
+          5: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }  // SALDO
+        },
+        alternateRowStyles: {
+          fillColor: [245, 247, 250]
+        },
+        didParseCell: (data) => {
+          // Colorear columnas según tipo
+          if (data.section === 'body') {
+            const rowData = datosTabla[data.row.index];
+            const tipo = rowData[1];
+            
+            // Colorear DEBE en rojo
+            if (data.column.index === 3 && rowData[3]) {
+              data.cell.styles.textColor = [220, 38, 38];
+              data.cell.styles.fontStyle = 'bold';
+            }
+            
+            // Colorear HABER según tipo
+            if (data.column.index === 4 && rowData[4]) {
+              if (tipo === 'Pago') {
+                data.cell.styles.textColor = [34, 197, 94]; // Verde
+              } else if (tipo === 'Devolución') {
+                data.cell.styles.textColor = [249, 115, 22]; // Naranja
+              }
+              data.cell.styles.fontStyle = 'bold';
+            }
+            
+            // Colorear SALDO en azul
+            if (data.column.index === 5) {
+              data.cell.styles.textColor = [59, 130, 246]; // Azul
+            }
+          }
+        }
+      });
+      
+      // ========================================
+      // 4. RESUMEN FINAL
+      // ========================================
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.line(14, finalY, 196, finalY);
+      doc.setLineWidth(0.1);
+      doc.line(14, finalY + 1, 196, finalY + 1);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      const saldoActual = Number(cliente.saldo_actual) || 0;
+      doc.text('SALDO ACTUAL:', 14, finalY + 7);
+      
+      doc.setFontSize(10);
+      if (saldoActual > 0) {
+        doc.setTextColor(220, 38, 38);
+        doc.text(`$${saldoActual.toFixed(2)}`, 194, finalY + 7, { align: 'right' });
+      } else if (saldoActual < 0) {
+        doc.setTextColor(34, 197, 94);
+        doc.text(`$${Math.abs(saldoActual).toFixed(2)} (a favor)`, 194, finalY + 7, { align: 'right' });
+      } else {
+        doc.setTextColor(120, 120, 120);
+        doc.text('$0.00', 194, finalY + 7, { align: 'right' });
+      }
+      
+      // ========================================
+      // 5. GUARDAR PDF
+      // ========================================
+      const nombreCliente = cliente.cliente_nombre.replace(/\s+/g, '_');
+      const fechaDescarga = dayjs().format('DD-MM-YYYY');
+      const nombreArchivo = `Estado_Cuenta_${nombreCliente}_${fechaDescarga}.pdf`;
+      
+      doc.save(nombreArchivo);
+      message.success('✅ PDF generado correctamente con formato de tabla DEBE/HABER/SALDO');
+      
+    } catch (error) {
+      console.error('Error al generar PDF:', error);
+      message.error('❌ Error al generar el PDF');
+    }
+  };
+
+  /**
+   * Imprimir estado de cuenta - DISEÑO MINIMALISTA (ORIGINAL)
    */
   const handleImprimirEstado = (cliente: ClienteCuentaCorriente) => {
     if (!movimientos || movimientos.length === 0) {
@@ -679,7 +939,7 @@ const Accounts: React.FC = () => {
         return dayjs(a.fecha_movimiento).diff(dayjs(b.fecha_movimiento));
       });
       
-      // MEJORA 4: Filtrar solo ventas y pagos visibles (y no ocultos para PDF) + filtro de fechas
+      // MEJORA 4: Filtrar solo ventas, pagos y devoluciones visibles (y no ocultos para PDF) + filtro de fechas
       const movimientosFiltrados = movimientosOrdenados.filter(mov => {
         // Excluir movimientos que el usuario marcó como ocultos
         if (movimientosOcultosParaPDF.has(mov.id)) {
@@ -687,7 +947,7 @@ const Accounts: React.FC = () => {
         }
         
         // Filtro de tipo
-        if (mov.tipo !== 'venta' && mov.tipo !== 'pago') {
+        if (mov.tipo !== 'venta' && mov.tipo !== 'pago' && mov.tipo !== 'devolucion') {
           return false;
         }
         
@@ -840,6 +1100,46 @@ const Accounts: React.FC = () => {
           doc.text(`-$${montoPago.toFixed(2)}`, 194, yPos, { align: 'right' });
           
           // MEJORA 3: Mostrar saldo acumulado después del pago
+          yPos += 4;
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text('Saldo Acumulado:', 155, yPos);
+          doc.setTextColor(59, 130, 246); // Azul
+          doc.text(`$${saldoAcumulado.toFixed(2)}`, 194, yPos, { align: 'right' });
+          
+          doc.setTextColor(0, 0, 0);
+          yPos += 2;
+          
+        } else if (mov.tipo === 'devolucion') {
+          // ========================================
+          // DEVOLUCIÓN - DISEÑO MINIMALISTA
+          // ========================================
+          
+          // Centrado vertical
+          yPos += 3;
+          
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text('DEVOLUCIÓN', 16, yPos);
+          
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(120, 120, 120);
+          doc.text(dayjs(mov.fecha_movimiento).format('DD/MM/YYYY'), 115, yPos);
+          
+          const montoDevolucion = parseFloat(String(mov.haber || 0));
+          saldoAcumulado -= montoDevolucion;
+          
+          // Monto en naranja - alineado
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(249, 115, 22); // Naranja
+          doc.text('Devolución:', 155, yPos);
+          doc.text(`-$${montoDevolucion.toFixed(2)}`, 194, yPos, { align: 'right' });
+          
+          // Mostrar saldo acumulado después de la devolución
           yPos += 4;
           doc.setFontSize(8);
           doc.setFont('helvetica', 'bold');
@@ -1055,11 +1355,15 @@ const Accounts: React.FC = () => {
       key: 'tipo',
       align: 'center',
       responsive: ['sm', 'md', 'lg', 'xl'], // Visible desde móviles grandes
-      render: (tipo: string) => (
-        <Tag color={tipo === 'venta' ? 'red' : 'green'}>
-          {tipo === 'venta' ? 'Venta' : 'Pago'}
-        </Tag>
-      ),
+      render: (tipo: string) => {
+        if (tipo === 'venta') {
+          return <Tag color="red">Venta</Tag>;
+        } else if (tipo === 'devolucion') {
+          return <Tag color="orange">Devolución</Tag>;
+        } else {
+          return <Tag color="green">Pago</Tag>;
+        }
+      },
     },
     {
       title: 'Detalle',
@@ -1599,7 +1903,7 @@ const Accounts: React.FC = () => {
             key="descargar"
             type="primary"
             icon={<FilePdfOutlined />}
-            onClick={() => clienteSeleccionado && handleImprimirEstado(clienteSeleccionado)}
+            onClick={() => clienteSeleccionado && handleImprimirEstadoTabla(clienteSeleccionado)}
             loading={loadingMovimientos}
           >
             Descargar PDF
