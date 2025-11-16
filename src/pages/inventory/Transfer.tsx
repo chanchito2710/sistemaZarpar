@@ -157,6 +157,9 @@ const Transfer: React.FC = () => {
   const [selectedItemsLimpieza, setSelectedItemsLimpieza] = useState<{[key: string]: boolean}>({});
   const [loadingLimpieza, setLoadingLimpieza] = useState(false);
   
+  // ⭐ Estado para trackear filtros activos de marca
+  const [filtroMarcaActivo, setFiltroMarcaActivo] = useState<boolean>(false);
+  
   /**
    * ===================================
    * CARGAR SUCURSAL PRINCIPAL DINÁMICA
@@ -1914,11 +1917,20 @@ const Transfer: React.FC = () => {
             rowKey="id"
             scroll={{ x: 955, y: 600 }}
             sticky={{ offsetHeader: 0 }}
-            pagination={{
-              pageSize: 20,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} productos`
+            pagination={
+              filtroMarcaActivo
+                ? false // ⭐ Sin paginación cuando filtro de marca está activo
+                : {
+                    pageSize: 20,
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} productos`
+                  }
+            }
+            onChange={(pagination, filters, sorter) => {
+              // ⭐ Detectar si el filtro de marca está activo
+              const marcaFiltrada = filters.marca && Array.isArray(filters.marca) && filters.marca.length > 0;
+              setFiltroMarcaActivo(!!marcaFiltrada);
             }}
             className="transfer-table"
           />
