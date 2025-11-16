@@ -28,6 +28,7 @@ import {
   Divider,
   Collapse
 } from 'antd';
+import ReactSelect, { StylesConfig } from 'react-select';
 import {
   SearchOutlined,
   PlusOutlined,
@@ -57,6 +58,83 @@ import {
 const { Option } = Select;
 const { Title, Text } = Typography;
 const { Search } = Input;
+
+/**
+ * ESTILOS PERSONALIZADOS PARA REACT-SELECT
+ */
+const customSelectStyles: StylesConfig = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: '48px',
+    borderRadius: '12px',
+    border: state.isFocused ? '2px solid #1890ff' : '2px solid #d9d9d9',
+    boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+    '&:hover': {
+      borderColor: '#1890ff'
+    },
+    cursor: 'pointer',
+    transition: 'all 0.3s ease'
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected 
+      ? '#1890ff' 
+      : state.isFocused 
+      ? '#e6f7ff' 
+      : 'white',
+    color: state.isSelected ? 'white' : '#000',
+    cursor: 'pointer',
+    padding: '12px 16px',
+    transition: 'all 0.2s ease',
+    '&:active': {
+      backgroundColor: '#1890ff'
+    }
+  }),
+  menu: (provided) => ({
+    ...provided,
+    borderRadius: '12px',
+    boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+    overflow: 'hidden',
+    marginTop: '4px',
+    zIndex: 9999
+  }),
+  menuList: (provided) => ({
+    ...provided,
+    padding: '4px',
+    maxHeight: '300px'
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    color: '#000',
+    fontSize: '15px',
+    fontWeight: 500
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: '#bfbfbf',
+    fontSize: '15px'
+  }),
+  input: (provided) => ({
+    ...provided,
+    color: '#000',
+    fontSize: '15px'
+  }),
+  indicatorSeparator: () => ({
+    display: 'none'
+  }),
+  dropdownIndicator: (provided, state) => ({
+    ...provided,
+    color: state.isFocused ? '#1890ff' : '#bfbfbf',
+    '&:hover': {
+      color: '#1890ff'
+    },
+    transition: 'all 0.2s ease'
+  }),
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: 9999
+  })
+};
 
 /**
  * Interfaz para Sucursal
@@ -1131,33 +1209,73 @@ const Products: React.FC = () => {
       </Row>
 
       {/* Filtros y búsqueda */}
-      <Card style={{ marginBottom: '24px' }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} md={12}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong>Sucursal:</Text>
-              <Select
-                value={sucursalSeleccionada}
-                onChange={setSucursalSeleccionada}
-                style={{ width: '100%' }}
-                size="large"
-              >
-                {sucursales.map(sucursalObj => (
-                  <Option key={sucursalObj.sucursal} value={sucursalObj.sucursal}>
-                    {formatearNombreSucursal(sucursalObj.sucursal)}
-                    {sucursalObj.sucursal === 'maldonado' && (
-                      <Tag color="gold" style={{ marginLeft: '8px' }}>
-                        Stock Principal
-                      </Tag>
-                    )}
-                  </Option>
-                ))}
-              </Select>
+      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+        {/* Selector de Sucursal */}
+        <Col xs={24} md={12}>
+          <Card 
+            hoverable
+            style={{ 
+              textAlign: 'center',
+              borderRadius: '12px',
+              border: sucursalSeleccionada ? '2px solid #1890ff' : '1px solid #d9d9d9',
+              background: sucursalSeleccionada ? '#f0f8ff' : 'white',
+              height: '100%'
+            }}
+          >
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <ShopOutlined 
+                style={{ 
+                  fontSize: '48px', 
+                  color: sucursalSeleccionada ? '#1890ff' : '#8c8c8c'
+                }} 
+              />
+              <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
+                Sucursal
+              </Title>
+              <ReactSelect
+                placeholder="Seleccionar sucursal"
+                value={sucursalSeleccionada ? { 
+                  value: sucursalSeleccionada, 
+                  label: formatearNombreSucursal(sucursalSeleccionada) + (sucursalSeleccionada === 'maldonado' ? ' - Stock Principal' : '')
+                } : null}
+                onChange={(option) => setSucursalSeleccionada(option?.value || '')}
+                options={sucursales.map(sucursalObj => ({
+                  value: sucursalObj.sucursal,
+                  label: formatearNombreSucursal(sucursalObj.sucursal) + (sucursalObj.sucursal === 'maldonado' ? ' - Stock Principal' : '')
+                }))}
+                styles={customSelectStyles}
+                isLoading={loadingSucursales}
+                isClearable={false}
+                isSearchable={true}
+                noOptionsMessage={() => 'No hay sucursales disponibles'}
+                loadingMessage={() => 'Cargando...'}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+              />
             </Space>
-            </Col>
-          <Col xs={24} md={12}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong>Buscar:</Text>
+          </Card>
+        </Col>
+
+        {/* Búsqueda */}
+        <Col xs={24} md={12}>
+          <Card 
+            style={{ 
+              textAlign: 'center',
+              borderRadius: '12px',
+              border: '1px solid #d9d9d9',
+              height: '100%'
+            }}
+          >
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <SearchOutlined 
+                style={{ 
+                  fontSize: '48px', 
+                  color: '#8c8c8c'
+                }} 
+              />
+              <Title level={4} style={{ margin: 0 }}>
+                Buscar Producto
+              </Title>
               <Search
                 placeholder="Buscar por nombre, marca, tipo o código"
                 allowClear
@@ -1172,9 +1290,9 @@ const Products: React.FC = () => {
                 }}
               />
             </Space>
-            </Col>
-          </Row>
-      </Card>
+          </Card>
+        </Col>
+      </Row>
           
       {/* Tabla de productos */}
       <Card>
