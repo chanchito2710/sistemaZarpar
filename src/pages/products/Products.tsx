@@ -623,7 +623,7 @@ const Products: React.FC = () => {
   };
 
   /**
-   * Actualizar información básica del producto + stock y precio de todas las sucursales
+   * Actualizar información básica del producto + stock, precio y stock_minimo de todas las sucursales
    */
   const handleEditarProducto = async () => {
     if (!productoEditando) return;
@@ -642,13 +642,13 @@ const Products: React.FC = () => {
 
       await productosService.actualizar(productoEditando.id, datosActualizados);
 
-      // 2. 🆕 Actualizar stock y precio de CADA sucursal
+      // 2. 🆕 Actualizar stock, precio y stock_minimo de CADA sucursal
       for (const sucursalObj of sucursales) {
         const sucursal = sucursalObj.sucursal;
         const datos: Partial<ProductoSucursalInput> = {
           stock: values[`stock_${sucursal}`] || 0,
           precio: values[`precio_${sucursal}`] || 0,
-          stock_minimo: 0
+          stock_minimo: values[`stock_minimo_${sucursal}`] || 0 // ⭐ NUEVO: Guardar stock_minimo configurado
         };
 
         await productosService.actualizarSucursal(
@@ -658,7 +658,7 @@ const Products: React.FC = () => {
         );
       }
 
-      message.success('✅ Producto y stock/precio actualizados exitosamente');
+      message.success('✅ Producto actualizado exitosamente (incluyendo alertas de stock mínimo)');
       setModalEditarVisible(false);
       setProductoEditando(null);
       formEditar.resetFields();
@@ -715,19 +715,20 @@ const Products: React.FC = () => {
       codigo_barras: producto.codigo_barras || ''
     });
 
-    // 🆕 Cargar stock y precio de TODAS las sucursales
+    // 🆕 Cargar stock, precio y stock_minimo de TODAS las sucursales
     try {
       setLoading(true);
       const productoCompleto = await productosService.obtenerPorId(producto.id);
       
       if (productoCompleto) {
-        // Cargar stock y precio de cada sucursal en el formulario
+        // Cargar stock, precio y stock_minimo de cada sucursal en el formulario
         const sucursalesData: any = {};
         sucursales.forEach(sucursalObj => {
           const sucursal = sucursalObj.sucursal;
           const sucursalData = productoCompleto.sucursales?.find(s => s.sucursal === sucursal);
           sucursalesData[`stock_${sucursal}`] = sucursalData?.stock || 0;
           sucursalesData[`precio_${sucursal}`] = sucursalData?.precio || 0;
+          sucursalesData[`stock_minimo_${sucursal}`] = sucursalData?.stock_minimo || 0; // ⭐ NUEVO
         });
         
         formEditar.setFieldsValue(sucursalesData);
@@ -1557,17 +1558,33 @@ const Products: React.FC = () => {
             </Row>
           </Card>
 
-          {/* 📝 Nota: Stock y Precio se configuran desde "Gestionar Precios y Stock" */}
-          <Card size="small" style={{ background: '#f0f5ff', border: '1px solid #adc6ff' }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong style={{ color: '#1890ff' }}>
-                ℹ️ Stock y Precios por Sucursal
-              </Text>
-              <Text type="secondary">
-                Una vez creado el producto, podrás configurar stock y precios para cada sucursal 
-                usando el botón <Text strong>"Gestionar Precios y Stock"</Text> en la parte superior.
-              </Text>
-            </Space>
+          {/* 📝 Stock Mínimo (Alertas) por Sucursal */}
+          <Card size="small" style={{ marginTop: 16 }} title="⚠️ Configurar Alertas de Stock Mínimo">
+            <Alert
+              message="Stock Mínimo"
+              description="Configura la cantidad mínima de stock para cada sucursal. Cuando el stock esté por debajo de este valor, se mostrará una alerta."
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+            <Row gutter={[16, 16]}>
+              {sucursales.map(sucursalObj => (
+                <Col key={sucursalObj.sucursal} xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={`${formatearNombreSucursal(sucursalObj.sucursal)}`}
+                    name={`stock_minimo_${sucursalObj.sucursal}`}
+                    tooltip="Cuando el stock sea menor a este valor, se mostrará una alerta"
+                  >
+                    <InputNumber
+                      min={0}
+                      style={{ width: '100%' }}
+                      placeholder="Stock mínimo"
+                      addonBefore={<WarningOutlined style={{ color: '#faad14' }} />}
+                    />
+                  </Form.Item>
+                </Col>
+              ))}
+            </Row>
           </Card>
         </Form>
       </Modal>
