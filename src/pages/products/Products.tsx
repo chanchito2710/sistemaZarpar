@@ -624,7 +624,8 @@ const Products: React.FC = () => {
   };
 
   /**
-   * Actualizar información básica del producto + stock, precio y stock_minimo de todas las sucursales
+   * Actualizar información básica del producto + stock_minimo de todas las sucursales
+   * ⚠️ IMPORTANTE: NO actualiza stock ni precio (eso se hace en otro modal)
    */
   const handleEditarProducto = async () => {
     if (!productoEditando) return;
@@ -643,20 +644,31 @@ const Products: React.FC = () => {
 
       await productosService.actualizar(productoEditando.id, datosActualizados);
 
-      // 2. 🆕 Actualizar stock, precio y stock_minimo de CADA sucursal
+      // 2. ⭐ Obtener datos actuales del producto UNA SOLA VEZ para mantener stock y precio
+      const productoCompleto = await productosService.obtenerPorId(productoEditando.id);
+
+      // 3. ⭐ Actualizar SOLO stock_minimo de CADA sucursal (SIN tocar stock ni precio)
       for (const sucursalObj of sucursales) {
         const sucursal = sucursalObj.sucursal;
-        const datos: Partial<ProductoSucursalInput> = {
-          stock: values[`stock_${sucursal}`] || 0,
-          precio: values[`precio_${sucursal}`] || 0,
-          stock_minimo: values[`stock_minimo_${sucursal}`] || 0 // ⭐ NUEVO: Guardar stock_minimo configurado
-        };
+        
+        // Solo actualizar stock_minimo si existe en el formulario
+        const stockMinimo = values[`stock_minimo_${sucursal}`];
+        if (stockMinimo !== undefined) {
+          // Buscar datos de la sucursal actual
+          const sucursalData = productoCompleto?.sucursales?.find(s => s.sucursal === sucursal);
+          
+          const datos: Partial<ProductoSucursalInput> = {
+            stock: sucursalData?.stock || 0, // ✅ Mantener stock actual
+            precio: sucursalData?.precio || 0, // ✅ Mantener precio actual
+            stock_minimo: stockMinimo || 0 // ⭐ Actualizar SOLO stock_minimo
+          };
 
-        await productosService.actualizarSucursal(
-          productoEditando.id,
-          sucursal,
-          datos
-        );
+          await productosService.actualizarSucursal(
+            productoEditando.id,
+            sucursal,
+            datos
+          );
+        }
       }
 
       message.success('✅ Producto actualizado exitosamente (incluyendo alertas de stock mínimo)');
