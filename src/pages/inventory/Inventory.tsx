@@ -38,6 +38,7 @@ import {
   EyeOutlined,
   DollarOutlined
 } from '@ant-design/icons';
+import ReactSelect, { StylesConfig } from 'react-select';
 import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -90,6 +91,72 @@ const Inventory: React.FC = () => {
     (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
       ? '/api' 
       : 'http://localhost:3456/api');
+  
+  // ✅ Estilos personalizados para react-select (igual que POS)
+  const customSelectStyles: StylesConfig = {
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: '48px',
+      borderRadius: '10px',
+      border: state.isFocused ? '2px solid #1890ff' : '2px solid #d9d9d9',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.1)' : 'none',
+      '&:hover': {
+        borderColor: '#1890ff',
+      },
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected 
+        ? '#1890ff' 
+        : state.isFocused 
+        ? '#e6f7ff' 
+        : 'white',
+      color: state.isSelected ? 'white' : '#262626',
+      cursor: 'pointer',
+      padding: '12px 16px',
+      fontSize: '14px',
+      fontWeight: state.isSelected ? 600 : 400,
+      '&:active': {
+        backgroundColor: '#40a9ff',
+      },
+    }),
+    menu: (provided) => ({
+      ...provided,
+      borderRadius: '10px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      overflow: 'hidden',
+      marginTop: '4px',
+      zIndex: 9999,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      padding: 0,
+      maxHeight: '300px',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: '#262626',
+      fontSize: '14px',
+      fontWeight: 500,
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: '#bfbfbf',
+      fontSize: '14px',
+    }),
+    dropdownIndicator: (provided) => ({
+      ...provided,
+      color: '#8c8c8c',
+      '&:hover': {
+        color: '#1890ff',
+      },
+    }),
+    indicatorSeparator: () => ({
+      display: 'none',
+    }),
+  };
   
   const [searchText, setSearchText] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
@@ -798,78 +865,35 @@ const Inventory: React.FC = () => {
                 
                 {/* Si es admin, muestra Select para elegir. Si no, solo muestra su sucursal */}
                 {esAdmin ? (
-                <Select
-                  value={selectedSucursal}
-                  onChange={(value) => {
-                    console.log('🔄 Cambiando sucursal a:', value);
-                    setSelectedSucursal(value);
-                  }}
-                    style={{ width: '100%' }}
-                  size="large"
-                  showSearch
-                  optionFilterProp="children"
+                <ReactSelect
                   placeholder="Seleccionar sucursal"
-                  dropdownStyle={{
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  }}
-                  suffixIcon={
-                    <div style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: '6px',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontSize: 12,
-                        fontWeight: 600
-                    }}>
-                      🏢
-                    </div>
+                  value={
+                    selectedSucursal === 'all' 
+                      ? { value: 'all', label: '🌐 Todas las Sucursales' }
+                      : { 
+                          value: selectedSucursal, 
+                          label: `🏪 ${selectedSucursal.charAt(0).toUpperCase() + selectedSucursal.slice(1)}` 
+                        }
                   }
-                    className="custom-select-sucursal"
-                >
-                    <Option value="all">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ 
-                          fontSize: 18,
-                          width: 28,
-                          height: 28,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '6px',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        }}>
-                          🌐
-                        </span>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>Todas las Sucursales</span>
-                      </div>
-                    </Option>
-                  {sucursales.map((sucursal) => (
-                    <Option key={sucursal} value={sucursal}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ 
-                          fontSize: 18,
-                          width: 28,
-                          height: 28,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '6px',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        }}>
-                          🏪
-                        </span>
-                        <span style={{ fontWeight: 500, fontSize: 14 }}>
-                          {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
-                        </span>
-                      </div>
-                    </Option>
-                  ))}
-                </Select>
+                  onChange={(option) => {
+                    const newValue = option?.value || 'all';
+                    console.log('🔄 Cambiando sucursal a:', newValue);
+                    setSelectedSucursal(newValue);
+                  }}
+                  options={[
+                    { value: 'all', label: '🌐 Todas las Sucursales' },
+                    ...sucursales.map(sucursal => ({
+                      value: sucursal,
+                      label: `🏪 ${sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}`
+                    }))
+                  ]}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={true}
+                  noOptionsMessage={() => 'No hay sucursales disponibles'}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
                 ) : (
                   <div style={{
                     width: '100%',
