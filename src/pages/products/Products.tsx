@@ -1488,7 +1488,7 @@ const Products: React.FC = () => {
 
       {/* Modal: Editar Producto */}
       <Modal
-        title="Editar Producto"
+        title={<span style={{ color: '#000' }}>Editar Producto</span>}
         open={modalEditarVisible}
         onOk={handleEditarProducto}
         onCancel={() => {
