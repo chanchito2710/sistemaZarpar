@@ -28,6 +28,7 @@ import {
   obtenerFiltrosProductos,
   eliminarProducto,
   eliminarProductosMultiple,
+  obtenerAlertasStock,
   obtenerStockEnTransito,
   limpiarStockEnTransito
 } from '../controllers/productosController.js';
@@ -193,6 +194,18 @@ router.post(
   '/limpiar-stock-transito',
   verificarAutenticacion,
   limpiarStockEnTransito
+);
+
+/**
+ * @route   GET /api/productos/alertas-stock
+ * @desc    ⭐ Obtener alertas de stock bajo o agotado
+ * @access  Private (requiere autenticación, solo admin)
+ * @returns Array de productos con stock = 0 o stock < stock_minimo
+ */
+router.get(
+  '/alertas-stock',
+  verificarAutenticacion,
+  obtenerAlertasStock
 );
 
 /**

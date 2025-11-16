@@ -2013,3 +2013,50 @@ export const limpiarStockEnTransito = async (req: Request, res: Response): Promi
   }
 };
 
+/**
+ * ⭐ Obtener alertas de stock bajo o agotado
+ * GET /api/productos/alertas-stock
+ * Devuelve productos con stock <= 0 o stock < stock_minimo
+ */
+export const obtenerAlertasStock = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = `
+      SELECT 
+        ps.producto_id,
+        p.nombre,
+        p.marca,
+        p.tipo,
+        ps.sucursal,
+        ps.stock,
+        ps.stock_minimo
+      FROM productos_sucursal ps
+      INNER JOIN productos p ON ps.producto_id = p.id
+      WHERE p.activo = 1
+        AND ps.activo = 1
+        AND (
+          ps.stock = 0 
+          OR (ps.stock_minimo > 0 AND ps.stock < ps.stock_minimo)
+        )
+      ORDER BY 
+        ps.stock ASC,
+        p.nombre ASC,
+        ps.sucursal ASC
+    `;
+    
+    const [rows] = await pool.query<RowDataPacket[]>(query);
+    
+    console.log(`⚠️ Alertas de stock: ${rows.length} productos encontrados`);
+    
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener alertas de stock:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener alertas de stock'
+    });
+  }
+};
+

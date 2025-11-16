@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col, Select, Statistic, Card, Upload, message } from 'antd';
+import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col, Select, Statistic, Card, Upload, message, Badge, Drawer, Table, Alert, Tooltip } from 'antd';
 import './MainLayout.css';
 import {
   UserOutlined,
@@ -19,6 +19,8 @@ import {
   PictureOutlined,
   UploadOutlined,
   DeleteOutlined,
+  WarningOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { menuItems } from '../../utils/menuItems';
@@ -59,6 +61,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [modalPersonalizarVisible, setModalPersonalizarVisible] = useState(false);
   const [logoEmpresa, setLogoEmpresa] = useState<string | null>(null);
   const [faviconEmpresa, setFaviconEmpresa] = useState<string | null>(null);
+  
+  // ⭐ Estados para alertas de stock bajo
+  const [alertasStock, setAlertasStock] = useState<any[]>([]);
+  const [modalAlertasVisible, setModalAlertasVisible] = useState(false);
+  const [loadingAlertas, setLoadingAlertas] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -304,6 +311,42 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   }, [triggerActualizacion]);
 
+  // ⭐ Función para cargar alertas de stock bajo
+  const cargarAlertasStock = async () => {
+    if (!usuario?.esAdmin) return; // Solo para administradores
+    
+    setLoadingAlertas(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+      const response = await fetch(`${API_URL}/productos/alertas-stock`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setAlertasStock(data.data || []);
+        console.log(`⚠️ ${data.data?.length || 0} alertas de stock detectadas`);
+      }
+    } catch (error) {
+      console.error('Error al cargar alertas de stock:', error);
+    } finally {
+      setLoadingAlertas(false);
+    }
+  };
+  
+  // Efecto para cargar alertas de stock (solo admin)
+  useEffect(() => {
+    if (usuario?.esAdmin) {
+      cargarAlertasStock();
+      
+      // Actualizar cada 5 minutos
+      const interval = setInterval(cargarAlertasStock, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [usuario]);
 
   // Obtener color e ícono del método de pago
   const getMetodoPagoColor = (metodo: string): string => {
@@ -1073,6 +1116,29 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* ⭐ Botón de Alertas de Stock (solo admin) */}
+            {usuario?.esAdmin && alertasStock.length > 0 && (
+              <Tooltip title={`${alertasStock.length} productos con stock bajo o agotado`}>
+                <Badge count={alertasStock.length} overflowCount={99}>
+                  <Button
+                    danger
+                    size="large"
+                    icon={<ExclamationCircleOutlined />}
+                    onClick={() => setModalAlertasVisible(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontWeight: 'bold',
+                      animation: 'pulse 2s infinite',
+                    }}
+                  >
+                    Alertas de Stock
+                  </Button>
+                </Badge>
+              </Tooltip>
+            )}
+            
             <Dropdown
               menu={{
                 items: userMenuItems,
@@ -1564,6 +1630,134 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </Row>
         </div>
       </Modal>
+
+      {/* ⭐ Drawer de Alertas de Stock */}
+      <Drawer
+        title={
+          <Space>
+            <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 24 }} />
+            <span style={{ fontSize: 18, fontWeight: 'bold' }}>
+              Alertas de Stock ({alertasStock.length})
+            </span>
+          </Space>
+        }
+        placement="right"
+        width={900}
+        open={modalAlertasVisible}
+        onClose={() => setModalAlertasVisible(false)}
+        extra={
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={cargarAlertasStock}
+            loading={loadingAlertas}
+          >
+            Actualizar
+          </Button>
+        }
+      >
+        <Alert
+          message="⚠️ Productos con Stock Bajo o Agotado"
+          description="Los productos listados a continuación tienen stock por debajo del mínimo configurado o están agotados. Revisa y reabastece según sea necesario."
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        
+        <Table
+          dataSource={alertasStock}
+          rowKey={(record) => `${record.producto_id}-${record.sucursal}`}
+          loading={loadingAlertas}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
+          scroll={{ x: 800 }}
+          columns={[
+            {
+              title: 'Producto',
+              dataIndex: 'nombre',
+              key: 'nombre',
+              width: 200,
+              fixed: 'left',
+              render: (text: string) => <Text strong>{text}</Text>
+            },
+            {
+              title: 'Marca',
+              dataIndex: 'marca',
+              key: 'marca',
+              width: 100,
+              render: (marca: string) => marca || '-'
+            },
+            {
+              title: 'Tipo',
+              dataIndex: 'tipo',
+              key: 'tipo',
+              width: 100,
+              render: (tipo: string) => <Tag color="blue">{tipo}</Tag>
+            },
+            {
+              title: 'Sucursal',
+              dataIndex: 'sucursal',
+              key: 'sucursal',
+              width: 120,
+              render: (sucursal: string) => (
+                <Tag color="purple">{sucursal.toUpperCase()}</Tag>
+              )
+            },
+            {
+              title: 'Stock Actual',
+              dataIndex: 'stock',
+              key: 'stock',
+              width: 100,
+              align: 'center',
+              render: (stock: number) => (
+                <Tag color={stock === 0 ? 'red' : 'orange'} style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                  {stock === 0 ? '⛔ AGOTADO' : `⚠️ ${stock}`}
+                </Tag>
+              )
+            },
+            {
+              title: 'Stock Mínimo',
+              dataIndex: 'stock_minimo',
+              key: 'stock_minimo',
+              width: 100,
+              align: 'center',
+              render: (stock_minimo: number) => (
+                <Tag color="default">{stock_minimo || 0}</Tag>
+              )
+            },
+            {
+              title: 'Estado',
+              key: 'estado',
+              width: 120,
+              render: (_, record: any) => {
+                if (record.stock === 0) {
+                  return <Tag color="red">🔴 AGOTADO</Tag>;
+                } else if (record.stock < record.stock_minimo) {
+                  return <Tag color="orange">⚠️ STOCK BAJO</Tag>;
+                }
+                return <Tag color="green">✅ NORMAL</Tag>;
+              }
+            },
+            {
+              title: 'Acción',
+              key: 'accion',
+              width: 120,
+              fixed: 'right',
+              render: (_, record: any) => (
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={() => {
+                    navigate('/products');
+                    setModalAlertasVisible(false);
+                  }}
+                >
+                  Ver Productos
+                </Button>
+              )
+            }
+          ]}
+          rowClassName={(record) => record.stock === 0 ? 'row-agotado' : 'row-stock-bajo'}
+        />
+      </Drawer>
     </Layout>
   );
 };
