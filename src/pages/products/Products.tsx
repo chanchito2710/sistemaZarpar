@@ -43,8 +43,7 @@ import {
   ThunderboltOutlined,
   RocketOutlined,
   DeleteOutlined,
-  InboxOutlined,
-  CheckCircleOutlined
+  InboxOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuth } from '../../contexts/AuthContext';
@@ -95,184 +94,6 @@ const formatearNombreSucursal = (nombre: string): string => {
   
   // Si no, capitalizar la primera letra
   return normalizado.charAt(0).toUpperCase() + normalizado.slice(1);
-};
-
-/**
- * ========================================
- * COMPONENTE PERSONALIZADO: Selector de Sucursales
- * ========================================
- * Grid elegante de cards con hover effects y animaciones
- */
-interface BranchSelectorProps {
-  branches: Sucursal[];
-  selectedBranch: string;
-  onSelect: (branch: string) => void;
-  loading?: boolean;
-}
-
-const BranchSelector: React.FC<BranchSelectorProps> = ({ 
-  branches, 
-  selectedBranch, 
-  onSelect,
-  loading = false 
-}) => {
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
-
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '40px' }}>
-        <Spin size="large" tip="Cargando sucursales..." />
-      </div>
-    );
-  }
-
-  const getCardStyle = (branch: string): React.CSSProperties => {
-    const isSelected = selectedBranch === branch;
-    const isHovered = hoveredCard === branch;
-    const isStockPrincipal = branch === 'maldonado';
-
-    return {
-      padding: '16px 20px',
-      borderRadius: '12px',
-      cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      position: 'relative',
-      border: isSelected 
-        ? isStockPrincipal
-          ? '2px solid #faad14'
-          : '2px solid #1890ff'
-        : '2px solid transparent',
-      background: isSelected
-        ? isStockPrincipal
-          ? 'linear-gradient(135deg, #fffbe6 0%, #fff7e6 100%)'
-          : 'linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%)'
-        : isHovered
-        ? 'linear-gradient(135deg, #f5f5f5 0%, #fafafa 100%)'
-        : '#ffffff',
-      boxShadow: isSelected
-        ? isStockPrincipal
-          ? '0 8px 24px rgba(250, 173, 20, 0.3), 0 0 0 3px rgba(250, 173, 20, 0.1)'
-          : '0 8px 24px rgba(24, 144, 255, 0.3), 0 0 0 3px rgba(24, 144, 255, 0.1)'
-        : isHovered
-        ? '0 8px 16px rgba(0, 0, 0, 0.12)'
-        : '0 2px 8px rgba(0, 0, 0, 0.06)',
-      transform: isHovered ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
-    };
-  };
-
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '12px',
-        width: '100%',
-      }}
-    >
-      {branches.map(branchObj => {
-        const branch = branchObj.sucursal;
-        const isSelected = selectedBranch === branch;
-        const isStockPrincipal = branch === 'maldonado';
-
-        return (
-          <div
-            key={branch}
-            style={getCardStyle(branch)}
-            onClick={() => onSelect(branch)}
-            onMouseEnter={() => setHoveredCard(branch)}
-            onMouseLeave={() => setHoveredCard(null)}
-          >
-            {/* Checkmark animado */}
-            {isSelected && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  background: isStockPrincipal ? '#faad14' : '#1890ff',
-                  borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  animation: 'bounceIn 0.4s ease',
-                }}
-              >
-                <CheckCircleOutlined style={{ color: '#fff', fontSize: '14px' }} />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {/* Ícono de tienda */}
-              <div
-                style={{
-                  fontSize: '24px',
-                  transition: 'transform 0.3s ease',
-                  transform: hoveredCard === branch ? 'scale(1.2) rotate(10deg)' : 'scale(1) rotate(0)',
-                  color: isSelected 
-                    ? isStockPrincipal ? '#fa8c16' : '#1890ff'
-                    : '#8c8c8c',
-                }}
-              >
-                <ShopOutlined />
-              </div>
-
-              <div style={{ flex: 1 }}>
-                {/* Nombre de sucursal */}
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: '14px',
-                    color: isSelected
-                      ? isStockPrincipal ? '#ad6800' : '#0050b3'
-                      : '#262626',
-                    marginBottom: isStockPrincipal ? '4px' : '0',
-                  }}
-                >
-                  {formatearNombreSucursal(branch)}
-                </div>
-
-                {/* Tag especial para Maldonado */}
-                {isStockPrincipal && (
-                  <Tag 
-                    color="gold" 
-                    style={{ 
-                      fontSize: '10px', 
-                      padding: '0 6px',
-                      margin: 0,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Stock Principal
-                  </Tag>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Animación CSS */}
-      <style>
-        {`
-          @keyframes bounceIn {
-            0% {
-              transform: scale(0);
-              opacity: 0;
-            }
-            50% {
-              transform: scale(1.2);
-            }
-            100% {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
-        `}
-      </style>
-    </div>
-  );
 };
 
 const Products: React.FC = () => {
@@ -1312,22 +1133,31 @@ const Products: React.FC = () => {
       {/* Filtros y búsqueda */}
       <Card style={{ marginBottom: '24px' }}>
         <Row gutter={[16, 16]}>
-          <Col xs={24}>
-            <div style={{ marginBottom: '16px' }}>
-              <Text strong style={{ fontSize: '15px', marginBottom: '12px', display: 'block' }}>
-                🏪 Selecciona una Sucursal:
-              </Text>
-              <BranchSelector
-                branches={sucursales}
-                selectedBranch={sucursalSeleccionada}
-                onSelect={setSucursalSeleccionada}
-                loading={loadingSucursales}
-              />
-            </div>
-          </Col>
-          <Col xs={24}>
+          <Col xs={24} md={12}>
             <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong>🔍 Buscar Producto:</Text>
+              <Text strong>Sucursal:</Text>
+              <Select
+                value={sucursalSeleccionada}
+                onChange={setSucursalSeleccionada}
+                style={{ width: '100%' }}
+                size="large"
+              >
+                {sucursales.map(sucursalObj => (
+                  <Option key={sucursalObj.sucursal} value={sucursalObj.sucursal}>
+                    {formatearNombreSucursal(sucursalObj.sucursal)}
+                    {sucursalObj.sucursal === 'maldonado' && (
+                      <Tag color="gold" style={{ marginLeft: '8px' }}>
+                        Stock Principal
+                      </Tag>
+                    )}
+                  </Option>
+                ))}
+              </Select>
+            </Space>
+            </Col>
+          <Col xs={24} md={12}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text strong>Buscar:</Text>
               <Search
                 placeholder="Buscar por nombre, marca, tipo o código"
                 allowClear
@@ -1342,8 +1172,8 @@ const Products: React.FC = () => {
                 }}
               />
             </Space>
-          </Col>
-        </Row>
+            </Col>
+          </Row>
       </Card>
           
       {/* Tabla de productos */}
