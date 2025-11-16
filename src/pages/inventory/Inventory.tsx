@@ -1288,6 +1288,11 @@ const Inventory: React.FC = () => {
               key: 'tipo', 
               width: 120, 
               render: (tipo) => <Tag color="orange">{tipo}</Tag>,
+              filters: Array.from(new Set(stockFallas.map(p => p.tipo).filter(Boolean))).map(tipo => ({
+                text: tipo,
+                value: tipo
+              })),
+              onFilter: (value, record) => record.tipo === value,
               sorter: (a, b) => (a.tipo || '').localeCompare(b.tipo || ''),
               sortDirections: ['ascend', 'descend'],
             },
@@ -1296,6 +1301,11 @@ const Inventory: React.FC = () => {
               dataIndex: 'marca', 
               key: 'marca', 
               width: 120,
+              filters: Array.from(new Set(stockFallas.map(p => p.marca).filter(Boolean))).map(marca => ({
+                text: marca,
+                value: marca
+              })),
+              onFilter: (value, record) => record.marca === value,
               sorter: (a, b) => (a.marca || '').localeCompare(b.marca || ''),
               sortDirections: ['ascend', 'descend'],
             },
