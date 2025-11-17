@@ -646,6 +646,7 @@ const Products: React.FC = () => {
 
       // 2. ⭐ Obtener datos actuales del producto UNA SOLA VEZ para mantener stock y precio
       const productoCompleto = await productosService.obtenerPorId(productoEditando.id);
+      console.log('📦 Producto completo obtenido:', productoCompleto);
 
       // 3. ⭐ Actualizar SOLO stock_minimo de CADA sucursal (SIN tocar stock ni precio)
       for (const sucursalObj of sucursales) {
@@ -657,17 +658,27 @@ const Products: React.FC = () => {
           // Buscar datos de la sucursal actual
           const sucursalData = productoCompleto?.sucursales?.find(s => s.sucursal === sucursal);
           
+          console.log(`\n🔍 Actualizando ${sucursal}:`);
+          console.log('  sucursalData encontrada:', sucursalData);
+          console.log('  stock actual:', sucursalData?.stock);
+          console.log('  precio actual:', sucursalData?.precio);
+          console.log('  stock_minimo nuevo:', stockMinimo);
+          
           const datos: Partial<ProductoSucursalInput> = {
             stock: sucursalData?.stock || 0, // ✅ Mantener stock actual
             precio: sucursalData?.precio || 0, // ✅ Mantener precio actual
             stock_minimo: stockMinimo || 0 // ⭐ Actualizar SOLO stock_minimo
           };
+          
+          console.log('  📤 Datos a enviar al backend:', datos);
 
           await productosService.actualizarSucursal(
             productoEditando.id,
             sucursal,
             datos
           );
+          
+          console.log(`  ✅ Actualización completada para ${sucursal}\n`);
         }
       }
 

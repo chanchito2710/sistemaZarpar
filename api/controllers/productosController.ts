@@ -581,6 +581,11 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
     const { id, sucursal } = req.params;
     const data: Partial<ProductoSucursalInput> = req.body;
 
+    console.log(`\n🔧 ========== ACTUALIZAR PRODUCTO SUCURSAL ==========`);
+    console.log(`   Producto ID: ${id}`);
+    console.log(`   Sucursal: ${sucursal}`);
+    console.log(`   Datos recibidos:`, JSON.stringify(data, null, 2));
+
     if (isNaN(Number(id))) {
       res.status(400).json({
         success: false,
@@ -671,6 +676,7 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
       `;
 
       await executeQuery<ResultSetHeader>(query, valores);
+      console.log(`   ✅ UPDATE ejecutado con éxito`);
     }
 
     // Obtener registro actualizado
@@ -678,6 +684,9 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
       `SELECT * FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?`,
       [id, sucursal.toLowerCase()]
     );
+
+    console.log(`   📊 Registro actualizado en BD:`, JSON.stringify(registroActualizado[0], null, 2));
+    console.log(`====================================================\n`);
 
     res.json({
       success: true,
@@ -2044,7 +2053,22 @@ export const obtenerAlertasStock = async (req: Request, res: Response): Promise<
     
     const [rows] = await pool.query<RowDataPacket[]>(query);
     
-    console.log(`⚠️ Alertas de stock: ${rows.length} productos encontrados`);
+    console.log(`\n========== ALERTAS DE STOCK ==========`);
+    console.log(`⚠️ Total de alertas encontradas: ${rows.length}`);
+    
+    if (rows.length > 0) {
+      console.log('\n📋 Detalles de alertas:');
+      rows.forEach((row: any, index: number) => {
+        console.log(`\n  ${index + 1}. ${row.nombre}`);
+        console.log(`     Sucursal: ${row.sucursal}`);
+        console.log(`     Stock actual: ${row.stock}`);
+        console.log(`     Stock mínimo: ${row.stock_minimo}`);
+        console.log(`     ❌ stock (${row.stock}) < stock_minimo (${row.stock_minimo})`);
+      });
+    } else {
+      console.log('✅ No hay alertas de stock en este momento');
+    }
+    console.log(`======================================\n`);
     
     res.json({
       success: true,
