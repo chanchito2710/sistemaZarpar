@@ -1890,7 +1890,7 @@ const Products: React.FC = () => {
         title={
           <Space>
             <DollarOutlined style={{ color: '#667eea', fontSize: 20 }} />
-            <span style={{ fontSize: 18, fontWeight: 600 }}>Gestionar Precios por Sucursal</span>
+            <span style={{ fontSize: 18, fontWeight: 600, color: '#000' }}>Gestionar Precios por Sucursal</span>
           </Space>
         }
         open={modalGestionarPrecios}
