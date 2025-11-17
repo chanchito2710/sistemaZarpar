@@ -972,9 +972,8 @@ const Products: React.FC = () => {
       align: 'center',
       sorter: (a, b) => (a.stock || 0) - (b.stock || 0),
       render: (stock: number, record: ProductoCompleto) => {
-        // ✅ Conversión explícita a booleano
-        // MySQL devuelve 0/1, necesitamos comparación estricta
-        const esBajo = record.tiene_stock_bajo === 1 || record.tiene_stock_bajo === true;
+        // ✅ Conversión explícita a número (MySQL puede devolver "1" como string)
+        const esBajo = Number(record.tiene_stock_bajo) === 1;
         const stockNum = stock || 0;
         
         // 🔴 SIN STOCK (stock = 0)
@@ -1097,7 +1096,7 @@ const Products: React.FC = () => {
    */
   const estadisticas = {
     totalProductos: productos.length,
-    stockBajo: productos.filter(p => p.tiene_stock_bajo === 1 || p.tiene_stock_bajo === true).length,
+    stockBajo: productos.filter(p => Number(p.tiene_stock_bajo) === 1).length,
     valorTotal: productos.reduce((sum, p) => sum + (Number(p.stock) || 0) * (Number(p.precio) || 0), 0)
   };
 
