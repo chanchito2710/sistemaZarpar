@@ -1657,7 +1657,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       >
         <Alert
           message="⚠️ Productos con Stock Bajo o Agotado"
-          description="Los productos listados a continuación tienen stock por debajo del mínimo configurado o están agotados. Revisa y reabastece según sea necesario."
+          description="Los productos listados tienen un stock mínimo configurado y su stock actual está por debajo de ese mínimo. Solo aparecen productos con alertas configuradas (stock_minimo > 0)."
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
@@ -1707,11 +1707,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               key: 'stock',
               width: 100,
               align: 'center',
-              render: (stock: number) => (
-                <Tag color={stock === 0 ? 'red' : 'orange'} style={{ fontSize: '13px', fontWeight: 'bold' }}>
-                  {stock === 0 ? '⛔ AGOTADO' : `⚠️ ${stock}`}
-                </Tag>
-              )
+              render: (stock: number, record: any) => {
+                // Si stock = 0 y tiene stock_minimo configurado, es AGOTADO
+                if (stock === 0 && record.stock_minimo > 0) {
+                  return <Tag color="red" style={{ fontSize: '13px', fontWeight: 'bold' }}>⛔ AGOTADO</Tag>;
+                }
+                // Si stock < stock_minimo pero > 0, es STOCK BAJO
+                return <Tag color="orange" style={{ fontSize: '13px', fontWeight: 'bold' }}>⚠️ {stock}</Tag>;
+              }
             },
             {
               title: 'Stock Mínimo',
@@ -1728,11 +1731,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               key: 'estado',
               width: 120,
               render: (_, record: any) => {
-                if (record.stock === 0) {
-                  return <Tag color="red">🔴 AGOTADO</Tag>;
-                } else if (record.stock < record.stock_minimo) {
-                  return <Tag color="orange">⚠️ STOCK BAJO</Tag>;
+                // Solo mostrar estados si stock_minimo está configurado (> 0)
+                if (record.stock_minimo > 0) {
+                  if (record.stock === 0) {
+                    return <Tag color="red">🔴 AGOTADO</Tag>;
+                  } else if (record.stock < record.stock_minimo) {
+                    return <Tag color="orange">⚠️ STOCK BAJO</Tag>;
+                  }
                 }
+                // Si no tiene stock_minimo configurado, no debería estar en esta lista
                 return <Tag color="green">✅ NORMAL</Tag>;
               }
             },
@@ -1755,7 +1762,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               )
             }
           ]}
-          rowClassName={(record) => record.stock === 0 ? 'row-agotado' : 'row-stock-bajo'}
+          rowClassName={(record) => {
+            // Solo productos con stock_minimo > 0 aparecen en esta tabla
+            if (record.stock === 0 && record.stock_minimo > 0) {
+              return 'row-agotado';
+            }
+            return 'row-stock-bajo';
+          }}
         />
       </Drawer>
     </Layout>

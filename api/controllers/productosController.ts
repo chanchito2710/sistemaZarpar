@@ -2016,7 +2016,8 @@ export const limpiarStockEnTransito = async (req: Request, res: Response): Promi
 /**
  * ⭐ Obtener alertas de stock bajo o agotado
  * GET /api/productos/alertas-stock
- * Devuelve productos con stock <= 0 o stock < stock_minimo
+ * Devuelve productos con stock_minimo configurado (> 0) y stock < stock_minimo
+ * SOLO alerta productos que tienen un mínimo configurado
  */
 export const obtenerAlertasStock = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -2033,10 +2034,8 @@ export const obtenerAlertasStock = async (req: Request, res: Response): Promise<
       INNER JOIN productos p ON ps.producto_id = p.id
       WHERE p.activo = 1
         AND ps.activo = 1
-        AND (
-          ps.stock = 0 
-          OR (ps.stock_minimo > 0 AND ps.stock < ps.stock_minimo)
-        )
+        AND ps.stock_minimo > 0
+        AND ps.stock < ps.stock_minimo
       ORDER BY 
         ps.stock ASC,
         p.nombre ASC,
