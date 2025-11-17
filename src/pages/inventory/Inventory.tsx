@@ -1007,24 +1007,31 @@ const Inventory: React.FC = () => {
                 }}>
                   🏷️ Marca
                 </Text>
-                <Select
+                <ReactSelect
                   placeholder="Marca"
-                  value={selectedBrand}
-                  onChange={setSelectedBrand}
-                  style={{ width: '100%' }}
-                  size="large"
-                  variant="filled"
-                  suffixIcon={<FilterOutlined style={{ color: '#9ca3af' }} />}
-                >
-                  <Option value="all">
-                    <span style={{ fontWeight: 500 }}>✨ Todas</span>
-                  </Option>
-                  {marcasDisponibles.map(marca => (
-                    <Option key={marca} value={marca}>
-                      📱 {marca}
-                    </Option>
-                  ))}
-                </Select>
+                  value={{
+                    value: selectedBrand,
+                    label: selectedBrand === 'all' ? '✨ Todas' : `📱 ${selectedBrand}`
+                  }}
+                  onChange={(option) => {
+                    if (option) {
+                      setSelectedBrand(option.value);
+                    }
+                  }}
+                  options={[
+                    { value: 'all', label: '✨ Todas' },
+                    ...marcasDisponibles.map(marca => ({
+                      value: marca,
+                      label: `📱 ${marca}`
+                    }))
+                  ]}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={true}
+                  noOptionsMessage={() => 'No hay marcas disponibles'}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
               </div>
             </Col>
             
@@ -1043,24 +1050,31 @@ const Inventory: React.FC = () => {
                 }}>
                   🏷️ Tipo
                 </Text>
-                <Select
+                <ReactSelect
                   placeholder="Tipo"
-                  value={selectedCategory}
-                  onChange={setSelectedCategory}
-                  style={{ width: '100%' }}
-                  size="large"
-                  variant="filled"
-                  suffixIcon={<FilterOutlined style={{ color: '#9ca3af' }} />}
-                >
-                  <Option value="all">
-                    <span style={{ fontWeight: 500 }}>✨ Todos</span>
-                  </Option>
-                  {tiposDisponibles.map(tipo => (
-                    <Option key={tipo} value={tipo}>
-                      🏷️ {tipo}
-                    </Option>
-                  ))}
-                </Select>
+                  value={{
+                    value: selectedCategory,
+                    label: selectedCategory === 'all' ? '✨ Todos' : `🏷️ ${selectedCategory}`
+                  }}
+                  onChange={(option) => {
+                    if (option) {
+                      setSelectedCategory(option.value);
+                    }
+                  }}
+                  options={[
+                    { value: 'all', label: '✨ Todos' },
+                    ...tiposDisponibles.map(tipo => ({
+                      value: tipo,
+                      label: `🏷️ ${tipo}`
+                    }))
+                  ]}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={true}
+                  noOptionsMessage={() => 'No hay tipos disponibles'}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
               </div>
             </Col>
             

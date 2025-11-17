@@ -1291,6 +1291,75 @@ const customSelectStyles: StylesConfig = {
 - ✅ Searchable por defecto
 - ✅ Mejor integración con React
 
+### 🚨 PROTOCOLO OBLIGATORIO AL REEMPLAZAR SELECT
+
+**ANTES de hacer commit, SIEMPRE:**
+
+1. **Buscar TODOS los usos:**
+```bash
+# Buscar en el archivo que estás editando
+grep -n "<Select\|Select\s\|<Option\|Select\." archivo.tsx
+```
+
+2. **Verificar imports:**
+```typescript
+// ❌ Si ves esto, hay un problema:
+import { Select } from 'antd';
+const { Option } = Select;
+
+// ✅ Debe quedar así:
+import ReactSelect, { StylesConfig } from 'react-select';
+// (sin Select ni Option)
+```
+
+3. **Reemplazar TODOS los usos:**
+- ❌ NO eliminar `Select` del import si aún se usa en el archivo
+- ✅ Buscar TODOS los `<Select` en el archivo
+- ✅ Buscar TODOS los `<Option` en el archivo
+- ✅ Buscar TODOS los `Select.Option` en el archivo
+- ✅ Reemplazar CADA UNO por ReactSelect
+
+4. **Verificar sin errores:**
+```bash
+# Ejecutar linter
+npm run lint archivo.tsx
+
+# Verificar en navegador
+# Refrescar página (CTRL + SHIFT + R)
+```
+
+**❌ ERROR COMÚN:**
+```typescript
+// Eliminaste Select del import pero hay un Select en línea 1050
+import { Card, Button } from 'antd'; // ❌ Sin Select
+// ...
+<Select value={x} /> // ❌ Esto causará error
+```
+
+**✅ CORRECTO:**
+```typescript
+// Opción 1: Dejar Select si se usa
+import { Card, Button, Select } from 'antd';
+<Select value={x} />
+
+// Opción 2: Reemplazar TODO y eliminar Select
+import { Card, Button } from 'antd';
+import ReactSelect from 'react-select';
+<ReactSelect value={{...}} />
+```
+
+**⚠️ CHECKLIST OBLIGATORIO:**
+```
+[ ] Busqué TODOS los <Select en el archivo
+[ ] Busqué TODOS los <Option en el archivo  
+[ ] Busqué TODOS los Select. en el archivo
+[ ] Reemplacé CADA UNO por ReactSelect
+[ ] Eliminé Select del import de antd
+[ ] Eliminé const { Option } = Select
+[ ] Verifiqué sin errores de linter
+[ ] Probé en el navegador
+```
+
 ---
 
 ## 🔒 REGLA #10: SEGURIDAD MÁXIMA
