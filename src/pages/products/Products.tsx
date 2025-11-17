@@ -216,11 +216,15 @@ const Products: React.FC = () => {
   const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
   const [marcaFiltroModalGestion, setMarcaFiltroModalGestion] = useState<string>('todas');
   
-  // Estados para Precio Base
-  const [precioBase1, setPrecioBase1] = useState<number>(0);
-  const [precioBase2, setPrecioBase2] = useState<number>(0);
-  const [sucursalesBase1, setSucursalesBase1] = useState<string[]>([]);
-  const [sucursalesBase2, setSucursalesBase2] = useState<string[]>([]);
+  // Estados para Precio Base por producto
+  const [preciosBase, setPreciosBase] = useState<{
+    [productoId: number]: {
+      precio1: number;
+      precio2: number;
+      sucursales1: string[];
+      sucursales2: string[];
+    }
+  }>({});
   const [preciosEditados, setPreciosEditados] = useState<{[productoId: number]: {[sucursal: string]: number}}>({});
   
   // Estados para filtros del modal de gestión de stock
@@ -432,11 +436,12 @@ const Products: React.FC = () => {
    * Aplicar Precio Base 1 a un producto específico
    */
   const aplicarPrecioBase1Producto = (productoId: number, productoNombre: string) => {
-    if (!precioBase1 || precioBase1 <= 0) {
-      message.warning('⚠️ Ingresa un precio base 1 válido');
+    const config = preciosBase[productoId];
+    if (!config || !config.precio1 || config.precio1 <= 0) {
+      message.warning('⚠️ Ingresa un precio base 1 válido para este producto');
       return;
     }
-    if (sucursalesBase1.length === 0) {
+    if (config.sucursales1.length === 0) {
       message.warning('⚠️ Selecciona al menos una sucursal para Precio Base 1');
       return;
     }
@@ -445,23 +450,24 @@ const Products: React.FC = () => {
     if (!nuevosPrecios[productoId]) {
       nuevosPrecios[productoId] = {};
     }
-    sucursalesBase1.forEach(sucursal => {
-      nuevosPrecios[productoId][sucursal] = precioBase1;
+    config.sucursales1.forEach(sucursal => {
+      nuevosPrecios[productoId][sucursal] = config.precio1;
     });
 
     setPreciosEditados(nuevosPrecios);
-    message.success(`✅ Precio Base 1 ($${precioBase1}) aplicado a "${productoNombre}" en ${sucursalesBase1.length} sucursales`);
+    message.success(`✅ Precio Base 1 ($${config.precio1}) aplicado a "${productoNombre}" en ${config.sucursales1.length} sucursales`);
   };
 
   /**
    * Aplicar Precio Base 2 a un producto específico
    */
   const aplicarPrecioBase2Producto = (productoId: number, productoNombre: string) => {
-    if (!precioBase2 || precioBase2 <= 0) {
-      message.warning('⚠️ Ingresa un precio base 2 válido');
+    const config = preciosBase[productoId];
+    if (!config || !config.precio2 || config.precio2 <= 0) {
+      message.warning('⚠️ Ingresa un precio base 2 válido para este producto');
       return;
     }
-    if (sucursalesBase2.length === 0) {
+    if (config.sucursales2.length === 0) {
       message.warning('⚠️ Selecciona al menos una sucursal para Precio Base 2');
       return;
     }
@@ -470,12 +476,12 @@ const Products: React.FC = () => {
     if (!nuevosPrecios[productoId]) {
       nuevosPrecios[productoId] = {};
     }
-    sucursalesBase2.forEach(sucursal => {
-      nuevosPrecios[productoId][sucursal] = precioBase2;
+    config.sucursales2.forEach(sucursal => {
+      nuevosPrecios[productoId][sucursal] = config.precio2;
     });
 
     setPreciosEditados(nuevosPrecios);
-    message.success(`✅ Precio Base 2 ($${precioBase2}) aplicado a "${productoNombre}" en ${sucursalesBase2.length} sucursales`);
+    message.success(`✅ Precio Base 2 ($${config.precio2}) aplicado a "${productoNombre}" en ${config.sucursales2.length} sucursales`);
   };
 
   /**
@@ -2034,10 +2040,7 @@ const Products: React.FC = () => {
         onCancel={() => {
           setModalGestionarPrecios(false);
           setPreciosEditados({});
-          setPrecioBase1(0);
-          setPrecioBase2(0);
-          setSucursalesBase1([]);
-          setSucursalesBase2([]);
+          setPreciosBase({});
         }}
         footer={
           <Space style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -2072,86 +2075,6 @@ const Products: React.FC = () => {
       >
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           
-          {/* 🎯 Configuración de Precios Base */}
-          <Card bodyStyle={{ padding: '16px' }}>
-            <Row gutter={[16, 16]} align="middle">
-              <Col xs={24} md={6}>
-                <div>
-                  <Text strong style={{ fontSize: 13 }}>💰 Precio Base 1:</Text>
-                  <InputNumber
-                    prefix="$"
-                    value={precioBase1}
-                    onChange={(val) => setPrecioBase1(val || 0)}
-                    style={{ width: '100%', marginTop: 4 }}
-                    size="middle"
-                    min={0}
-                    placeholder="Ej: 1000"
-                  />
-                </div>
-              </Col>
-              <Col xs={24} md={6}>
-                <div>
-                  <Text strong style={{ fontSize: 13 }}>Sucursales Base 1:</Text>
-                  <Select
-                    mode="multiple"
-                    placeholder="Selecciona..."
-                    value={sucursalesBase1}
-                    onChange={setSucursalesBase1}
-                    style={{ width: '100%', marginTop: 4 }}
-                    size="middle"
-                    maxTagCount="responsive"
-                  >
-                    {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
-                      <Select.Option key={s.sucursal} value={s.sucursal}>
-                        {s.sucursal.toUpperCase()}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </div>
-              </Col>
-              <Col xs={24} md={6}>
-                <div>
-                  <Text strong style={{ fontSize: 13 }}>💵 Precio Base 2:</Text>
-                  <InputNumber
-                    prefix="$"
-                    value={precioBase2}
-                    onChange={(val) => setPrecioBase2(val || 0)}
-                    style={{ width: '100%', marginTop: 4 }}
-                    size="middle"
-                    min={0}
-                    placeholder="Ej: 1500"
-                  />
-                </div>
-              </Col>
-              <Col xs={24} md={6}>
-                <div>
-                  <Text strong style={{ fontSize: 13 }}>Sucursales Base 2:</Text>
-                  <Select
-                    mode="multiple"
-                    placeholder="Selecciona..."
-                    value={sucursalesBase2}
-                    onChange={setSucursalesBase2}
-                    style={{ width: '100%', marginTop: 4 }}
-                    size="middle"
-                    maxTagCount="responsive"
-                  >
-                    {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
-                      <Select.Option key={s.sucursal} value={s.sucursal}>
-                        {s.sucursal.toUpperCase()}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </div>
-              </Col>
-            </Row>
-            <Alert
-              message="💡 Configura los precios base arriba, luego haz clic en los botones 'Base 1' o 'Base 2' de cada producto para aplicarlos"
-              type="info"
-              showIcon
-              style={{ marginTop: 12 }}
-            />
-          </Card>
-
           {/* Filtros */}
           <Card bodyStyle={{ padding: '16px' }}>
             <Row gutter={[16, 16]}>
@@ -2206,57 +2129,134 @@ const Products: React.FC = () => {
           <div style={{ overflowX: 'auto' }}>
             <Table
               columns={[
-                // Columna Producto (fija) con botones de Precio Base
+                // Columna Producto (fija) con Precio Base integrado
                 {
                   title: 'Producto',
                   key: 'producto',
-                  width: 280,
+                  width: 400,
                   fixed: 'left',
-                  render: (_, record: ProductoCompleto) => (
-                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                      <div>
-                        <Text strong style={{ fontSize: 13 }}>{record.nombre}</Text>
-                      </div>
-                      <Space size={4} wrap>
-                        <Tag color="blue" style={{ fontSize: 10 }}>{record.marca}</Tag>
-                        <Tag color="cyan" style={{ fontSize: 10 }}>{record.tipo}</Tag>
+                  render: (_, record: ProductoCompleto) => {
+                    const config = preciosBase[record.id] || { precio1: 0, precio2: 0, sucursales1: [], sucursales2: [] };
+                    
+                    return (
+                      <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                        {/* Nombre y tags */}
+                        <div>
+                          <Text strong style={{ fontSize: 13 }}>{record.nombre}</Text>
+                        </div>
+                        <Space size={4} wrap>
+                          <Tag color="blue" style={{ fontSize: 10 }}>{record.marca}</Tag>
+                          <Tag color="cyan" style={{ fontSize: 10 }}>{record.tipo}</Tag>
+                        </Space>
+                        
+                        <Divider style={{ margin: '4px 0' }} />
+                        
+                        {/* Precio Base 1 */}
+                        <div style={{ background: '#f6ffed', padding: 6, borderRadius: 4 }}>
+                          <Text strong style={{ fontSize: 11, color: '#52c41a' }}>💰 Precio Base 1</Text>
+                          <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 4 }}>
+                            <InputNumber
+                              prefix="$"
+                              value={config.precio1}
+                              onChange={(val) => {
+                                setPreciosBase({
+                                  ...preciosBase,
+                                  [record.id]: { ...config, precio1: val || 0 }
+                                });
+                              }}
+                              size="small"
+                              min={0}
+                              placeholder="Precio"
+                              style={{ width: '100%' }}
+                            />
+                            <Select
+                              mode="multiple"
+                              placeholder="Sucursales..."
+                              value={config.sucursales1}
+                              onChange={(vals) => {
+                                setPreciosBase({
+                                  ...preciosBase,
+                                  [record.id]: { ...config, sucursales1: vals }
+                                });
+                              }}
+                              size="small"
+                              style={{ width: '100%' }}
+                              maxTagCount={1}
+                              maxTagTextLength={5}
+                            >
+                              {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
+                                <Select.Option key={s.sucursal} value={s.sucursal}>
+                                  {s.sucursal.toUpperCase()}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                            <Button
+                              size="small"
+                              type="primary"
+                              block
+                              style={{ background: '#52c41a', height: 26, fontSize: 11 }}
+                              onClick={() => aplicarPrecioBase1Producto(record.id, record.nombre)}
+                              disabled={!config.precio1 || config.sucursales1.length === 0}
+                            >
+                              Aplicar Base 1
+                            </Button>
+                          </Space>
+                        </div>
+                        
+                        {/* Precio Base 2 */}
+                        <div style={{ background: '#fff7e6', padding: 6, borderRadius: 4 }}>
+                          <Text strong style={{ fontSize: 11, color: '#fa8c16' }}>💵 Precio Base 2</Text>
+                          <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 4 }}>
+                            <InputNumber
+                              prefix="$"
+                              value={config.precio2}
+                              onChange={(val) => {
+                                setPreciosBase({
+                                  ...preciosBase,
+                                  [record.id]: { ...config, precio2: val || 0 }
+                                });
+                              }}
+                              size="small"
+                              min={0}
+                              placeholder="Precio"
+                              style={{ width: '100%' }}
+                            />
+                            <Select
+                              mode="multiple"
+                              placeholder="Sucursales..."
+                              value={config.sucursales2}
+                              onChange={(vals) => {
+                                setPreciosBase({
+                                  ...preciosBase,
+                                  [record.id]: { ...config, sucursales2: vals }
+                                });
+                              }}
+                              size="small"
+                              style={{ width: '100%' }}
+                              maxTagCount={1}
+                              maxTagTextLength={5}
+                            >
+                              {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
+                                <Select.Option key={s.sucursal} value={s.sucursal}>
+                                  {s.sucursal.toUpperCase()}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                            <Button
+                              size="small"
+                              type="primary"
+                              block
+                              style={{ background: '#fa8c16', height: 26, fontSize: 11 }}
+                              onClick={() => aplicarPrecioBase2Producto(record.id, record.nombre)}
+                              disabled={!config.precio2 || config.sucursales2.length === 0}
+                            >
+                              Aplicar Base 2
+                            </Button>
+                          </Space>
+                        </div>
                       </Space>
-                      <Space size={4} style={{ marginTop: 4 }}>
-                        <Tooltip title={`Aplicar Precio Base 1 ($${precioBase1}) a las sucursales seleccionadas`}>
-                          <Button
-                            size="small"
-                            type="primary"
-                            style={{ 
-                              fontSize: 11, 
-                              padding: '0 8px',
-                              height: 24,
-                              background: '#52c41a'
-                            }}
-                            onClick={() => aplicarPrecioBase1Producto(record.id, record.nombre)}
-                            disabled={!precioBase1 || sucursalesBase1.length === 0}
-                          >
-                            Base 1
-                          </Button>
-                        </Tooltip>
-                        <Tooltip title={`Aplicar Precio Base 2 ($${precioBase2}) a las sucursales seleccionadas`}>
-                          <Button
-                            size="small"
-                            type="primary"
-                            style={{ 
-                              fontSize: 11, 
-                              padding: '0 8px',
-                              height: 24,
-                              background: '#fa8c16'
-                            }}
-                            onClick={() => aplicarPrecioBase2Producto(record.id, record.nombre)}
-                            disabled={!precioBase2 || sucursalesBase2.length === 0}
-                          >
-                            Base 2
-                          </Button>
-                        </Tooltip>
-                      </Space>
-                    </Space>
-                  ),
+                    );
+                  },
                 },
                 // Columnas dinámicas por cada sucursal
                 ...sucursales
