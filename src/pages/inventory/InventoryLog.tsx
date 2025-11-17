@@ -2117,18 +2117,37 @@ const GlobalSales: React.FC = () => {
                             <Text style={{ fontSize: 12, color: '#8c8c8c', display: 'block', marginBottom: 6 }}>
                               Concepto:
                             </Text>
-                            <Select
-                              value={conceptoGastos}
-                              onChange={setConceptoGastos}
-                              style={{ width: 200 }}
-                              placeholder="Seleccionar concepto"
-                            >
-                              <Select.Option value="todos">Todos</Select.Option>
-                              <Select.Option value="Gasolina">⛽ Gasolina</Select.Option>
-                              <Select.Option value="Papelería">📄 Papelería</Select.Option>
-                              <Select.Option value="Flete">🚚 Flete</Select.Option>
-                              <Select.Option value="Otro">❓ Otro</Select.Option>
-                            </Select>
+                            <div style={{ width: 200 }}>
+                              <ReactSelect
+                                value={{
+                                  value: conceptoGastos,
+                                  label: conceptoGastos === 'todos' ? 'Todos' :
+                                         conceptoGastos === 'Gasolina' ? '⛽ Gasolina' :
+                                         conceptoGastos === 'Papelería' ? '📄 Papelería' :
+                                         conceptoGastos === 'Flete' ? '🚚 Flete' :
+                                         '❓ Otro'
+                                }}
+                                onChange={(option) => {
+                                  if (option) {
+                                    setConceptoGastos(option.value);
+                                  }
+                                }}
+                                options={[
+                                  { value: 'todos', label: 'Todos' },
+                                  { value: 'Gasolina', label: '⛽ Gasolina' },
+                                  { value: 'Papelería', label: '📄 Papelería' },
+                                  { value: 'Flete', label: '🚚 Flete' },
+                                  { value: 'Otro', label: '❓ Otro' }
+                                ]}
+                                styles={customSelectStyles}
+                                isClearable={false}
+                                isSearchable={false}
+                                placeholder="Seleccionar concepto"
+                                noOptionsMessage={() => 'No hay opciones'}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                              />
+                            </div>
                           </div>
                           
                           {/* Filtro por fecha */}
