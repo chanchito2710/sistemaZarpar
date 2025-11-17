@@ -1199,7 +1199,7 @@ const Inventory: React.FC = () => {
               {esAdmin && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Sucursal:</span>
-                  <div style={{ width: 180 }}>
+                  <div style={{ width: 180, position: 'relative', zIndex: 9999 }}>
                     <ReactSelect
                       value={
                         sucursalFallasSeleccionada
@@ -1211,6 +1211,7 @@ const Inventory: React.FC = () => {
                       }
                       onChange={(option) => {
                         if (option) {
+                          console.log('📍 Cambiando a sucursal:', option.value);
                           cambiarSucursalFallas(option.value);
                         }
                       }}
@@ -1221,13 +1222,26 @@ const Inventory: React.FC = () => {
                           label: s.toUpperCase()
                         }))
                       }
-                      styles={customSelectStyles}
+                      styles={{
+                        ...customSelectStyles,
+                        menu: (provided) => ({
+                          ...provided,
+                          borderRadius: '6px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          zIndex: 99999
+                        }),
+                        menuPortal: (provided) => ({
+                          ...provided,
+                          zIndex: 99999
+                        })
+                      }}
                       isClearable={false}
                       isSearchable={false}
                       placeholder="Selecciona sucursal"
                       noOptionsMessage={() => 'No hay sucursales'}
                       menuPortalTarget={document.body}
                       menuPosition="fixed"
+                      menuShouldBlockScroll={true}
                     />
                   </div>
                 </div>
