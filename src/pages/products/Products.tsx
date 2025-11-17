@@ -968,22 +968,43 @@ const Products: React.FC = () => {
       title: 'Stock',
       dataIndex: 'stock',
       key: 'stock',
-      width: 100,
+      width: 120,
       align: 'center',
       sorter: (a, b) => (a.stock || 0) - (b.stock || 0),
       render: (stock: number, record: ProductoCompleto) => {
         // ✅ Conversión explícita a booleano
         // MySQL devuelve 0/1, necesitamos comparación estricta
         const esBajo = record.tiene_stock_bajo === 1 || record.tiene_stock_bajo === true;
-        return (
-          <Badge
-            count={esBajo ? <WarningOutlined style={{ color: '#f5222d' }} /> : 0}
-            offset={[10, 0]}
-          >
-            <Tag color={esBajo ? 'red' : stock > 50 ? 'green' : 'orange'}>
-              {stock || 0}
+        const stockNum = stock || 0;
+        
+        // 🔴 SIN STOCK (stock = 0)
+        if (stockNum === 0) {
+          return (
+            <Tag color="red" style={{ fontSize: '13px', fontWeight: 'bold' }}>
+              ⛔ Sin Stock
             </Tag>
-          </Badge>
+          );
+        }
+        
+        // 🟠 STOCK BAJO (tiene_stock_bajo pero stock > 0)
+        if (esBajo) {
+          return (
+            <Badge
+              count={<WarningOutlined style={{ color: '#fa8c16' }} />}
+              offset={[10, 0]}
+            >
+              <Tag color="orange" style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                ⚠️ {stockNum}
+              </Tag>
+            </Badge>
+          );
+        }
+        
+        // 🟢 STOCK NORMAL
+        return (
+          <Tag color="green" style={{ fontSize: '13px', fontWeight: 'bold' }}>
+            ✅ {stockNum}
+          </Tag>
         );
       }
     },
