@@ -36,6 +36,11 @@ export const registrarEnvioFallas = async (req: Request, res: Response): Promise
     const { sucursal, observaciones } = req.body;
     const userEmail = (req as any).user?.email || 'sistema';
     
+    console.log('📦 ===== REGISTRAR ENVÍO DE FALLAS =====');
+    console.log('📊 Sucursal recibida:', sucursal);
+    console.log('📧 Usuario:', userEmail);
+    console.log('📝 Observaciones:', observaciones);
+    
     if (!sucursal) {
       res.status(400).json({
         success: false,
@@ -63,13 +68,18 @@ export const registrarEnvioFallas = async (req: Request, res: Response): Promise
       ORDER BY p.nombre ASC
     `;
     
+    console.log('🔍 Buscando productos con fallas en sucursal:', sucursal.toLowerCase());
+    
     const productosFallas = await executeQuery<RowDataPacket[]>(
       queryProductosFallas,
       [sucursal.toLowerCase()]
     );
     
+    console.log('📊 Productos con fallas encontrados:', productosFallas.length);
+    
     if (productosFallas.length === 0) {
       await connection.rollback();
+      console.log('⚠️ No hay productos con stock de fallas para enviar en:', sucursal);
       res.status(400).json({
         success: false,
         message: 'No hay productos con stock de fallas para enviar'
