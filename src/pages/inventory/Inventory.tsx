@@ -35,14 +35,16 @@ import {
   FilePdfOutlined,
   WarningOutlined,
   EyeOutlined,
-  DollarOutlined
+  DollarOutlined,
+  SendOutlined,
+  HistoryOutlined
 } from '@ant-design/icons';
 import ReactSelect, { StylesConfig } from 'react-select';
 import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BRANCHES } from '../../data/branches';
-import { productosService, devolucionesService } from '../../services/api';
+import { productosService, devolucionesService, enviosFallasService } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import './Inventory.css';
 
@@ -193,6 +195,23 @@ const Inventory: React.FC = () => {
 
   // Modal Estadísticas de Fallas
   const [modalEstadisticasVisible, setModalEstadisticasVisible] = useState(false);
+
+  // Modal Envío de Fallas
+  const [modalEnvioFallasVisible, setModalEnvioFallasVisible] = useState(false);
+  const [loadingEnvioFallas, setLoadingEnvioFallas] = useState(false);
+  const [observacionesEnvio, setObservacionesEnvio] = useState('');
+
+  // Modal Historial de Envíos
+  const [modalHistorialEnviosVisible, setModalHistorialEnviosVisible] = useState(false);
+  const [historialEnvios, setHistorialEnvios] = useState<any[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const [fechaHistorialDesde, setFechaHistorialDesde] = useState<dayjs.Dayjs | null>(null);
+  const [fechaHistorialHasta, setFechaHistorialHasta] = useState<dayjs.Dayjs | null>(null);
+  
+  // Modal Detalle de Envío
+  const [modalDetalleEnvioVisible, setModalDetalleEnvioVisible] = useState(false);
+  const [detalleEnvioSeleccionado, setDetalleEnvioSeleccionado] = useState<any>(null);
+  const [loadingDetalleEnvio, setLoadingDetalleEnvio] = useState(false);
   const [estadisticasFallas, setEstadisticasFallas] = useState<any>({});
   const [loadingEstadisticas, setLoadingEstadisticas] = useState(false);
   const [fechasEstadisticas, setFechasEstadisticas] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([null, null]);
@@ -431,6 +450,118 @@ const Inventory: React.FC = () => {
   const cambiarSucursalFallas = (nuevaSucursal: string) => {
     setSucursalFallasSeleccionada(nuevaSucursal);
     cargarStockFallas(nuevaSucursal);
+  };
+
+  /**
+   * Enviar stock de fallas (poner en cero y registrar en historial)
+   */
+  const handleEnviarFallas = async () => {
+    if (!sucursalFallasSeleccionada) {
+      message.warning('⚠️ Selecciona una sucursal primero');
+      return;
+    }
+
+    // Verificar que hay productos con fallas
+    const productosFallas = stockFallas.filter(p => 
+      p.sucursal.toLowerCase() === sucursalFallasSeleccionada.toLowerCase() && 
+      p.stock_fallas > 0
+    );
+
+    if (productosFallas.length === 0) {
+      message.warning('⚠️ No hay productos con stock de fallas para enviar');
+      return;
+    }
+
+    setModalEnvioFallasVisible(true);
+  };
+
+  /**
+   * Confirmar envío de fallas
+   */
+  const confirmarEnvioFallas = async () => {
+    setLoadingEnvioFallas(true);
+    try {
+      const response = await enviosFallasService.registrarEnvio(
+        sucursalFallasSeleccionada,
+        observacionesEnvio || undefined
+      );
+
+      message.success(`✅ ${response.message}`);
+      console.log('✅ Envío registrado:', response.data);
+
+      // Cerrar modal y limpiar
+      setModalEnvioFallasVisible(false);
+      setObservacionesEnvio('');
+
+      // Recargar stock de fallas para ver los cambios
+      cargarStockFallas(sucursalFallasSeleccionada);
+    } catch (error: any) {
+      message.error(error?.message || 'Error al registrar envío de fallas');
+      console.error('❌ Error al enviar fallas:', error);
+    } finally {
+      setLoadingEnvioFallas(false);
+    }
+  };
+
+  /**
+   * Cargar historial de envíos de fallas
+   */
+  const handleCargarHistorial = async () => {
+    setModalHistorialEnviosVisible(true);
+    await cargarHistorialEnvios();
+  };
+
+  /**
+   * Cargar historial con filtros
+   */
+  const cargarHistorialEnvios = async () => {
+    setLoadingHistorial(true);
+    try {
+      const params: any = {};
+
+      // Filtrar por sucursal (admin puede ver todas o una específica)
+      if (!esAdmin) {
+        params.sucursal = sucursalUsuario;
+      } else if (sucursalFallasSeleccionada) {
+        params.sucursal = sucursalFallasSeleccionada;
+      }
+
+      // Filtrar por fechas
+      if (fechaHistorialDesde) {
+        params.fecha_desde = fechaHistorialDesde.format('YYYY-MM-DD');
+      }
+      if (fechaHistorialHasta) {
+        params.fecha_hasta = fechaHistorialHasta.format('YYYY-MM-DD');
+      }
+
+      const response = await enviosFallasService.obtenerHistorial(params);
+      setHistorialEnvios(response.data || []);
+      console.log(`✅ ${response.count} envíos cargados`);
+    } catch (error) {
+      message.error('Error al cargar historial de envíos');
+      console.error('❌ Error al cargar historial:', error);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  /**
+   * Ver detalle de un envío específico
+   */
+  const verDetalleEnvio = async (envioId: number) => {
+    setLoadingDetalleEnvio(true);
+    setModalDetalleEnvioVisible(true);
+    try {
+      const response = await enviosFallasService.obtenerDetalle(envioId);
+      setDetalleEnvioSeleccionado(response.data);
+      console.log('✅ Detalle de envío cargado:', response.data);
+    } catch (error) {
+      message.error('Error al cargar detalle de envío');
+      console.error('❌ Error al cargar detalle:', error);
+      setModalDetalleEnvioVisible(false);
+    } finally {
+      setLoadingDetalleEnvio(false);
+    }
   };
 
   // Cargar sucursales y sucursal principal al montar el componente
@@ -1256,6 +1387,40 @@ const Inventory: React.FC = () => {
           showIcon
           style={{ marginBottom: 16 }}
         />
+
+        {/* Botones de Acción: Enviar Fallas e Historial */}
+        <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'flex-start' }} wrap>
+          <Button
+            type="primary"
+            danger
+            icon={<SendOutlined />}
+            onClick={handleEnviarFallas}
+            size="large"
+            style={{
+              background: 'linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%)',
+              border: 'none',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 12px rgba(255, 77, 79, 0.4)'
+            }}
+          >
+            📤 Enviar Stock Fallas
+          </Button>
+
+          <Button
+            icon={<HistoryOutlined />}
+            onClick={handleCargarHistorial}
+            size="large"
+            style={{
+              background: 'linear-gradient(135deg, #8c8c8c 0%, #bfbfbf 100%)',
+              border: 'none',
+              color: '#fff',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 12px rgba(140, 140, 140, 0.4)'
+            }}
+          >
+            📋 Historial Fallas Enviadas
+          </Button>
+        </Space>
         
         {/* Filtro por rango de fechas */}
         <div style={{ 
@@ -2351,6 +2516,354 @@ const Inventory: React.FC = () => {
               },
             ]}
           />
+        )}
+      </Modal>
+
+      {/* ========================================
+          MODAL: Confirmación de Envío de Fallas
+          ======================================== */}
+      <Modal
+        title="📤 Confirmar Envío de Stock de Fallas"
+        open={modalEnvioFallasVisible}
+        onCancel={() => {
+          setModalEnvioFallasVisible(false);
+          setObservacionesEnvio('');
+        }}
+        onOk={confirmarEnvioFallas}
+        okText="✅ Confirmar Envío"
+        cancelText="❌ Cancelar"
+        width={700}
+        okButtonProps={{
+          danger: true,
+          loading: loadingEnvioFallas,
+          disabled: loadingEnvioFallas
+        }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Alert
+            message="⚠️ Acción Permanente"
+            description={
+              <div>
+                <p>Estás a punto de registrar el envío de <strong>TODOS</strong> los productos con fallas de la sucursal <strong>{sucursalFallasSeleccionada?.toUpperCase()}</strong>.</p>
+                <p><strong>Esta acción:</strong></p>
+                <ul style={{ marginLeft: 20 }}>
+                  <li>Pondrá en <strong>CERO</strong> el stock de fallas de todos los productos</li>
+                  <li>Registrará el envío en el historial</li>
+                  <li>Es <strong>IRREVERSIBLE</strong></li>
+                </ul>
+              </div>
+            }
+            type="warning"
+            showIcon
+          />
+
+          <Card size="small" title="📊 Resumen del Envío" style={{ background: '#f6ffed' }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text strong>Sucursal:</Text>
+                <Tag color="blue" style={{ fontSize: 14 }}>
+                  {sucursalFallasSeleccionada?.toUpperCase()}
+                </Tag>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text strong>Productos con fallas:</Text>
+                <Tag color="red" style={{ fontSize: 14 }}>
+                  {stockFallas.filter(p => 
+                    p.sucursal.toLowerCase() === sucursalFallasSeleccionada?.toLowerCase() && 
+                    p.stock_fallas > 0
+                  ).length}
+                </Tag>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text strong>Total unidades:</Text>
+                <Tag color="orange" style={{ fontSize: 14 }}>
+                  {stockFallas
+                    .filter(p => 
+                      p.sucursal.toLowerCase() === sucursalFallasSeleccionada?.toLowerCase() && 
+                      p.stock_fallas > 0
+                    )
+                    .reduce((sum, p) => sum + p.stock_fallas, 0)}
+                </Tag>
+              </div>
+            </Space>
+          </Card>
+
+          <div>
+            <Text strong>Observaciones (Opcional):</Text>
+            <Input.TextArea
+              value={observacionesEnvio}
+              onChange={(e) => setObservacionesEnvio(e.target.value)}
+              placeholder="Ej: Envío mensual, productos reparados, etc..."
+              rows={3}
+              maxLength={500}
+              showCount
+              style={{ marginTop: 8 }}
+            />
+          </div>
+        </Space>
+      </Modal>
+
+      {/* ========================================
+          MODAL: Historial de Envíos de Fallas
+          ======================================== */}
+      <Modal
+        title="📋 Historial de Envíos de Fallas"
+        open={modalHistorialEnviosVisible}
+        onCancel={() => {
+          setModalHistorialEnviosVisible(false);
+          setFechaHistorialDesde(null);
+          setFechaHistorialHasta(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => setModalHistorialEnviosVisible(false)}>
+            Cerrar
+          </Button>
+        ]}
+        width={1200}
+        style={{ top: 20 }}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          {/* Filtros */}
+          <Card size="small" style={{ background: '#f9f9f9' }}>
+            <Space wrap>
+              <span style={{ fontWeight: 600 }}>Filtrar por fecha:</span>
+              <DatePicker.RangePicker
+                value={[fechaHistorialDesde, fechaHistorialHasta]}
+                onChange={(dates) => {
+                  setFechaHistorialDesde(dates ? dates[0] : null);
+                  setFechaHistorialHasta(dates ? dates[1] : null);
+                }}
+                format="DD/MM/YYYY"
+                placeholder={['Desde', 'Hasta']}
+                allowClear
+              />
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={cargarHistorialEnvios}
+                loading={loadingHistorial}
+              >
+                Buscar
+              </Button>
+              {(fechaHistorialDesde || fechaHistorialHasta) && (
+                <Button
+                  onClick={() => {
+                    setFechaHistorialDesde(null);
+                    setFechaHistorialHasta(null);
+                    cargarHistorialEnvios();
+                  }}
+                >
+                  Limpiar
+                </Button>
+              )}
+            </Space>
+          </Card>
+
+          {/* Tabla de Historial */}
+          <Table
+            dataSource={historialEnvios}
+            loading={loadingHistorial}
+            rowKey="id"
+            pagination={{ pageSize: 10, showSizeChanger: true }}
+            columns={[
+              {
+                title: 'ID',
+                dataIndex: 'id',
+                key: 'id',
+                width: 80,
+                align: 'center'
+              },
+              {
+                title: 'Fecha de Envío',
+                dataIndex: 'fecha_envio',
+                key: 'fecha_envio',
+                width: 180,
+                render: (fecha) => dayjs(fecha).format('DD/MM/YYYY HH:mm')
+              },
+              {
+                title: 'Sucursal',
+                dataIndex: 'sucursal',
+                key: 'sucursal',
+                width: 150,
+                render: (sucursal) => (
+                  <Tag color="blue">{sucursal.toUpperCase()}</Tag>
+                )
+              },
+              {
+                title: 'Productos',
+                dataIndex: 'total_productos',
+                key: 'total_productos',
+                width: 120,
+                align: 'center',
+                render: (total) => (
+                  <Tag color="orange">{total}</Tag>
+                )
+              },
+              {
+                title: 'Unidades',
+                dataIndex: 'total_unidades',
+                key: 'total_unidades',
+                width: 120,
+                align: 'center',
+                render: (total) => (
+                  <Tag color="red">{total}</Tag>
+                )
+              },
+              {
+                title: 'Usuario',
+                dataIndex: 'usuario_email',
+                key: 'usuario_email',
+                width: 200
+              },
+              {
+                title: 'Observaciones',
+                dataIndex: 'observaciones',
+                key: 'observaciones',
+                ellipsis: true,
+                render: (obs) => obs || '-'
+              },
+              {
+                title: 'Acción',
+                key: 'accion',
+                width: 120,
+                align: 'center',
+                render: (_, record) => (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<EyeOutlined />}
+                    onClick={() => verDetalleEnvio(record.id)}
+                  >
+                    Ver Detalle
+                  </Button>
+                )
+              }
+            ]}
+          />
+        </Space>
+      </Modal>
+
+      {/* ========================================
+          MODAL: Detalle de Envío Específico
+          ======================================== */}
+      <Modal
+        title={`📦 Detalle del Envío #${detalleEnvioSeleccionado?.id || ''}`}
+        open={modalDetalleEnvioVisible}
+        onCancel={() => {
+          setModalDetalleEnvioVisible(false);
+          setDetalleEnvioSeleccionado(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => setModalDetalleEnvioVisible(false)}>
+            Cerrar
+          </Button>
+        ]}
+        width={900}
+        style={{ top: 20 }}
+      >
+        {detalleEnvioSeleccionado && (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            {/* Información del Envío */}
+            <Card size="small" title="ℹ️ Información del Envío" style={{ background: '#e6f7ff' }}>
+              <Row gutter={[16, 16]}>
+                <Col span={8}>
+                  <Text strong>Sucursal:</Text>
+                  <br />
+                  <Tag color="blue" style={{ fontSize: 14, marginTop: 4 }}>
+                    {detalleEnvioSeleccionado.sucursal?.toUpperCase()}
+                  </Tag>
+                </Col>
+                <Col span={8}>
+                  <Text strong>Fecha:</Text>
+                  <br />
+                  <Text>{dayjs(detalleEnvioSeleccionado.fecha_envio).format('DD/MM/YYYY HH:mm')}</Text>
+                </Col>
+                <Col span={8}>
+                  <Text strong>Usuario:</Text>
+                  <br />
+                  <Text>{detalleEnvioSeleccionado.usuario_email}</Text>
+                </Col>
+                <Col span={12}>
+                  <Text strong>Total Productos:</Text>
+                  <br />
+                  <Tag color="orange" style={{ fontSize: 14, marginTop: 4 }}>
+                    {detalleEnvioSeleccionado.total_productos}
+                  </Tag>
+                </Col>
+                <Col span={12}>
+                  <Text strong>Total Unidades:</Text>
+                  <br />
+                  <Tag color="red" style={{ fontSize: 14, marginTop: 4 }}>
+                    {detalleEnvioSeleccionado.total_unidades}
+                  </Tag>
+                </Col>
+                {detalleEnvioSeleccionado.observaciones && (
+                  <Col span={24}>
+                    <Text strong>Observaciones:</Text>
+                    <br />
+                    <Text italic>{detalleEnvioSeleccionado.observaciones}</Text>
+                  </Col>
+                )}
+              </Row>
+            </Card>
+
+            {/* Tabla de Productos */}
+            <Card size="small" title="📦 Productos Enviados">
+              <Table
+                dataSource={detalleEnvioSeleccionado.productos || []}
+                loading={loadingDetalleEnvio}
+                rowKey="id"
+                pagination={false}
+                columns={[
+                  {
+                    title: 'Producto',
+                    dataIndex: 'producto_nombre',
+                    key: 'producto_nombre'
+                  },
+                  {
+                    title: 'Marca',
+                    dataIndex: 'producto_marca',
+                    key: 'producto_marca',
+                    width: 150,
+                    render: (marca) => marca || '-'
+                  },
+                  {
+                    title: 'Tipo',
+                    dataIndex: 'producto_tipo',
+                    key: 'producto_tipo',
+                    width: 150,
+                    render: (tipo) => tipo ? (
+                      <Tag color="orange">{tipo}</Tag>
+                    ) : '-'
+                  },
+                  {
+                    title: 'Cantidad',
+                    dataIndex: 'cantidad',
+                    key: 'cantidad',
+                    width: 120,
+                    align: 'center',
+                    render: (cantidad) => (
+                      <Tag color="red" style={{ fontSize: 14, fontWeight: 'bold' }}>
+                        {cantidad}
+                      </Tag>
+                    )
+                  }
+                ]}
+                summary={(pageData) => (
+                  <Table.Summary.Row style={{ background: '#f0f0f0' }}>
+                    <Table.Summary.Cell index={0} colSpan={3}>
+                      <Text strong>TOTAL</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={1} align="center">
+                      <Tag color="red" style={{ fontSize: 16, fontWeight: 'bold' }}>
+                        {pageData.reduce((sum, item) => sum + Number(item.cantidad || 0), 0)}
+                      </Tag>
+                    </Table.Summary.Cell>
+                  </Table.Summary.Row>
+                )}
+              />
+            </Card>
+          </Space>
         )}
       </Modal>
     </div>

@@ -2231,6 +2231,61 @@ export const descuentosService = {
   },
 };
 
+/**
+ * ========================================
+ * SERVICIO: ENVÍOS DE FALLAS
+ * ========================================
+ */
+export const enviosFallasService = {
+  /**
+   * Registrar envío de stock de fallas
+   */
+  registrarEnvio: async (sucursal: string, observaciones?: string) => {
+    try {
+      const response = await apiClient.post('/envios-fallas', {
+        sucursal,
+        observaciones
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al registrar envío de fallas:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Obtener historial de envíos con filtros
+   */
+  obtenerHistorial: async (params?: {
+    sucursal?: string;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+  }) => {
+    try {
+      const response = await apiClient.get('/envios-fallas/historial', {
+        params
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al obtener historial de envíos:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Obtener detalle de un envío específico
+   */
+  obtenerDetalle: async (envioId: number) => {
+    try {
+      const response = await apiClient.get(`/envios-fallas/${envioId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al obtener detalle de envío:', error);
+      throw error.response?.data || error;
+    }
+  }
+};
+
 export default apiClient;
 
 
