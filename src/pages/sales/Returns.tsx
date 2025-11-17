@@ -790,7 +790,7 @@ const Returns: React.FC = () => {
 
       {/* Modal Devolución */}
       <Modal
-        title="💸 Procesar Devolución"
+        title={<span style={{ color: '#000' }}>💸 Procesar Devolución</span>}
         open={modalDevolucionVisible}
         onCancel={() => setModalDevolucionVisible(false)}
         footer={null}

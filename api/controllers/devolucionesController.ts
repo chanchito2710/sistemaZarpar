@@ -254,11 +254,36 @@ export const procesarDevolucion = async (req: Request, res: Response): Promise<v
       // Devolver a cuenta corriente del cliente (genera un HABER = crédito a favor del cliente)
       console.log('💳 Agregando crédito a cuenta corriente del cliente...');
       
+      // 1. Verificar si el cliente existe en la tabla de clientes
+      const tablaClientes = `clientes_${sucursal.toLowerCase()}`;
+      const [clienteExiste] = await connection.execute<RowDataPacket[]>(
+        `SELECT id, nombre FROM \`${tablaClientes}\` WHERE id = ?`,
+        [cliente_id]
+      );
+      
+      let clienteIdFinal = cliente_id;
+      
+      // 2. Si el cliente NO existe, crearlo automáticamente
+      if (!clienteExiste || clienteExiste.length === 0) {
+        console.log(`⚠️ Cliente ${cliente_nombre} no existe en ${tablaClientes}, creando automáticamente...`);
+        
+        const [insertResult] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO \`${tablaClientes}\` 
+           (nombre, apellido, telefono, direccion, vendedor_id, activo, created_at)
+           VALUES (?, '', '', '', NULL, 1, NOW())`,
+          [cliente_nombre]
+        );
+        
+        clienteIdFinal = insertResult.insertId;
+        console.log(`✅ Cliente ${cliente_nombre} creado en ${tablaClientes} con ID: ${clienteIdFinal}`);
+      }
+      
+      // 3. Insertar movimiento en cuenta corriente
       await connection.execute(
         `INSERT INTO cuenta_corriente_movimientos 
          (sucursal, cliente_id, cliente_nombre, tipo, debe, haber, saldo, descripcion, fecha_movimiento)
          VALUES (?, ?, ?, 'devolucion', 0, ?, 0, ?, NOW())`,
-        [sucursal, cliente_id, cliente_nombre, monto_devuelto, `DEVOLUCIÓN - ${producto_nombre}${observaciones ? ' - ' + observaciones : ''}`]
+        [sucursal, clienteIdFinal, cliente_nombre, monto_devuelto, `DEVOLUCIÓN - ${producto_nombre}${observaciones ? ' - ' + observaciones : ''}`]
       );
       
       console.log(`✅ Crédito de $${monto_devuelto} agregado a cuenta corriente de ${cliente_nombre}`);
