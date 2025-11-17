@@ -66,6 +66,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [alertasStock, setAlertasStock] = useState<any[]>([]);
   const [modalAlertasVisible, setModalAlertasVisible] = useState(false);
   const [loadingAlertas, setLoadingAlertas] = useState(false);
+  const [filtroSucursalAlertas, setFiltroSucursalAlertas] = useState<string>('todas');
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -1637,14 +1638,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           <Space>
             <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 24 }} />
             <span style={{ fontSize: 18, fontWeight: 'bold' }}>
-              Alertas de Stock ({alertasStock.length})
+              Alertas de Stock ({alertasStock.filter(a => filtroSucursalAlertas === 'todas' || a.sucursal === filtroSucursalAlertas).length} de {alertasStock.length})
             </span>
           </Space>
         }
         placement="right"
         width={900}
         open={modalAlertasVisible}
-        onClose={() => setModalAlertasVisible(false)}
+        onClose={() => {
+          setModalAlertasVisible(false);
+          setFiltroSucursalAlertas('todas'); // Reset filtro al cerrar
+        }}
         extra={
           <Button
             icon={<ReloadOutlined />}
@@ -1662,9 +1666,37 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           showIcon
           style={{ marginBottom: 16 }}
         />
+
+        {/* Filtro de Sucursales */}
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Row gutter={16} align="middle">
+            <Col>
+              <Text strong>Filtrar por Sucursal:</Text>
+            </Col>
+            <Col flex="auto">
+              <Select
+                value={filtroSucursalAlertas}
+                onChange={(value) => setFiltroSucursalAlertas(value)}
+                style={{ width: 200 }}
+                options={[
+                  { label: '🌐 Todas las Sucursales', value: 'todas' },
+                  ...sucursales.map(s => ({
+                    label: `🏪 ${s.charAt(0).toUpperCase() + s.slice(1)}`,
+                    value: s
+                  }))
+                ]}
+              />
+            </Col>
+            <Col>
+              <Text type="secondary">
+                Mostrando: {alertasStock.filter(a => filtroSucursalAlertas === 'todas' || a.sucursal === filtroSucursalAlertas).length} alertas
+              </Text>
+            </Col>
+          </Row>
+        </Card>
         
         <Table
-          dataSource={alertasStock}
+          dataSource={alertasStock.filter(a => filtroSucursalAlertas === 'todas' || a.sucursal === filtroSucursalAlertas)}
           rowKey={(record) => `${record.producto_id}-${record.sucursal}`}
           loading={loadingAlertas}
           pagination={{ pageSize: 10, showSizeChanger: true }}
