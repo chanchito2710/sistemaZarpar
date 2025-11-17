@@ -173,10 +173,45 @@ const Inventory: React.FC = () => {
   // Datos de inventario desde la BD
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
   
-  // Estados para marcas, modelos y tipos dinámicos
+  // Estados para marcas, modelos y tipos dinámicos (DEPRECATED: ahora se usan useMemo)
   const [marcasDisponibles, setMarcasDisponibles] = useState<string[]>([]);
   const [modelosDisponibles, setModelosDisponibles] = useState<string[]>([]);
   const [tiposDisponibles, setTiposDisponibles] = useState<string[]>([]);
+
+  // ⭐ Filtros dinámicos para Inventario Principal (useMemo para evitar problemas en Railway)
+  const filtrosTipoInventario = useMemo(() => {
+    const tipos = Array.from(new Set(
+      inventoryData
+        .map(p => p.tipo)
+        .filter(Boolean)
+        .map(tipo => tipo.trim()) // Normalizar espacios
+    )).sort();
+    
+    const filtros = tipos.map(tipo => ({
+      text: tipo,
+      value: tipo
+    }));
+    
+    console.log('🔄 Filtros de Tipo (Inventario) recalculados:', filtros.length, 'opciones');
+    return filtros;
+  }, [inventoryData]);
+
+  const filtrosMarcaInventario = useMemo(() => {
+    const marcas = Array.from(new Set(
+      inventoryData
+        .map(p => p.marca)
+        .filter(Boolean)
+        .map(marca => marca.trim()) // Normalizar espacios
+    )).sort();
+    
+    const filtros = marcas.map(marca => ({
+      text: marca,
+      value: marca
+    }));
+    
+    console.log('🔄 Filtros de Marca (Inventario) recalculados:', filtros.length, 'opciones');
+    return filtros;
+  }, [inventoryData]);
 
   // Drawer Stock Fallas
   const [drawerFallasVisible, setDrawerFallasVisible] = useState(false);
@@ -345,6 +380,16 @@ const Inventory: React.FC = () => {
       }));
       
       console.log('✅ [DEBUG] Productos transformados en tránsito:', datosTransformados.filter((d: any) => d.recibidos > 0));
+      
+      // ⭐ Logging adicional para debugging en Railway
+      if (datosTransformados.length > 0) {
+        const tiposUnicos = Array.from(new Set(datosTransformados.map(p => p.tipo).filter(Boolean)));
+        const marcasUnicas = Array.from(new Set(datosTransformados.map(p => p.marca).filter(Boolean)));
+        console.log('📊 Inventario: Tipos únicos encontrados:', tiposUnicos);
+        console.log('📊 Inventario: Marcas únicas encontradas:', marcasUnicas);
+      } else {
+        console.warn('⚠️ No se recibieron datos de inventario');
+      }
       
       setInventoryData(datosTransformados);
     } catch (error) {
@@ -861,9 +906,14 @@ const Inventory: React.FC = () => {
           </Tag>
         );
       },
-      filters: tiposDisponibles.map(tipo => ({ text: tipo, value: tipo })),
+      filters: filtrosTipoInventario, // ⭐ Usar useMemo calculado reactivamente
       defaultFilteredValue: ['Display'],
-      onFilter: (value: any, record: InventoryItem) => record.tipo === value,
+      onFilter: (value: any, record: InventoryItem) => {
+        // Normalizar comparación para evitar problemas de encoding
+        const tipoRecord = (record.tipo || '').trim();
+        const tipoValue = String(value).trim();
+        return tipoRecord === tipoValue;
+      },
       sorter: (a: InventoryItem, b: InventoryItem) => (a.tipo || '').localeCompare(b.tipo || '')
     },
     {
@@ -886,8 +936,13 @@ const Inventory: React.FC = () => {
           </Tag>
         );
       },
-      filters: marcasDisponibles.map(marca => ({ text: marca, value: marca })),
-      onFilter: (value: any, record: InventoryItem) => record.marca === value,
+      filters: filtrosMarcaInventario, // ⭐ Usar useMemo calculado reactivamente
+      onFilter: (value: any, record: InventoryItem) => {
+        // Normalizar comparación para evitar problemas de encoding
+        const marcaRecord = (record.marca || '').trim();
+        const marcaValue = String(value).trim();
+        return marcaRecord === marcaValue;
+      },
       sorter: (a: InventoryItem, b: InventoryItem) => a.marca.localeCompare(b.marca)
     },
     {
@@ -1204,9 +1259,9 @@ const Inventory: React.FC = () => {
                   }}
                   options={[
                     { value: 'all', label: '✨ Todas' },
-                    ...marcasDisponibles.map(marca => ({
-                      value: marca,
-                      label: `📱 ${marca}`
+                    ...filtrosMarcaInventario.map(filtro => ({
+                      value: filtro.value,
+                      label: `📱 ${filtro.text}`
                     }))
                   ]}
                   styles={customSelectStyles}
@@ -1247,9 +1302,9 @@ const Inventory: React.FC = () => {
                   }}
                   options={[
                     { value: 'all', label: '✨ Todos' },
-                    ...tiposDisponibles.map(tipo => ({
-                      value: tipo,
-                      label: `🏷️ ${tipo}`
+                    ...filtrosTipoInventario.map(filtro => ({
+                      value: filtro.value,
+                      label: `🏷️ ${filtro.text}`
                     }))
                   ]}
                   styles={customSelectStyles}
