@@ -415,8 +415,16 @@ const Inventory: React.FC = () => {
       // Usuario normal: usar su sucursal
       setSucursalFallasSeleccionada(sucursalUsuario);
       cargarStockFallas(sucursalUsuario);
+    } else if (esAdmin && sucursales.length > 0) {
+      // Admin: inicializar con sucursal principal o primera disponible
+      const primeraDisponible = sucursalPrincipal || sucursales
+        .filter(s => s.toLowerCase() !== 'administrador' && s.toLowerCase() !== 'administracion')[0];
+      
+      if (primeraDisponible) {
+        setSucursalFallasSeleccionada(primeraDisponible.toLowerCase());
+        cargarStockFallas(primeraDisponible.toLowerCase());
+      }
     }
-    // Si es admin sin sucursal seleccionada, el useEffect se encargará
   };
 
   // Cambiar sucursal de fallas
@@ -1193,10 +1201,14 @@ const Inventory: React.FC = () => {
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Sucursal:</span>
                   <div style={{ width: 180 }}>
                     <ReactSelect
-                      value={{
-                        value: sucursalFallasSeleccionada,
-                        label: sucursalFallasSeleccionada.toUpperCase()
-                      }}
+                      value={
+                        sucursalFallasSeleccionada
+                          ? {
+                              value: sucursalFallasSeleccionada,
+                              label: sucursalFallasSeleccionada.toUpperCase()
+                            }
+                          : null
+                      }
                       onChange={(option) => {
                         if (option) {
                           cambiarSucursalFallas(option.value);
