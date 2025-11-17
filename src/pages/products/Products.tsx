@@ -2027,7 +2027,7 @@ const Products: React.FC = () => {
         title={
           <Space>
             <DollarOutlined style={{ color: '#52c41a' }} />
-            <span>{productoEditandoPrecios?.nombre} - Precios por Sucursal</span>
+            <span style={{ color: '#000' }}>{productoEditandoPrecios?.nombre} - Precios por Sucursal</span>
           </Space>
         }
         open={modalEditarPrecios}
