@@ -7,6 +7,7 @@
 import { Request, Response } from 'express';
 import { executeQuery } from '../config/database';
 import pool from '../config/database';
+import { RowDataPacket } from 'mysql2';
 
 /**
  * Interfaz para Sucursal
@@ -347,6 +348,8 @@ export const crearSucursal = async (req: Request, res: Response): Promise<void> 
  * En su lugar, detecta y elimina FKs de forma explícita
  */
 export const eliminarSucursal = async (req: Request, res: Response): Promise<void> => {
+  const connection = await pool.getConnection();
+  
   try {
     const { nombre } = req.params;
 
@@ -361,29 +364,26 @@ export const eliminarSucursal = async (req: Request, res: Response): Promise<voi
     const nombreNormalizado = nombre.toLowerCase();
     const nombreTabla = `clientes_${nombreNormalizado}`;
 
-    console.log(`🗑️ Iniciando eliminación de sucursal: ${nombreNormalizado}`);
+    console.log(`🗑️ ⚠️ INICIANDO ELIMINACIÓN PERMANENTE Y TOTAL DE SUCURSAL: ${nombreNormalizado}`);
+    console.log(`⚠️ Esta operación ELIMINARÁ TODO: vendedores, clientes, ventas, productos, etc.`);
 
-    // 1. Verificar si hay vendedores activos en esta sucursal
-    const vendedores = await executeQuery<{ total: number }[]>(
-      'SELECT COUNT(*) as total FROM vendedores WHERE sucursal = ? AND activo = 1',
+    // ⭐ Iniciar transacción para que sea todo o nada
+    await connection.beginTransaction();
+
+    // 1. Contar TODOS los vendedores (activos e inactivos)
+    const [vendedores] = await connection.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as total FROM vendedores WHERE sucursal = ?',
       [nombreNormalizado]
     );
-
-    if (vendedores[0].total > 0) {
-      console.log(`⚠️ Sucursal ${nombreNormalizado} tiene ${vendedores[0].total} vendedor(es) activo(s)`);
-      res.status(400).json({
-        success: false,
-        message: `❌ No se puede eliminar la sucursal "${nombreNormalizado.toUpperCase()}" porque tiene ${vendedores[0].total} vendedor(es) activo(s). Por favor, elimina o reasigna los vendedores primero.`
-      });
-      return;
-    }
+    const totalVendedores = vendedores[0]?.total || 0;
+    console.log(`👥 Total vendedores en ${nombreNormalizado}: ${totalVendedores}`)
 
     // 2. Verificar si la tabla de clientes existe y tiene datos
     let totalClientes = 0;
     let tablaExiste = false;
 
     try {
-      const clientes = await executeQuery<{ total: number }[]>(
+      const [clientes] = await connection.execute<RowDataPacket[]>(
         `SELECT COUNT(*) as total FROM \`${nombreTabla}\``
       );
       totalClientes = clientes[0]?.total || 0;
@@ -398,36 +398,106 @@ export const eliminarSucursal = async (req: Request, res: Response): Promise<voi
     }
 
     // 3. Contar productos de esta sucursal
-    const productos = await executeQuery<{ total: number }[]>(
+    const [productos] = await connection.execute<RowDataPacket[]>(
       'SELECT COUNT(*) as total FROM productos_sucursal WHERE sucursal = ?',
       [nombreNormalizado]
     );
     const totalProductos = productos[0]?.total || 0;
     console.log(`📦 La sucursal ${nombreNormalizado} tiene ${totalProductos} producto(s) asignado(s)`);
 
-    // ELIMINACIÓN EN ORDEN:
+    // 4. Contar ventas de esta sucursal
+    const [ventas] = await connection.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as total FROM ventas WHERE sucursal = ?',
+      [nombreNormalizado]
+    );
+    const totalVentas = ventas[0]?.total || 0;
+    console.log(`💰 La sucursal ${nombreNormalizado} tiene ${totalVentas} venta(s) registrada(s)`);
 
-    // 4. Eliminar productos de la sucursal
-    if (totalProductos > 0) {
-      try {
-        await executeQuery(
-          'DELETE FROM productos_sucursal WHERE sucursal = ?',
-          [nombreNormalizado]
-        );
-        console.log(`✅ ${totalProductos} producto(s) eliminado(s) de ${nombreNormalizado}`);
-      } catch (error: any) {
-        console.error(`⚠️ Error al eliminar productos: ${error.message}`);
-        // Continuar de todas formas
-      }
+    // 5. Contar transferencias relacionadas
+    const [transferencias] = await connection.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as total FROM transferencias WHERE sucursal_origen = ? OR sucursal_destino = ?',
+      [nombreNormalizado, nombreNormalizado]
+    );
+    const totalTransferencias = transferencias[0]?.total || 0;
+    console.log(`🔄 La sucursal ${nombreNormalizado} tiene ${totalTransferencias} transferencia(s) relacionada(s)`);
+
+    // ⚠️ ELIMINACIÓN EN ORDEN ESTRICTO:
+
+    console.log(`\n🗑️ Iniciando eliminación en orden...`);
+
+    // 6. Eliminar ventas_detalle (depende de ventas)
+    if (totalVentas > 0) {
+      const [ventasDetalle] = await connection.execute(
+        'DELETE vd FROM ventas_detalle vd INNER JOIN ventas v ON vd.venta_id = v.id WHERE v.sucursal = ?',
+        [nombreNormalizado]
+      );
+      console.log(`✅ Detalles de ventas eliminados`);
     }
 
-    // 5. Eliminar la tabla de clientes (si existe)
+    // 7. Eliminar ventas de la sucursal
+    if (totalVentas > 0) {
+      await connection.execute(
+        'DELETE FROM ventas WHERE sucursal = ?',
+        [nombreNormalizado]
+      );
+      console.log(`✅ ${totalVentas} venta(s) eliminada(s) de ${nombreNormalizado}`);
+    }
+
+    // 8. Eliminar transferencias_detalle (depende de transferencias)
+    if (totalTransferencias > 0) {
+      await connection.execute(
+        'DELETE td FROM transferencias_detalle td INNER JOIN transferencias t ON td.transferencia_id = t.id WHERE t.sucursal_origen = ? OR t.sucursal_destino = ?',
+        [nombreNormalizado, nombreNormalizado]
+      );
+      console.log(`✅ Detalles de transferencias eliminados`);
+    }
+
+    // 9. Eliminar transferencias
+    if (totalTransferencias > 0) {
+      await connection.execute(
+        'DELETE FROM transferencias WHERE sucursal_origen = ? OR sucursal_destino = ?',
+        [nombreNormalizado, nombreNormalizado]
+      );
+      console.log(`✅ ${totalTransferencias} transferencia(s) eliminada(s)`);
+    }
+
+    // 10. Eliminar comisiones de vendedores de esta sucursal
+    await connection.execute(
+      'DELETE c FROM comisiones_vendedores c INNER JOIN vendedores v ON c.vendedor_id = v.id WHERE v.sucursal = ?',
+      [nombreNormalizado]
+    );
+    console.log(`✅ Comisiones de vendedores eliminadas`);
+
+    // 11. Eliminar movimientos de caja
+    await connection.execute(
+      'DELETE FROM movimientos_caja WHERE sucursal = ?',
+      [nombreNormalizado]
+    );
+    console.log(`✅ Movimientos de caja eliminados`);
+
+    // 12. Eliminar entrada de caja
+    await connection.execute(
+      'DELETE FROM caja WHERE sucursal = ?',
+      [nombreNormalizado]
+    );
+    console.log(`✅ Registro de caja eliminado`);
+
+    // 13. Eliminar productos de la sucursal
+    if (totalProductos > 0) {
+      await connection.execute(
+        'DELETE FROM productos_sucursal WHERE sucursal = ?',
+        [nombreNormalizado]
+      );
+      console.log(`✅ ${totalProductos} producto(s) eliminado(s) de ${nombreNormalizado}`);
+    }
+
+    // 14. Eliminar la tabla de clientes (si existe)
     if (tablaExiste) {
       try {
         console.log(`🔍 Buscando foreign keys en tabla ${nombreTabla}...`);
         
         // Obtener todas las foreign keys de la tabla
-        const [constraints] = await pool.execute(
+        const [constraints] = await connection.execute(
           `SELECT CONSTRAINT_NAME 
            FROM information_schema.TABLE_CONSTRAINTS 
            WHERE TABLE_SCHEMA = DATABASE() 
@@ -443,7 +513,7 @@ export const eliminarSucursal = async (req: Request, res: Response): Promise<voi
         for (const fk of fks) {
           try {
             console.log(`🗑️ Eliminando FK: ${fk.CONSTRAINT_NAME}`);
-            await pool.execute(
+            await connection.execute(
               `ALTER TABLE \`${nombreTabla}\` DROP FOREIGN KEY \`${fk.CONSTRAINT_NAME}\``
             );
             console.log(`✅ FK ${fk.CONSTRAINT_NAME} eliminada exitosamente`);
@@ -455,7 +525,7 @@ export const eliminarSucursal = async (req: Request, res: Response): Promise<voi
 
         // Ahora eliminar la tabla (sin foreign keys)
         console.log(`🗑️ Eliminando tabla ${nombreTabla}...`);
-        await pool.execute(`DROP TABLE IF EXISTS \`${nombreTabla}\``);
+        await connection.execute(`DROP TABLE IF EXISTS \`${nombreTabla}\``);
         console.log(`✅ Tabla ${nombreTabla} eliminada PERMANENTEMENTE`);
         
       } catch (error: any) {
@@ -464,41 +534,44 @@ export const eliminarSucursal = async (req: Request, res: Response): Promise<voi
       }
     }
 
-    // 6. Eliminar vendedores inactivos de la sucursal (si los hay)
-    const vendedoresInactivos = await executeQuery<{ total: number }[]>(
-      'SELECT COUNT(*) as total FROM vendedores WHERE sucursal = ? AND activo = 0',
-      [nombreNormalizado]
-    );
-
-    if (vendedoresInactivos[0].total > 0) {
-      await executeQuery(
-        'DELETE FROM vendedores WHERE sucursal = ? AND activo = 0',
+    // 15. Eliminar TODOS los vendedores de la sucursal (activos e inactivos)
+    if (totalVendedores > 0) {
+      await connection.execute(
+        'DELETE FROM vendedores WHERE sucursal = ?',
         [nombreNormalizado]
       );
-      console.log(`✅ ${vendedoresInactivos[0].total} vendedor(es) inactivo(s) eliminado(s)`);
+      console.log(`✅ ${totalVendedores} vendedor(es) eliminado(s) PERMANENTEMENTE`);
     }
 
-    console.log(`🎉 Sucursal ${nombreNormalizado} ELIMINADA PERMANENTEMENTE`);
+    // ⭐ Commit de la transacción
+    await connection.commit();
+    console.log(`\n🎉 ✅ SUCURSAL ${nombreNormalizado.toUpperCase()} ELIMINADA PERMANENTEMENTE`);
 
     res.json({
       success: true,
-      message: `🗑️ Sucursal "${nombreNormalizado.toUpperCase()}" eliminada PERMANENTEMENTE de la base de datos`,
+      message: `🗑️ Sucursal "${nombreNormalizado.toUpperCase()}" y TODOS sus datos eliminados PERMANENTEMENTE`,
       data: {
         sucursal: nombreNormalizado,
         tabla_clientes_eliminada: tablaExiste,
         clientes_eliminados: totalClientes,
         productos_eliminados: totalProductos,
-        vendedores_inactivos_eliminados: vendedoresInactivos[0].total,
+        ventas_eliminadas: totalVentas,
+        transferencias_eliminadas: totalTransferencias,
+        vendedores_eliminados: totalVendedores,
         eliminado_permanentemente: true
       }
     });
   } catch (error: any) {
-    console.error('❌ Error al eliminar sucursal:', error);
+    // ⚠️ Rollback de la transacción si algo falla
+    await connection.rollback();
+    console.error('❌ Error al eliminar sucursal (rollback ejecutado):', error);
     res.status(500).json({
       success: false,
-      message: 'Error al eliminar sucursal',
+      message: 'Error al eliminar sucursal. Ningún cambio fue aplicado.',
       error: error instanceof Error ? error.message : 'Error desconocido'
     });
+  } finally {
+    connection.release();
   }
 };
 

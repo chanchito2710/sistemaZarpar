@@ -711,22 +711,26 @@ const StaffSellers: React.FC = () => {
       if (response.data.success) {
         const data = response.data.data;
         
-        // Mostrar mensaje con detalles de lo que se eliminó
+        // Mostrar mensaje con detalles completos de lo que se eliminó
         messageApi.success({
           content: (
             <div>
-              <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 8, fontSize: 14 }}>
                 🗑️ Sucursal "{nombreSucursal.toUpperCase()}" eliminada PERMANENTEMENTE
               </div>
               <div style={{ fontSize: '12px' }}>
-                • Tabla de clientes: {data.tabla_clientes_eliminada ? '✅ Eliminada' : '⚠️ No existía'}<br />
-                • Clientes eliminados: {data.clientes_eliminados}<br />
-                • Productos eliminados: {data.productos_eliminados}<br />
-                • Vendedores inactivos eliminados: {data.vendedores_inactivos_eliminados}
+                <strong>Datos eliminados:</strong><br />
+                • 👥 Vendedores: {data.vendedores_eliminados}<br />
+                • 💰 Ventas: {data.ventas_eliminadas}<br />
+                • 👤 Clientes: {data.clientes_eliminados} (tabla {data.tabla_clientes_eliminada ? 'ELIMINADA' : 'no existía'})<br />
+                • 📦 Productos: {data.productos_eliminados}<br />
+                • 🔄 Transferencias: {data.transferencias_eliminadas}<br />
+                <br />
+                <strong style={{ color: '#ff4d4f' }}>⚠️ Eliminación total completada</strong>
               </div>
             </div>
           ),
-          duration: 8
+          duration: 10
         });
 
         // Recargar sucursales y vendedores
@@ -1399,33 +1403,52 @@ const StaffSellers: React.FC = () => {
 
                             {/* Botón Eliminar */}
                             <Popconfirm
-                              title="⚠️ Eliminar Sucursal"
+                              title={
+                                <div style={{ maxWidth: 450 }}>
+                                  <div style={{ fontWeight: 'bold', color: '#ff4d4f', fontSize: 16 }}>
+                                    🚨 ¡ELIMINAR SUCURSAL COMPLETA Y PERMANENTEMENTE!
+                                  </div>
+                                  <div style={{ marginTop: 12, fontSize: 14 }}>
+                                    ¿Estás ABSOLUTAMENTE SEGURO de eliminar la sucursal "<strong style={{ color: '#ff4d4f' }}>{formatearNombreSucursal(record.sucursal)}</strong>"?
+                                  </div>
+                                </div>
+                              }
                               description={
-                                <div style={{ maxWidth: 300 }}>
-                                  <p>¿Eliminar <strong>{formatearNombreSucursal(record.sucursal)}</strong>?</p>
-                                  {record.total_vendedores > 0 && (
+                                <div style={{ maxWidth: 450 }}>
                                   <Alert
-                                      message="No se puede eliminar"
-                                      description={`Tiene ${record.total_vendedores} vendedor(es) activo(s)`}
-                                      type="warning"
+                                    message="⛔ ADVERTENCIA: ELIMINACIÓN TOTAL E IRREVERSIBLE"
+                                    description={
+                                      <div style={{ fontSize: 12 }}>
+                                        Se eliminarán <strong style={{ color: '#ff4d4f' }}>PERMANENTEMENTE</strong> de la base de datos:
+                                        <br /><br />
+                                        • 👥 <strong>TODOS los vendedores</strong> ({record.total_vendedores} vendedor(es))
+                                        <br />• 💰 <strong>TODAS las ventas</strong> realizadas en esta sucursal
+                                        <br />• 👤 <strong>TODOS los clientes</strong> (tabla completa clientes_{record.sucursal})
+                                        <br />• 📦 <strong>TODOS los productos</strong> asignados
+                                        <br />• 🔄 <strong>TODAS las transferencias</strong> relacionadas
+                                        <br />• 💵 <strong>TODAS las comisiones</strong> de vendedores
+                                        <br />• 💸 <strong>TODO el historial de caja</strong>
+                                        <br />
+                                        <br /><strong style={{ color: '#ff4d4f', fontSize: 14 }}>⚠️ NO HAY VUELTA ATRÁS ⚠️</strong>
+                                        <br />Esta acción <strong>DESTRUIRÁ</strong> toda la información de la sucursal.
+                                      </div>
+                                    }
+                                    type="error"
                                     showIcon
-                                    style={{ marginTop: 8 }}
+                                    style={{ marginTop: 12, marginBottom: 12 }}
                                   />
-                                  )}
                                 </div>
                               }
                               onConfirm={() => handleEliminarSucursal(record.sucursal)}
-                              okText="Eliminar"
-                              cancelText="Cancelar"
+                              okText="⚠️ SÍ, ELIMINAR TODO PERMANENTEMENTE"
+                              cancelText="❌ NO, Cancelar"
                               okButtonProps={{
-                                danger: true,
-                                disabled: record.total_vendedores > 0
+                                danger: true
                               }}
                             >
                               <Button 
                                 danger 
                                 icon={<DeleteOutlined />}
-                                disabled={record.total_vendedores > 0}
                               >
                                 Eliminar
                               </Button>
