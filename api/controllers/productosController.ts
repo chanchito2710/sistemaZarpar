@@ -277,6 +277,17 @@ export const obtenerProductosPorSucursal = async (req: Request, res: Response): 
 
     const productos = await executeQuery<ProductoCompleto[]>(query, [sucursal.toLowerCase()]);
 
+    // 🔍 LOG TEMPORAL para debug
+    const iphone11 = productos.find(p => p.nombre?.toLowerCase().includes('iphone 11'));
+    if (iphone11) {
+      console.log('\n🔍 [DEBUG] iPhone 11 encontrado:');
+      console.log('   Nombre:', iphone11.nombre);
+      console.log('   Stock:', iphone11.stock);
+      console.log('   Stock mínimo:', iphone11.stock_minimo);
+      console.log('   tiene_stock_bajo:', iphone11.tiene_stock_bajo);
+      console.log('   ✅ Debería ser 0 (FALSO) porque stock (100) >= stock_minimo (10)\n');
+    }
+
     res.json({
       success: true,
       data: productos,
