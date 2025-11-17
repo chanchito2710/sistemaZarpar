@@ -6,10 +6,6 @@
 import { pool } from '../config/database.js';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Crear tabla de control de migraciones si no existe
@@ -89,8 +85,8 @@ export const ejecutarMigraciones = async () => {
     // Crear tabla de control
     await crearTablaMigraciones();
     
-    // Ruta a las migraciones
-    const migracionesDir = path.join(__dirname, '../../database/migrations');
+    // Ruta a las migraciones (desde la raíz del proyecto)
+    const migracionesDir = path.join(process.cwd(), 'database/migrations');
     
     // Verificar si el directorio existe
     if (!fs.existsSync(migracionesDir)) {
