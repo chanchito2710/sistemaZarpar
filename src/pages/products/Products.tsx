@@ -672,10 +672,14 @@ const Products: React.FC = () => {
       }
 
       message.success('✅ Producto actualizado exitosamente (incluyendo alertas de stock mínimo)');
+      
+      // ✅ Recargar los productos para actualizar el estado
+      await cargarProductos();
+      await cargarProductosConSucursales();
+      
       setModalEditarVisible(false);
       setProductoEditando(null);
       formEditar.resetFields();
-      cargarProductos();
     } catch (error) {
       console.error('Error al actualizar producto:', error);
       message.error('Error al actualizar producto');
@@ -2054,10 +2058,14 @@ const Products: React.FC = () => {
 
             await Promise.all(promesas);
             message.success('✅ Precios actualizados correctamente');
+            
+            // ✅ Recargar los productos para actualizar el estado
+            await cargarProductos();
+            await cargarProductosConSucursales();
+            
             setModalEditarPrecios(false);
             setProductoEditandoPrecios(null);
             setPreciosPorSucursal({});
-            cargarProductos();
           } catch (error) {
             message.error('Error al actualizar precios');
             console.error(error);
@@ -2307,12 +2315,14 @@ const Products: React.FC = () => {
             
             await Promise.all(promesas);
             message.success('✅ Stock actualizado correctamente en todas las sucursales');
+            
+            // ✅ Recargar ambas listas de productos para actualizar el estado
+            await cargarProductos();
+            await cargarProductosConSucursales();
+            
             setModalEditarStock(false);
             setProductoEditandoStock(null);
             setStockPorSucursal({});
-            // Recargar ambas listas de productos
-            cargarProductos();
-            cargarProductosConSucursales();
           } catch (error) {
             message.error('Error al actualizar stock');
             console.error(error);
