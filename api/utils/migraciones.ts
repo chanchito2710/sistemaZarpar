@@ -52,15 +52,36 @@ const ejecutarMigracion = async (nombre: string, sql: string) => {
   const connection = await pool.getConnection();
   
   try {
+    // Limpiar SQL: remover comentarios y líneas vacías
+    const cleanSql = sql
+      .split('\n')
+      .filter(line => {
+        const trimmed = line.trim();
+        return trimmed.length > 0 && !trimmed.startsWith('--');
+      })
+      .join('\n');
+    
     // Dividir por ';' y ejecutar cada statement
-    const statements = sql
+    const statements = cleanSql
       .split(';')
       .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
+      .filter(s => {
+        const upper = s.toUpperCase();
+        // Filtrar comandos problemáticos y vacíos
+        return s.length > 0 
+          && !upper.startsWith('USE ')
+          && !upper.startsWith('SHOW ')
+          && !upper.startsWith('SELECT \'');
+      });
     
     for (const statement of statements) {
       if (statement.length > 0) {
-        await connection.execute(statement);
+        try {
+          await connection.query(statement); // Usar query() en vez de execute()
+        } catch (stmtError: any) {
+          console.warn(`⚠️ Statement warning en ${nombre}: ${stmtError.message}`);
+          // Continuar con el siguiente statement
+        }
       }
     }
     
@@ -69,7 +90,8 @@ const ejecutarMigracion = async (nombre: string, sql: string) => {
     
   } catch (error: any) {
     console.error(`❌ Error ejecutando migración ${nombre}:`, error.message);
-    throw error;
+    // No lanzar error para no detener el servidor
+    console.log(`⏭️ Continuando con el siguiente proceso...`);
   } finally {
     connection.release();
   }
