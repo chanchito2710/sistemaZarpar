@@ -439,11 +439,24 @@ const Products: React.FC = () => {
    */
   /**
    * Guardar configuración de Precio Base Global (solo sucursales)
+   * ⭐ PERSISTE en localStorage para que no se pierda al recargar
    */
   const guardarConfigPrecioBaseGlobal = () => {
     if (sucursalesBaseGlobal1.length === 0 && sucursalesBaseGlobal2.length === 0) {
       message.warning('⚠️ Selecciona al menos una sucursal en Base 1 o Base 2');
       return;
+    }
+    
+    // ⭐ Guardar en localStorage
+    try {
+      const config = {
+        sucursalesBase1: sucursalesBaseGlobal1,
+        sucursalesBase2: sucursalesBaseGlobal2
+      };
+      localStorage.setItem('zarpar_precio_base_config', JSON.stringify(config));
+      console.log('💾 Configuración de Precio Base guardada en localStorage:', config);
+    } catch (error) {
+      console.error('Error al guardar configuración en localStorage:', error);
     }
     
     setModalConfigPrecioBase(false);
@@ -457,7 +470,25 @@ const Products: React.FC = () => {
       mensaje += `Base 2: ${sucursalesBaseGlobal2.length} sucursales`;
     }
     
-    message.success(`✅ Configuración guardada: ${mensaje}`);
+    message.success(`✅ Configuración guardada y persistida: ${mensaje}`);
+  };
+
+  /**
+   * Limpiar configuración de Precio Base Global
+   * ⭐ Elimina la configuración guardada de localStorage
+   */
+  const limpiarConfigPrecioBaseGlobal = () => {
+    setSucursalesBaseGlobal1([]);
+    setSucursalesBaseGlobal2([]);
+    
+    try {
+      localStorage.removeItem('zarpar_precio_base_config');
+      console.log('🗑️ Configuración de Precio Base eliminada de localStorage');
+      message.success('🗑️ Configuración limpiada exitosamente');
+    } catch (error) {
+      console.error('Error al limpiar configuración:', error);
+      message.error('Error al limpiar configuración');
+    }
   };
 
   /**
@@ -721,6 +752,28 @@ const Products: React.FC = () => {
     cargarTipos();
     cargarCalidades();
   }, []);
+
+  /**
+   * ⭐ Efecto: Cargar configuración de Precio Base desde localStorage
+   */
+  useEffect(() => {
+    try {
+      const configGuardada = localStorage.getItem('zarpar_precio_base_config');
+      if (configGuardada) {
+        const config = JSON.parse(configGuardada);
+        if (config.sucursalesBase1 && Array.isArray(config.sucursalesBase1)) {
+          setSucursalesBaseGlobal1(config.sucursalesBase1);
+          console.log('📥 Configuración Base 1 cargada desde localStorage:', config.sucursalesBase1);
+        }
+        if (config.sucursalesBase2 && Array.isArray(config.sucursalesBase2)) {
+          setSucursalesBaseGlobal2(config.sucursalesBase2);
+          console.log('📥 Configuración Base 2 cargada desde localStorage:', config.sucursalesBase2);
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar configuración desde localStorage:', error);
+    }
+  }, []); // Solo se ejecuta al montar el componente
 
   /**
    * Buscar productos
@@ -2848,24 +2901,37 @@ const Products: React.FC = () => {
         open={modalConfigPrecioBase}
         onCancel={() => setModalConfigPrecioBase(false)}
         footer={
-          <Space>
-            <Button onClick={() => setModalConfigPrecioBase(false)}>
-              Cancelar
-            </Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Botón Limpiar a la izquierda */}
             <Button 
-              type="primary" 
-              icon={<SaveOutlined />}
-              onClick={guardarConfigPrecioBaseGlobal}
+              danger
+              icon={<DeleteOutlined />}
+              onClick={limpiarConfigPrecioBaseGlobal}
+              disabled={sucursalesBaseGlobal1.length === 0 && sucursalesBaseGlobal2.length === 0}
             >
-              💾 Guardar Configuración
+              🗑️ Limpiar Configuración
             </Button>
-          </Space>
+            
+            {/* Botones de acción a la derecha */}
+            <Space>
+              <Button onClick={() => setModalConfigPrecioBase(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                type="primary" 
+                icon={<SaveOutlined />}
+                onClick={guardarConfigPrecioBaseGlobal}
+              >
+                💾 Guardar Configuración
+              </Button>
+            </Space>
+          </div>
         }
         width={700}
       >
         <Alert
-          message="💡 Pre-configuración de Sucursales"
-          description="Selecciona las sucursales que usarán cada precio base. Los precios se definirán individualmente por producto."
+          message="💡 Pre-configuración de Sucursales (se guarda automáticamente)"
+          description="Selecciona las sucursales que usarán cada precio base. Los precios se definirán individualmente por producto. Esta configuración se guardará y persistirá entre sesiones."
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
