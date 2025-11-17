@@ -263,7 +263,7 @@ export const obtenerProductosPorSucursal = async (req: Request, res: Response): 
         ps.stock_minimo,
         ps.es_stock_principal,
         CASE 
-          WHEN ps.stock <= ps.stock_minimo THEN 1 
+          WHEN ps.stock_minimo > 0 AND ps.stock < ps.stock_minimo THEN 1 
           ELSE 0 
         END as tiene_stock_bajo,
         p.activo,
@@ -739,7 +739,7 @@ export const buscarProductos = async (req: Request, res: Response): Promise<void
           ps.stock, ps.precio, ps.stock_minimo, 
           ps.es_stock_principal,
           CASE 
-            WHEN ps.stock <= ps.stock_minimo THEN 1 
+            WHEN ps.stock_minimo > 0 AND ps.stock < ps.stock_minimo THEN 1 
             ELSE 0 
           END as tiene_stock_bajo
         FROM productos p
