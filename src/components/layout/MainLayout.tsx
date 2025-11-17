@@ -1121,17 +1121,31 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Selector de sucursal (solo admin) */}
             {usuario?.esAdmin && (
-              <Select
-                value={sucursalSeleccionadaCaja}
-                onChange={(value) => setSucursalSeleccionadaCaja(value)}
-                style={{ width: 140 }}
-                size="middle"
-                loading={loadingCaja}
-                options={sucursales.map(s => ({
-                  label: s.toUpperCase(),
-                  value: s
-                }))}
-              />
+              <div style={{ width: 140 }}>
+                <ReactSelect
+                  value={{
+                    value: sucursalSeleccionadaCaja,
+                    label: sucursalSeleccionadaCaja.toUpperCase()
+                  }}
+                  onChange={(option) => {
+                    if (option) {
+                      setSucursalSeleccionadaCaja(option.value);
+                    }
+                  }}
+                  options={sucursales.map(s => ({
+                    value: s,
+                    label: s.toUpperCase()
+                  }))}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={false}
+                  isLoading={loadingCaja}
+                  placeholder="Sucursal"
+                  noOptionsMessage={() => 'No hay sucursales'}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
+              </div>
             )}
             
             {/* Div verde con la caja */}
