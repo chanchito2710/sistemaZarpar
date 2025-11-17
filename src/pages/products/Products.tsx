@@ -2018,14 +2018,16 @@ const Products: React.FC = () => {
           try {
             // Actualizar precios para cada sucursal
             const promesas = Object.entries(preciosPorSucursal).map(([sucursal, precio]) => {
+              const sucursalData = productoEditandoPrecios.sucursales?.find(s => s.sucursal === sucursal);
               return productosService.actualizarSucursal(
                 productoEditandoPrecios.id,
                 sucursal,
                 {
                   precio: Number(precio),
-                  // Mantener el stock actual sin cambios
-                  stock: productoEditandoPrecios.sucursales?.find(s => s.sucursal === sucursal)?.stock || 0,
-                  stock_minimo: 0
+                  // ✅ Mantener el stock actual sin cambios
+                  stock: sucursalData?.stock || 0,
+                  // ✅ Mantener el stock_minimo actual sin cambios
+                  stock_minimo: sucursalData?.stock_minimo || 0
                 }
               );
             });
@@ -2269,14 +2271,16 @@ const Products: React.FC = () => {
           try {
             // Actualizar stock para cada sucursal
             const promesas = Object.entries(stockPorSucursal).map(([sucursal, stock]) => {
+              const sucursalData = productoEditandoStock.sucursales?.find(s => s.sucursal === sucursal);
               return productosService.actualizarSucursal(
                 productoEditandoStock.id,
                 sucursal,
                 {
                   stock: Number(stock),
-                  // Mantener el precio actual sin cambios
-                  precio: productoEditandoStock.sucursales?.find(s => s.sucursal === sucursal)?.precio || 0,
-                  stock_minimo: 0
+                  // ✅ Mantener el precio actual sin cambios
+                  precio: sucursalData?.precio || 0,
+                  // ✅ Mantener el stock_minimo actual sin cambios
+                  stock_minimo: sucursalData?.stock_minimo || 0
                 }
               );
             });
