@@ -1308,16 +1308,17 @@ const Products: React.FC = () => {
                   {/* 🎯 Botón Gestionar Precios y Stock */}
                   <Button
                     icon={<SettingOutlined />}
-                    onClick={() => {
+                    onClick={async () => {
                       // Limpiar filtros al abrir el modal
                       setBusquedaModalGestion('');
                       setTipoFiltroModalGestion('todos');
                       setMarcaFiltroModalGestion('todas');
                       // ⭐ Cargar productos con información de todas las sucursales
-                      cargarProductosConSucursales();
-                      setModalGestionarPrecios(true);
+                      await cargarProductosConSucursales(); // ✅ Esperar a que se carguen los datos
+                      setModalGestionarPrecios(true); // ✅ Abrir modal DESPUÉS de cargar datos
                     }}
                     size="large"
+                    loading={loadingProductosConSucursales} // ✅ Mostrar spinner mientras carga
                     style={{
                       background: 'linear-gradient(135deg, #2c2416 0%, #3e2723 50%, #4a3728 100%)',
                       border: 'none',
@@ -1365,16 +1366,17 @@ const Products: React.FC = () => {
               {/* 📦 Botón Gestionar Stock */}
               <Button
                 icon={<InboxOutlined />}
-                onClick={() => {
+                onClick={async () => {
                   // Limpiar filtros al abrir el modal
                   setBusquedaModalGestionStock('');
                   setTipoFiltroModalGestionStock('todos');
                   setMarcaFiltroModalGestionStock('todas');
                   // Cargar productos con información de todas las sucursales
-                  cargarProductosConSucursales();
-                  setModalGestionarStock(true);
+                  await cargarProductosConSucursales(); // ✅ Esperar a que se carguen los datos
+                  setModalGestionarStock(true); // ✅ Abrir modal DESPUÉS de cargar datos
                 }}
                 size="large"
+                loading={loadingProductosConSucursales} // ✅ Mostrar spinner mientras carga
                 style={{
                   background: 'linear-gradient(135deg, #ffb3d9 0%, #ff85c0 100%)',
                   border: 'none',
@@ -2183,9 +2185,14 @@ const Products: React.FC = () => {
                   width: 400,
                   fixed: 'left',
                   render: (_, record: ProductoCompleto) => {
+                    // ⭐ Calcular precio promedio del producto como valor por defecto
+                    const precioPromedio = record.sucursales && record.sucursales.length > 0
+                      ? Math.round(record.sucursales.reduce((sum, s) => sum + (s.precio || 0), 0) / record.sucursales.length)
+                      : 0;
+                    
                     const config = preciosBase[record.id] || { 
-                      precio1: 0, 
-                      precio2: 0, 
+                      precio1: precioPromedio, // ✅ Usar precio promedio en lugar de 0
+                      precio2: precioPromedio, // ✅ Usar precio promedio en lugar de 0
                       sucursales1: sucursalesBaseGlobal1, 
                       sucursales2: sucursalesBaseGlobal2 
                     };
