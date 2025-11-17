@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col, Select, Statistic, Card, Upload, message, Badge, Drawer, Table, Alert, Tooltip } from 'antd';
+import { Layout, Menu, Avatar, Dropdown, theme, Tag, Spin, Space, Typography, Empty, Button, Modal, Divider, Row, Col, Statistic, Card, Upload, message, Badge, Drawer, Table, Alert, Tooltip } from 'antd';
+import ReactSelect, { StylesConfig } from 'react-select';
 import './MainLayout.css';
 import {
   UserOutlined,
@@ -72,6 +73,49 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const location = useLocation();
   const { token } = theme.useToken();
   const { usuario, isAuthenticated, isLoading, logout } = useAuth();
+
+  // ⭐ Estilos personalizados para react-select
+  const customSelectStyles: StylesConfig = {
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: '38px',
+      borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+      '&:hover': {
+        borderColor: '#1890ff'
+      },
+      cursor: 'pointer',
+      borderRadius: '6px'
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected 
+        ? '#1890ff' 
+        : state.isFocused 
+        ? '#e6f7ff' 
+        : 'white',
+      color: state.isSelected ? 'white' : '#262626',
+      cursor: 'pointer',
+      padding: '8px 12px',
+      '&:active': {
+        backgroundColor: '#1890ff'
+      }
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: '#262626'
+    }),
+    menu: (provided) => ({
+      ...provided,
+      borderRadius: '6px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      zIndex: 9999
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999
+    })
+  };
 
   // Función para actualizar el favicon dinámicamente
   const actualizarFavicon = (base64: string) => {
@@ -1674,17 +1718,34 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <Text strong>Filtrar por Sucursal:</Text>
             </Col>
             <Col flex="auto">
-              <Select
-                value={filtroSucursalAlertas}
-                onChange={(value) => setFiltroSucursalAlertas(value)}
-                style={{ width: 200 }}
+              <ReactSelect
+                value={
+                  filtroSucursalAlertas === 'todas'
+                    ? { value: 'todas', label: '🌐 Todas las Sucursales' }
+                    : { 
+                        value: filtroSucursalAlertas, 
+                        label: `🏪 ${filtroSucursalAlertas.charAt(0).toUpperCase() + filtroSucursalAlertas.slice(1)}` 
+                      }
+                }
+                onChange={(option) => {
+                  if (option) {
+                    setFiltroSucursalAlertas(option.value);
+                  }
+                }}
                 options={[
-                  { label: '🌐 Todas las Sucursales', value: 'todas' },
+                  { value: 'todas', label: '🌐 Todas las Sucursales' },
                   ...sucursales.map(s => ({
-                    label: `🏪 ${s.charAt(0).toUpperCase() + s.slice(1)}`,
-                    value: s
+                    value: s,
+                    label: `🏪 ${s.charAt(0).toUpperCase() + s.slice(1)}`
                   }))
                 ]}
+                styles={customSelectStyles}
+                isClearable={false}
+                isSearchable={true}
+                placeholder="Seleccionar sucursal"
+                noOptionsMessage={() => 'No hay sucursales disponibles'}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
               />
             </Col>
             <Col>

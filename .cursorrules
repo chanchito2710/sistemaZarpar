@@ -1215,6 +1215,82 @@ message.info('ℹ️ Información importante');
 - ✅ Sidebars (colapsable en móvil)
 - ✅ Estadísticas (stack vertical en móvil)
 
+### ⚠️ IMPORTANTE: Selectores (Dropdowns)
+
+**❌ NUNCA usar Ant Design Select:**
+```typescript
+// ❌ MAL - NO usar Ant Design Select
+import { Select } from 'antd';
+<Select options={...} />
+```
+
+**✅ SIEMPRE usar react-select:**
+```typescript
+// ✅ BIEN - Usar react-select con estilos personalizados
+import ReactSelect, { StylesConfig } from 'react-select';
+
+const customSelectStyles: StylesConfig = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: '38px',
+    borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
+    boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+    '&:hover': {
+      borderColor: '#1890ff'
+    },
+    cursor: 'pointer',
+    borderRadius: '6px'
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected ? '#1890ff' : state.isFocused ? '#e6f7ff' : 'white',
+    color: state.isSelected ? 'white' : '#262626',
+    cursor: 'pointer',
+    padding: '8px 12px',
+    '&:active': {
+      backgroundColor: '#1890ff'
+    }
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    color: '#262626'
+  }),
+  menu: (provided) => ({
+    ...provided,
+    borderRadius: '6px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    zIndex: 9999
+  }),
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: 9999
+  })
+};
+
+<ReactSelect
+  value={{ value: 'option1', label: 'Opción 1' }}
+  onChange={(option) => handleChange(option?.value)}
+  options={[
+    { value: 'option1', label: 'Opción 1' },
+    { value: 'option2', label: 'Opción 2' }
+  ]}
+  styles={customSelectStyles}
+  isClearable={false}
+  isSearchable={true}
+  placeholder="Seleccionar..."
+  noOptionsMessage={() => 'No hay opciones'}
+  menuPortalTarget={document.body}
+  menuPosition="fixed"
+/>
+```
+
+**Razones:**
+- ✅ Mejor UX y experiencia visual
+- ✅ Más personalizable
+- ✅ Funciona mejor con datos dinámicos
+- ✅ Searchable por defecto
+- ✅ Mejor integración con React
+
 ---
 
 ## 🔒 REGLA #10: SEGURIDAD MÁXIMA
