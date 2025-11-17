@@ -2169,27 +2169,64 @@ const Products: React.FC = () => {
                               placeholder="Precio"
                               style={{ width: '100%' }}
                             />
-                            <Select
-                              mode="multiple"
+                            <ReactSelect
+                              isMulti
                               placeholder="Sucursales..."
-                              value={config.sucursales1}
-                              onChange={(vals) => {
+                              value={config.sucursales1.map(s => ({ value: s, label: s.toUpperCase() }))}
+                              onChange={(options) => {
+                                const vals = options ? options.map((opt: any) => opt.value) : [];
                                 setPreciosBase({
                                   ...preciosBase,
                                   [record.id]: { ...config, sucursales1: vals }
                                 });
                               }}
-                              size="small"
-                              style={{ width: '100%' }}
-                              maxTagCount={1}
-                              maxTagTextLength={5}
-                            >
-                              {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
-                                <Select.Option key={s.sucursal} value={s.sucursal}>
-                                  {s.sucursal.toUpperCase()}
-                                </Select.Option>
-                              ))}
-                            </Select>
+                              options={sucursales
+                                .filter(s => s.sucursal.toLowerCase() !== 'administrador')
+                                .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
+                              }
+                              styles={{
+                                ...customSelectStyles,
+                                control: (provided: any, state: any) => ({
+                                  ...provided,
+                                  minHeight: '28px',
+                                  height: '28px',
+                                  fontSize: '12px',
+                                  borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
+                                  boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+                                  '&:hover': { borderColor: '#1890ff' }
+                                }),
+                                valueContainer: (provided: any) => ({
+                                  ...provided,
+                                  height: '28px',
+                                  padding: '0 6px',
+                                  fontSize: '12px'
+                                }),
+                                input: (provided: any) => ({
+                                  ...provided,
+                                  margin: '0px',
+                                  padding: '0px',
+                                  fontSize: '12px'
+                                }),
+                                indicatorsContainer: (provided: any) => ({
+                                  ...provided,
+                                  height: '28px'
+                                }),
+                                multiValue: (provided: any) => ({
+                                  ...provided,
+                                  fontSize: '11px'
+                                }),
+                                menu: (provided: any) => ({
+                                  ...provided,
+                                  zIndex: 9999,
+                                  fontSize: '12px'
+                                })
+                              }}
+                              isClearable={true}
+                              isSearchable={true}
+                              noOptionsMessage={() => 'No hay opciones'}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                            />
                             <Button
                               size="small"
                               type="primary"
@@ -2221,27 +2258,64 @@ const Products: React.FC = () => {
                               placeholder="Precio"
                               style={{ width: '100%' }}
                             />
-                            <Select
-                              mode="multiple"
+                            <ReactSelect
+                              isMulti
                               placeholder="Sucursales..."
-                              value={config.sucursales2}
-                              onChange={(vals) => {
+                              value={config.sucursales2.map(s => ({ value: s, label: s.toUpperCase() }))}
+                              onChange={(options) => {
+                                const vals = options ? options.map((opt: any) => opt.value) : [];
                                 setPreciosBase({
                                   ...preciosBase,
                                   [record.id]: { ...config, sucursales2: vals }
                                 });
                               }}
-                              size="small"
-                              style={{ width: '100%' }}
-                              maxTagCount={1}
-                              maxTagTextLength={5}
-                            >
-                              {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
-                                <Select.Option key={s.sucursal} value={s.sucursal}>
-                                  {s.sucursal.toUpperCase()}
-                                </Select.Option>
-                              ))}
-                            </Select>
+                              options={sucursales
+                                .filter(s => s.sucursal.toLowerCase() !== 'administrador')
+                                .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
+                              }
+                              styles={{
+                                ...customSelectStyles,
+                                control: (provided: any, state: any) => ({
+                                  ...provided,
+                                  minHeight: '28px',
+                                  height: '28px',
+                                  fontSize: '12px',
+                                  borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
+                                  boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+                                  '&:hover': { borderColor: '#1890ff' }
+                                }),
+                                valueContainer: (provided: any) => ({
+                                  ...provided,
+                                  height: '28px',
+                                  padding: '0 6px',
+                                  fontSize: '12px'
+                                }),
+                                input: (provided: any) => ({
+                                  ...provided,
+                                  margin: '0px',
+                                  padding: '0px',
+                                  fontSize: '12px'
+                                }),
+                                indicatorsContainer: (provided: any) => ({
+                                  ...provided,
+                                  height: '28px'
+                                }),
+                                multiValue: (provided: any) => ({
+                                  ...provided,
+                                  fontSize: '11px'
+                                }),
+                                menu: (provided: any) => ({
+                                  ...provided,
+                                  zIndex: 9999,
+                                  fontSize: '12px'
+                                })
+                              }}
+                              isClearable={true}
+                              isSearchable={true}
+                              noOptionsMessage={() => 'No hay opciones'}
+                              menuPortalTarget={document.body}
+                              menuPosition="fixed"
+                            />
                             <Button
                               size="small"
                               type="primary"
