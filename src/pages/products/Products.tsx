@@ -429,9 +429,9 @@ const Products: React.FC = () => {
    * Agregar nueva marca
    */
   /**
-   * Aplicar Precio Base 1 a las sucursales seleccionadas
+   * Aplicar Precio Base 1 a un producto específico
    */
-  const aplicarPrecioBase1 = () => {
+  const aplicarPrecioBase1Producto = (productoId: number, productoNombre: string) => {
     if (!precioBase1 || precioBase1 <= 0) {
       message.warning('⚠️ Ingresa un precio base 1 válido');
       return;
@@ -442,23 +442,21 @@ const Products: React.FC = () => {
     }
 
     const nuevosPrecios = { ...preciosEditados };
-    productosFiltrados.forEach(producto => {
-      if (!nuevosPrecios[producto.id]) {
-        nuevosPrecios[producto.id] = {};
-      }
-      sucursalesBase1.forEach(sucursal => {
-        nuevosPrecios[producto.id][sucursal] = precioBase1;
-      });
+    if (!nuevosPrecios[productoId]) {
+      nuevosPrecios[productoId] = {};
+    }
+    sucursalesBase1.forEach(sucursal => {
+      nuevosPrecios[productoId][sucursal] = precioBase1;
     });
 
     setPreciosEditados(nuevosPrecios);
-    message.success(`✅ Precio Base 1 ($${precioBase1}) aplicado a ${sucursalesBase1.length} sucursales en ${productosFiltrados.length} productos`);
+    message.success(`✅ Precio Base 1 ($${precioBase1}) aplicado a "${productoNombre}" en ${sucursalesBase1.length} sucursales`);
   };
 
   /**
-   * Aplicar Precio Base 2 a las sucursales seleccionadas
+   * Aplicar Precio Base 2 a un producto específico
    */
-  const aplicarPrecioBase2 = () => {
+  const aplicarPrecioBase2Producto = (productoId: number, productoNombre: string) => {
     if (!precioBase2 || precioBase2 <= 0) {
       message.warning('⚠️ Ingresa un precio base 2 válido');
       return;
@@ -469,17 +467,15 @@ const Products: React.FC = () => {
     }
 
     const nuevosPrecios = { ...preciosEditados };
-    productosFiltrados.forEach(producto => {
-      if (!nuevosPrecios[producto.id]) {
-        nuevosPrecios[producto.id] = {};
-      }
-      sucursalesBase2.forEach(sucursal => {
-        nuevosPrecios[producto.id][sucursal] = precioBase2;
-      });
+    if (!nuevosPrecios[productoId]) {
+      nuevosPrecios[productoId] = {};
+    }
+    sucursalesBase2.forEach(sucursal => {
+      nuevosPrecios[productoId][sucursal] = precioBase2;
     });
 
     setPreciosEditados(nuevosPrecios);
-    message.success(`✅ Precio Base 2 ($${precioBase2}) aplicado a ${sucursalesBase2.length} sucursales en ${productosFiltrados.length} productos`);
+    message.success(`✅ Precio Base 2 ($${precioBase2}) aplicado a "${productoNombre}" en ${sucursalesBase2.length} sucursales`);
   };
 
   /**
@@ -2076,115 +2072,84 @@ const Products: React.FC = () => {
       >
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           
-          {/* 🎯 Precio Base */}
-          <Card 
-            title={<><ThunderboltOutlined /> Precios Base - Aplicar Masivamente</>}
-            bodyStyle={{ padding: '16px' }}
-            headStyle={{ background: '#f0f5ff', fontWeight: 600 }}
-          >
-            <Row gutter={[16, 16]}>
-              {/* Precio Base 1 */}
-              <Col xs={24} lg={12}>
-                <Card 
-                  size="small" 
-                  title="💰 Precio Base 1"
-                  extra={
-                    <Button 
-                      type="primary" 
-                      size="small"
-                      onClick={aplicarPrecioBase1}
-                      disabled={!precioBase1 || sucursalesBase1.length === 0}
-                    >
-                      Aplicar
-                    </Button>
-                  }
-                  style={{ background: '#f6ffed' }}
-                >
-                  <Space direction="vertical" style={{ width: '100%' }} size="small">
-                    <div>
-                      <Text strong>Precio:</Text>
-                      <InputNumber
-                        prefix="$"
-                        value={precioBase1}
-                        onChange={(val) => setPrecioBase1(val || 0)}
-                        style={{ width: '100%', marginTop: 4 }}
-                        size="large"
-                        min={0}
-                        placeholder="Ingresa el precio"
-                      />
-                    </div>
-                    <div>
-                      <Text strong>Sucursales afectadas:</Text>
-                      <Select
-                        mode="multiple"
-                        placeholder="Selecciona sucursales"
-                        value={sucursalesBase1}
-                        onChange={setSucursalesBase1}
-                        style={{ width: '100%', marginTop: 4 }}
-                        size="large"
-                      >
-                        {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
-                          <Select.Option key={s.sucursal} value={s.sucursal}>
-                            {s.sucursal.toUpperCase()}
-                          </Select.Option>
-                        ))}
-                      </Select>
-                    </div>
-                  </Space>
-                </Card>
+          {/* 🎯 Configuración de Precios Base */}
+          <Card bodyStyle={{ padding: '16px' }}>
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} md={6}>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>💰 Precio Base 1:</Text>
+                  <InputNumber
+                    prefix="$"
+                    value={precioBase1}
+                    onChange={(val) => setPrecioBase1(val || 0)}
+                    style={{ width: '100%', marginTop: 4 }}
+                    size="middle"
+                    min={0}
+                    placeholder="Ej: 1000"
+                  />
+                </div>
               </Col>
-
-              {/* Precio Base 2 */}
-              <Col xs={24} lg={12}>
-                <Card 
-                  size="small" 
-                  title="💵 Precio Base 2"
-                  extra={
-                    <Button 
-                      type="primary" 
-                      size="small"
-                      onClick={aplicarPrecioBase2}
-                      disabled={!precioBase2 || sucursalesBase2.length === 0}
-                    >
-                      Aplicar
-                    </Button>
-                  }
-                  style={{ background: '#fff7e6' }}
-                >
-                  <Space direction="vertical" style={{ width: '100%' }} size="small">
-                    <div>
-                      <Text strong>Precio:</Text>
-                      <InputNumber
-                        prefix="$"
-                        value={precioBase2}
-                        onChange={(val) => setPrecioBase2(val || 0)}
-                        style={{ width: '100%', marginTop: 4 }}
-                        size="large"
-                        min={0}
-                        placeholder="Ingresa el precio"
-                      />
-                    </div>
-                    <div>
-                      <Text strong>Sucursales afectadas:</Text>
-                      <Select
-                        mode="multiple"
-                        placeholder="Selecciona sucursales"
-                        value={sucursalesBase2}
-                        onChange={setSucursalesBase2}
-                        style={{ width: '100%', marginTop: 4 }}
-                        size="large"
-                      >
-                        {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
-                          <Select.Option key={s.sucursal} value={s.sucursal}>
-                            {s.sucursal.toUpperCase()}
-                          </Select.Option>
-                        ))}
-                      </Select>
-                    </div>
-                  </Space>
-                </Card>
+              <Col xs={24} md={6}>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>Sucursales Base 1:</Text>
+                  <Select
+                    mode="multiple"
+                    placeholder="Selecciona..."
+                    value={sucursalesBase1}
+                    onChange={setSucursalesBase1}
+                    style={{ width: '100%', marginTop: 4 }}
+                    size="middle"
+                    maxTagCount="responsive"
+                  >
+                    {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
+                      <Select.Option key={s.sucursal} value={s.sucursal}>
+                        {s.sucursal.toUpperCase()}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </div>
+              </Col>
+              <Col xs={24} md={6}>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>💵 Precio Base 2:</Text>
+                  <InputNumber
+                    prefix="$"
+                    value={precioBase2}
+                    onChange={(val) => setPrecioBase2(val || 0)}
+                    style={{ width: '100%', marginTop: 4 }}
+                    size="middle"
+                    min={0}
+                    placeholder="Ej: 1500"
+                  />
+                </div>
+              </Col>
+              <Col xs={24} md={6}>
+                <div>
+                  <Text strong style={{ fontSize: 13 }}>Sucursales Base 2:</Text>
+                  <Select
+                    mode="multiple"
+                    placeholder="Selecciona..."
+                    value={sucursalesBase2}
+                    onChange={setSucursalesBase2}
+                    style={{ width: '100%', marginTop: 4 }}
+                    size="middle"
+                    maxTagCount="responsive"
+                  >
+                    {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
+                      <Select.Option key={s.sucursal} value={s.sucursal}>
+                        {s.sucursal.toUpperCase()}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </div>
               </Col>
             </Row>
+            <Alert
+              message="💡 Configura los precios base arriba, luego haz clic en los botones 'Base 1' o 'Base 2' de cada producto para aplicarlos"
+              type="info"
+              showIcon
+              style={{ marginTop: 12 }}
+            />
           </Card>
 
           {/* Filtros */}
@@ -2241,18 +2206,54 @@ const Products: React.FC = () => {
           <div style={{ overflowX: 'auto' }}>
             <Table
               columns={[
-                // Columna Producto (fija)
+                // Columna Producto (fija) con botones de Precio Base
                 {
                   title: 'Producto',
                   key: 'producto',
-                  width: 250,
+                  width: 280,
                   fixed: 'left',
                   render: (_, record: ProductoCompleto) => (
-                    <Space direction="vertical" size={0}>
-                      <Text strong style={{ fontSize: 13 }}>{record.nombre}</Text>
-                      <Space size={4}>
+                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                      <div>
+                        <Text strong style={{ fontSize: 13 }}>{record.nombre}</Text>
+                      </div>
+                      <Space size={4} wrap>
                         <Tag color="blue" style={{ fontSize: 10 }}>{record.marca}</Tag>
                         <Tag color="cyan" style={{ fontSize: 10 }}>{record.tipo}</Tag>
+                      </Space>
+                      <Space size={4} style={{ marginTop: 4 }}>
+                        <Tooltip title={`Aplicar Precio Base 1 ($${precioBase1}) a las sucursales seleccionadas`}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            style={{ 
+                              fontSize: 11, 
+                              padding: '0 8px',
+                              height: 24,
+                              background: '#52c41a'
+                            }}
+                            onClick={() => aplicarPrecioBase1Producto(record.id, record.nombre)}
+                            disabled={!precioBase1 || sucursalesBase1.length === 0}
+                          >
+                            Base 1
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title={`Aplicar Precio Base 2 ($${precioBase2}) a las sucursales seleccionadas`}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            style={{ 
+                              fontSize: 11, 
+                              padding: '0 8px',
+                              height: 24,
+                              background: '#fa8c16'
+                            }}
+                            onClick={() => aplicarPrecioBase2Producto(record.id, record.nombre)}
+                            disabled={!precioBase2 || sucursalesBase2.length === 0}
+                          >
+                            Base 2
+                          </Button>
+                        </Tooltip>
                       </Space>
                     </Space>
                   ),
