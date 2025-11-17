@@ -692,9 +692,10 @@ const Products: React.FC = () => {
    */
   /**
    * Productos filtrados para el modal de gestión de precios
+   * ⭐ IMPORTANTE: Usa productosConSucursales para tener la información de precios
    */
   const productosFiltrados = useMemo(() => {
-    return productos.filter((producto) => {
+    return productosConSucursales.filter((producto) => {
       const terminoBusqueda = busquedaModalGestion.toLowerCase();
       const cumpleBusqueda = !terminoBusqueda || 
         producto.nombre.toLowerCase().includes(terminoBusqueda) ||
@@ -705,7 +706,7 @@ const Products: React.FC = () => {
         producto.marca === marcaFiltroModalGestion;
       return cumpleBusqueda && cumpleTipo && cumpleMarca;
     });
-  }, [productos, busquedaModalGestion, tipoFiltroModalGestion, marcaFiltroModalGestion]);
+  }, [productosConSucursales, busquedaModalGestion, tipoFiltroModalGestion, marcaFiltroModalGestion]);
 
   useEffect(() => {
     cargarProductos();
@@ -1311,6 +1312,9 @@ const Products: React.FC = () => {
                       // Limpiar filtros al abrir el modal
                       setBusquedaModalGestion('');
                       setTipoFiltroModalGestion('todos');
+                      setMarcaFiltroModalGestion('todas');
+                      // ⭐ Cargar productos con información de todas las sucursales
+                      cargarProductosConSucursales();
                       setModalGestionarPrecios(true);
                     }}
                     size="large"
