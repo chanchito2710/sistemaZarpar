@@ -253,29 +253,45 @@ export const procesarDevolucion = async (req: Request, res: Response): Promise<v
     if (metodo_devolucion === 'cuenta_corriente') {
       // Devolver a cuenta corriente del cliente (genera un HABER = crédito a favor del cliente)
       console.log('💳 Agregando crédito a cuenta corriente del cliente...');
+      console.log('📊 Datos recibidos:', { cliente_id, cliente_nombre, sucursal });
       
       // 1. Verificar si el cliente existe en la tabla de clientes
       const tablaClientes = `clientes_${sucursal.toLowerCase()}`;
-      const [clienteExiste] = await connection.execute<RowDataPacket[]>(
-        `SELECT id, nombre FROM \`${tablaClientes}\` WHERE id = ?`,
-        [cliente_id]
-      );
-      
       let clienteIdFinal = cliente_id;
+      let debeCrearCliente = false;
+      
+      // Verificar si cliente_id es válido
+      if (!cliente_id || cliente_id === null || cliente_id === undefined) {
+        console.log('⚠️ Cliente ID es NULL/undefined, se creará automáticamente');
+        debeCrearCliente = true;
+      } else {
+        // Verificar si el cliente existe en la BD
+        const [clienteExiste] = await connection.execute<RowDataPacket[]>(
+          `SELECT id, nombre FROM \`${tablaClientes}\` WHERE id = ?`,
+          [cliente_id]
+        );
+        
+        if (!clienteExiste || clienteExiste.length === 0) {
+          console.log(`⚠️ Cliente con ID ${cliente_id} no existe en ${tablaClientes}`);
+          debeCrearCliente = true;
+        } else {
+          console.log(`✅ Cliente encontrado: ${clienteExiste[0].nombre}`);
+        }
+      }
       
       // 2. Si el cliente NO existe, crearlo automáticamente
-      if (!clienteExiste || clienteExiste.length === 0) {
-        console.log(`⚠️ Cliente ${cliente_nombre} no existe en ${tablaClientes}, creando automáticamente...`);
+      if (debeCrearCliente) {
+        console.log(`🔨 Creando cliente "${cliente_nombre}" en ${tablaClientes}...`);
         
         const [insertResult] = await connection.execute<ResultSetHeader>(
           `INSERT INTO \`${tablaClientes}\` 
            (nombre, apellido, telefono, direccion, vendedor_id, activo, created_at)
            VALUES (?, '', '', '', NULL, 1, NOW())`,
-          [cliente_nombre]
+          [cliente_nombre || 'Cliente Sin Nombre']
         );
         
         clienteIdFinal = insertResult.insertId;
-        console.log(`✅ Cliente ${cliente_nombre} creado en ${tablaClientes} con ID: ${clienteIdFinal}`);
+        console.log(`✅ Cliente creado en ${tablaClientes} con ID: ${clienteIdFinal}`);
       }
       
       // 3. Insertar movimiento en cuenta corriente
@@ -283,10 +299,10 @@ export const procesarDevolucion = async (req: Request, res: Response): Promise<v
         `INSERT INTO cuenta_corriente_movimientos 
          (sucursal, cliente_id, cliente_nombre, tipo, debe, haber, saldo, descripcion, fecha_movimiento)
          VALUES (?, ?, ?, 'devolucion', 0, ?, 0, ?, NOW())`,
-        [sucursal, clienteIdFinal, cliente_nombre, monto_devuelto, `DEVOLUCIÓN - ${producto_nombre}${observaciones ? ' - ' + observaciones : ''}`]
+        [sucursal, clienteIdFinal, cliente_nombre || 'Cliente Sin Nombre', monto_devuelto, `DEVOLUCIÓN - ${producto_nombre}${observaciones ? ' - ' + observaciones : ''}`]
       );
       
-      console.log(`✅ Crédito de $${monto_devuelto} agregado a cuenta corriente de ${cliente_nombre}`);
+      console.log(`✅ Crédito de $${monto_devuelto} agregado a cuenta corriente de ${cliente_nombre || 'Cliente Sin Nombre'}`);
       
     } else if (metodo_devolucion === 'saldo_favor') {
       // Devolver efectivo - Descontar de caja y registrar movimiento
