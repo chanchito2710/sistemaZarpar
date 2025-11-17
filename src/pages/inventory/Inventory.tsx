@@ -187,6 +187,41 @@ const Inventory: React.FC = () => {
   const [fechaFiltroFallasDesde, setFechaFiltroFallasDesde] = useState<dayjs.Dayjs | null>(null);
   const [fechaFiltroFallasHasta, setFechaFiltroFallasHasta] = useState<dayjs.Dayjs | null>(null);
 
+  // ⭐ Filtros dinámicos para Stock de Fallas (useMemo para evitar problemas en Railway)
+  const filtrosTipo = useMemo(() => {
+    const tipos = Array.from(new Set(
+      stockFallas
+        .map(p => p.tipo)
+        .filter(Boolean)
+        .map(tipo => tipo.trim()) // Normalizar espacios
+    )).sort();
+    
+    const filtros = tipos.map(tipo => ({
+      text: tipo,
+      value: tipo
+    }));
+    
+    console.log('🔄 Filtros de Tipo recalculados:', filtros.length, 'opciones');
+    return filtros;
+  }, [stockFallas]);
+
+  const filtrosMarca = useMemo(() => {
+    const marcas = Array.from(new Set(
+      stockFallas
+        .map(p => p.marca)
+        .filter(Boolean)
+        .map(marca => marca.trim()) // Normalizar espacios
+    )).sort();
+    
+    const filtros = marcas.map(marca => ({
+      text: marca,
+      value: marca
+    }));
+    
+    console.log('🔄 Filtros de Marca recalculados:', filtros.length, 'opciones');
+    return filtros;
+  }, [stockFallas]);
+
   // Modal Detalle de Fallas
   const [modalDetalleFallasVisible, setModalDetalleFallasVisible] = useState(false);
   const [detalleFallas, setDetalleFallas] = useState<any[]>([]);
@@ -359,6 +394,16 @@ const Inventory: React.FC = () => {
       }
       
       console.log('✅ Stock de fallas recibido:', data.length, 'productos');
+      
+      // ⭐ Logging adicional para debugging en Railway
+      if (data.length > 0) {
+        const tiposUnicos = Array.from(new Set(data.map(p => p.tipo).filter(Boolean)));
+        const marcasUnicas = Array.from(new Set(data.map(p => p.marca).filter(Boolean)));
+        console.log('📊 Tipos únicos encontrados:', tiposUnicos);
+        console.log('📊 Marcas únicas encontradas:', marcasUnicas);
+      } else {
+        console.warn('⚠️ No se recibieron datos de stock de fallas');
+      }
       
       setStockFallas(data);
     } catch (error) {
@@ -1503,11 +1548,13 @@ const Inventory: React.FC = () => {
               key: 'tipo', 
               width: 120, 
               render: (tipo) => <Tag color="orange">{tipo}</Tag>,
-              filters: Array.from(new Set(stockFallas.map(p => p.tipo).filter(Boolean))).map(tipo => ({
-                text: tipo,
-                value: tipo
-              })),
-              onFilter: (value, record) => record.tipo === value,
+              filters: filtrosTipo, // ⭐ Usar useMemo calculado reactivamente
+              onFilter: (value, record) => {
+                // Normalizar comparación para evitar problemas de encoding
+                const tipoRecord = (record.tipo || '').trim();
+                const tipoValue = String(value).trim();
+                return tipoRecord === tipoValue;
+              },
               sorter: (a, b) => (a.tipo || '').localeCompare(b.tipo || ''),
               sortDirections: ['ascend', 'descend'],
             },
@@ -1516,11 +1563,13 @@ const Inventory: React.FC = () => {
               dataIndex: 'marca', 
               key: 'marca', 
               width: 120,
-              filters: Array.from(new Set(stockFallas.map(p => p.marca).filter(Boolean))).map(marca => ({
-                text: marca,
-                value: marca
-              })),
-              onFilter: (value, record) => record.marca === value,
+              filters: filtrosMarca, // ⭐ Usar useMemo calculado reactivamente
+              onFilter: (value, record) => {
+                // Normalizar comparación para evitar problemas de encoding
+                const marcaRecord = (record.marca || '').trim();
+                const marcaValue = String(value).trim();
+                return marcaRecord === marcaValue;
+              },
               sorter: (a, b) => (a.marca || '').localeCompare(b.marca || ''),
               sortDirections: ['ascend', 'descend'],
             },
