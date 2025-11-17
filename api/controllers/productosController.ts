@@ -277,17 +277,6 @@ export const obtenerProductosPorSucursal = async (req: Request, res: Response): 
 
     const productos = await executeQuery<ProductoCompleto[]>(query, [sucursal.toLowerCase()]);
 
-    // 🔍 LOG TEMPORAL para debug
-    const iphone11 = productos.find(p => p.nombre?.toLowerCase().includes('iphone 11'));
-    if (iphone11) {
-      console.log('\n🔍 [DEBUG] iPhone 11 encontrado:');
-      console.log('   Nombre:', iphone11.nombre);
-      console.log('   Stock:', iphone11.stock);
-      console.log('   Stock mínimo:', iphone11.stock_minimo);
-      console.log('   tiene_stock_bajo:', iphone11.tiene_stock_bajo);
-      console.log('   ✅ Debería ser 0 (FALSO) porque stock (100) >= stock_minimo (10)\n');
-    }
-
     res.json({
       success: true,
       data: productos,
@@ -592,11 +581,6 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
     const { id, sucursal } = req.params;
     const data: Partial<ProductoSucursalInput> = req.body;
 
-    console.log(`\n🔧 ========== ACTUALIZAR PRODUCTO SUCURSAL ==========`);
-    console.log(`   Producto ID: ${id}`);
-    console.log(`   Sucursal: ${sucursal}`);
-    console.log(`   Datos recibidos:`, JSON.stringify(data, null, 2));
-
     if (isNaN(Number(id))) {
       res.status(400).json({
         success: false,
@@ -687,7 +671,6 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
       `;
 
       await executeQuery<ResultSetHeader>(query, valores);
-      console.log(`   ✅ UPDATE ejecutado con éxito`);
     }
 
     // Obtener registro actualizado
@@ -695,9 +678,6 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
       `SELECT * FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?`,
       [id, sucursal.toLowerCase()]
     );
-
-    console.log(`   📊 Registro actualizado en BD:`, JSON.stringify(registroActualizado[0], null, 2));
-    console.log(`====================================================\n`);
 
     res.json({
       success: true,
@@ -2063,23 +2043,6 @@ export const obtenerAlertasStock = async (req: Request, res: Response): Promise<
     `;
     
     const [rows] = await pool.query<RowDataPacket[]>(query);
-    
-    console.log(`\n========== ALERTAS DE STOCK ==========`);
-    console.log(`⚠️ Total de alertas encontradas: ${rows.length}`);
-    
-    if (rows.length > 0) {
-      console.log('\n📋 Detalles de alertas:');
-      rows.forEach((row: any, index: number) => {
-        console.log(`\n  ${index + 1}. ${row.nombre}`);
-        console.log(`     Sucursal: ${row.sucursal}`);
-        console.log(`     Stock actual: ${row.stock}`);
-        console.log(`     Stock mínimo: ${row.stock_minimo}`);
-        console.log(`     ❌ stock (${row.stock}) < stock_minimo (${row.stock_minimo})`);
-      });
-    } else {
-      console.log('✅ No hay alertas de stock en este momento');
-    }
-    console.log(`======================================\n`);
     
     res.json({
       success: true,
