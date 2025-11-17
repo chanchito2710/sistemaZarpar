@@ -12,7 +12,6 @@ import {
   Row,
   Col,
   DatePicker,
-  Select,
   Tag,
   message,
   Statistic,
@@ -27,6 +26,7 @@ import {
   Tabs,
   Alert,
 } from 'antd';
+import ReactSelect, { StylesConfig } from 'react-select';
 import {
   ReloadOutlined,
   CalendarOutlined,
@@ -61,7 +61,6 @@ const API_URL = import.meta.env.VITE_API_URL ||
     : 'http://localhost:3456/api');
 
 const { RangePicker } = DatePicker;
-const { Option } = Select;
 const { Title, Text } = Typography;
 
 /**
@@ -110,6 +109,49 @@ const GlobalSales: React.FC = () => {
   const { usuario } = useAuth();
   const esAdmin = usuario?.esAdmin || false;
   const sucursalUsuario = usuario?.sucursal?.toLowerCase() || 'pando';
+
+  // ⭐ Estilos personalizados para react-select
+  const customSelectStyles: StylesConfig = {
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: '38px',
+      borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+      '&:hover': {
+        borderColor: '#1890ff'
+      },
+      cursor: 'pointer',
+      borderRadius: '6px'
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected 
+        ? '#1890ff' 
+        : state.isFocused 
+        ? '#e6f7ff' 
+        : 'white',
+      color: state.isSelected ? 'white' : '#262626',
+      cursor: 'pointer',
+      padding: '8px 12px',
+      '&:active': {
+        backgroundColor: '#1890ff'
+      }
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: '#262626'
+    }),
+    menu: (provided) => ({
+      ...provided,
+      borderRadius: '6px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      zIndex: 9999
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 9999
+    })
+  };
 
   // Estados para filtros
   const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(null);
@@ -888,21 +930,37 @@ const GlobalSales: React.FC = () => {
               <Text strong style={{ fontSize: 11 }}>
                 <ShopOutlined /> Sucursal {!esAdmin && '(Tu Sucursal)'}
               </Text>
-              <Select
-                value={sucursalSeleccionada}
-                onChange={setSucursalSeleccionada}
-                style={{ width: '100%' }}
-                size="middle"
-                loading={loadingSucursales}
-                disabled={!esAdmin}
-              >
-                {esAdmin && <Option value="todas">📊 Todas las Sucursales</Option>}
-                {sucursales.map((sucursal) => (
-                  <Option key={sucursal} value={sucursal}>
-                    {sucursal.toUpperCase()}
-                  </Option>
-                ))}
-              </Select>
+              <ReactSelect
+                value={
+                  sucursalSeleccionada === 'todas'
+                    ? { value: 'todas', label: '📊 Todas las Sucursales' }
+                    : { 
+                        value: sucursalSeleccionada, 
+                        label: sucursalSeleccionada.toUpperCase() 
+                      }
+                }
+                onChange={(option) => {
+                  if (option) {
+                    setSucursalSeleccionada(option.value);
+                  }
+                }}
+                options={[
+                  ...(esAdmin ? [{ value: 'todas', label: '📊 Todas las Sucursales' }] : []),
+                  ...sucursales.map(s => ({
+                    value: s,
+                    label: s.toUpperCase()
+                  }))
+                ]}
+                styles={customSelectStyles}
+                isClearable={false}
+                isSearchable={false}
+                isLoading={loadingSucursales}
+                isDisabled={!esAdmin}
+                placeholder="Seleccionar sucursal"
+                noOptionsMessage={() => 'No hay sucursales disponibles'}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+              />
             </Space>
           </Col>
 
