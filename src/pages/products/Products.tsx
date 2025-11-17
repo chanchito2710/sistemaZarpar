@@ -2897,7 +2897,10 @@ const Products: React.FC = () => {
                       setSucursalesBaseGlobal1(vals);
                     }}
                     options={sucursales
-                      .filter(s => s.sucursal.toLowerCase() !== 'administrador')
+                      .filter(s => 
+                        s.sucursal.toLowerCase() !== 'administrador' && 
+                        !sucursalesBaseGlobal2.includes(s.sucursal) // ⭐ Excluir las ya seleccionadas en Base 2
+                      )
                       .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
                     }
                     styles={{
@@ -2949,7 +2952,10 @@ const Products: React.FC = () => {
                       setSucursalesBaseGlobal2(vals);
                     }}
                     options={sucursales
-                      .filter(s => s.sucursal.toLowerCase() !== 'administrador')
+                      .filter(s => 
+                        s.sucursal.toLowerCase() !== 'administrador' && 
+                        !sucursalesBaseGlobal1.includes(s.sucursal) // ⭐ Excluir las ya seleccionadas en Base 1
+                      )
                       .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
                     }
                     styles={{
