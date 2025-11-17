@@ -559,10 +559,7 @@ const Products: React.FC = () => {
       
       // Limpiar estados y recargar
       setPreciosEditados({});
-      setPrecioBase1(0);
-      setPrecioBase2(0);
-      setSucursalesBase1([]);
-      setSucursalesBase2([]);
+      setPreciosBase({});
       
       await cargarProductos();
       await cargarProductosConSucursales();
