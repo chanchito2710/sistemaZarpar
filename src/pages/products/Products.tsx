@@ -216,9 +216,7 @@ const Products: React.FC = () => {
   const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
   const [marcaFiltroModalGestion, setMarcaFiltroModalGestion] = useState<string>('todas');
   
-  // Estados para Precio Base GLOBAL (pre-configuración)
-  const [precioBaseGlobal1, setPrecioBaseGlobal1] = useState<number>(0);
-  const [precioBaseGlobal2, setPrecioBaseGlobal2] = useState<number>(0);
+  // Estados para Precio Base GLOBAL (pre-configuración de sucursales)
   const [sucursalesBaseGlobal1, setSucursalesBaseGlobal1] = useState<string[]>([]);
   const [sucursalesBaseGlobal2, setSucursalesBaseGlobal2] = useState<string[]>([]);
   const [modalConfigPrecioBase, setModalConfigPrecioBase] = useState(false);
@@ -440,23 +438,23 @@ const Products: React.FC = () => {
    * Agregar nueva marca
    */
   /**
-   * Guardar configuración de Precio Base Global
+   * Guardar configuración de Precio Base Global (solo sucursales)
    */
   const guardarConfigPrecioBaseGlobal = () => {
-    if (!precioBaseGlobal1 && !precioBaseGlobal2) {
-      message.warning('⚠️ Configura al menos un precio base');
+    if (sucursalesBaseGlobal1.length === 0 && sucursalesBaseGlobal2.length === 0) {
+      message.warning('⚠️ Selecciona al menos una sucursal en Base 1 o Base 2');
       return;
     }
     
     setModalConfigPrecioBase(false);
     
     let mensaje = '';
-    if (precioBaseGlobal1 && sucursalesBaseGlobal1.length > 0) {
-      mensaje += `Precio Base 1: $${precioBaseGlobal1} (${sucursalesBaseGlobal1.length} sucursales)`;
+    if (sucursalesBaseGlobal1.length > 0) {
+      mensaje += `Base 1: ${sucursalesBaseGlobal1.length} sucursales`;
     }
-    if (precioBaseGlobal2 && sucursalesBaseGlobal2.length > 0) {
+    if (sucursalesBaseGlobal2.length > 0) {
       if (mensaje) mensaje += ' | ';
-      mensaje += `Precio Base 2: $${precioBaseGlobal2} (${sucursalesBaseGlobal2.length} sucursales)`;
+      mensaje += `Base 2: ${sucursalesBaseGlobal2.length} sucursales`;
     }
     
     message.success(`✅ Configuración guardada: ${mensaje}`);
@@ -2185,8 +2183,8 @@ const Products: React.FC = () => {
                   fixed: 'left',
                   render: (_, record: ProductoCompleto) => {
                     const config = preciosBase[record.id] || { 
-                      precio1: precioBaseGlobal1, 
-                      precio2: precioBaseGlobal2, 
+                      precio1: 0, 
+                      precio2: 0, 
                       sucursales1: sucursalesBaseGlobal1, 
                       sucursales2: sucursalesBaseGlobal2 
                     };
@@ -2858,8 +2856,8 @@ const Products: React.FC = () => {
         width={700}
       >
         <Alert
-          message="💡 Configuración Global"
-          description="Los valores configurados aquí se pre-cargarán automáticamente en todos los productos del modal de Gestionar Precios."
+          message="💡 Pre-configuración de Sucursales"
+          description="Selecciona las sucursales que usarán cada precio base. Los precios se definirán individualmente por producto."
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
@@ -2873,18 +2871,6 @@ const Products: React.FC = () => {
             style={{ background: '#f6ffed' }}
           >
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <div>
-                <Text strong>Precio:</Text>
-                <InputNumber
-                  prefix="$"
-                  value={precioBaseGlobal1}
-                  onChange={(val) => setPrecioBaseGlobal1(val || 0)}
-                  style={{ width: '100%', marginTop: 8 }}
-                  size="large"
-                  min={0}
-                  placeholder="Ej: 1000"
-                />
-              </div>
               <div>
                 <Text strong>Sucursales afectadas:</Text>
                 <div style={{ marginTop: 8 }}>
@@ -2928,18 +2914,6 @@ const Products: React.FC = () => {
             style={{ background: '#fff7e6' }}
           >
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <div>
-                <Text strong>Precio:</Text>
-                <InputNumber
-                  prefix="$"
-                  value={precioBaseGlobal2}
-                  onChange={(val) => setPrecioBaseGlobal2(val || 0)}
-                  style={{ width: '100%', marginTop: 8 }}
-                  size="large"
-                  min={0}
-                  placeholder="Ej: 1500"
-                />
-              </div>
               <div>
                 <Text strong>Sucursales afectadas:</Text>
                 <div style={{ marginTop: 8 }}>
