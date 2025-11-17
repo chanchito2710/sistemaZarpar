@@ -216,6 +216,13 @@ const Products: React.FC = () => {
   const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
   const [marcaFiltroModalGestion, setMarcaFiltroModalGestion] = useState<string>('todas');
   
+  // Estados para Precio Base
+  const [precioBase1, setPrecioBase1] = useState<number>(0);
+  const [precioBase2, setPrecioBase2] = useState<number>(0);
+  const [sucursalesBase1, setSucursalesBase1] = useState<string[]>([]);
+  const [sucursalesBase2, setSucursalesBase2] = useState<string[]>([]);
+  const [preciosEditados, setPreciosEditados] = useState<{[productoId: number]: {[sucursal: string]: number}}>({});
+  
   // Estados para filtros del modal de gestión de stock
   const [busquedaModalGestionStock, setBusquedaModalGestionStock] = useState('');
   const [tipoFiltroModalGestionStock, setTipoFiltroModalGestionStock] = useState<string>('todos');
@@ -421,6 +428,123 @@ const Products: React.FC = () => {
   /**
    * Agregar nueva marca
    */
+  /**
+   * Aplicar Precio Base 1 a las sucursales seleccionadas
+   */
+  const aplicarPrecioBase1 = () => {
+    if (!precioBase1 || precioBase1 <= 0) {
+      message.warning('⚠️ Ingresa un precio base 1 válido');
+      return;
+    }
+    if (sucursalesBase1.length === 0) {
+      message.warning('⚠️ Selecciona al menos una sucursal para Precio Base 1');
+      return;
+    }
+
+    const nuevosPrecios = { ...preciosEditados };
+    productosFiltrados.forEach(producto => {
+      if (!nuevosPrecios[producto.id]) {
+        nuevosPrecios[producto.id] = {};
+      }
+      sucursalesBase1.forEach(sucursal => {
+        nuevosPrecios[producto.id][sucursal] = precioBase1;
+      });
+    });
+
+    setPreciosEditados(nuevosPrecios);
+    message.success(`✅ Precio Base 1 ($${precioBase1}) aplicado a ${sucursalesBase1.length} sucursales en ${productosFiltrados.length} productos`);
+  };
+
+  /**
+   * Aplicar Precio Base 2 a las sucursales seleccionadas
+   */
+  const aplicarPrecioBase2 = () => {
+    if (!precioBase2 || precioBase2 <= 0) {
+      message.warning('⚠️ Ingresa un precio base 2 válido');
+      return;
+    }
+    if (sucursalesBase2.length === 0) {
+      message.warning('⚠️ Selecciona al menos una sucursal para Precio Base 2');
+      return;
+    }
+
+    const nuevosPrecios = { ...preciosEditados };
+    productosFiltrados.forEach(producto => {
+      if (!nuevosPrecios[producto.id]) {
+        nuevosPrecios[producto.id] = {};
+      }
+      sucursalesBase2.forEach(sucursal => {
+        nuevosPrecios[producto.id][sucursal] = precioBase2;
+      });
+    });
+
+    setPreciosEditados(nuevosPrecios);
+    message.success(`✅ Precio Base 2 ($${precioBase2}) aplicado a ${sucursalesBase2.length} sucursales en ${productosFiltrados.length} productos`);
+  };
+
+  /**
+   * Guardar todos los precios editados
+   */
+  const guardarPreciosEditados = async () => {
+    const cantidadActualizaciones = Object.keys(preciosEditados).length;
+    
+    if (cantidadActualizaciones === 0) {
+      message.warning('⚠️ No hay cambios para guardar');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const promesas: Promise<any>[] = [];
+      
+      // Iterar sobre cada producto editado
+      for (const [productoIdStr, preciosPorSucursal] of Object.entries(preciosEditados)) {
+        const productoId = Number(productoIdStr);
+        const producto = productos.find(p => p.id === productoId);
+        
+        if (!producto) continue;
+        
+        // Iterar sobre cada sucursal editada
+        for (const [sucursal, precioNuevo] of Object.entries(preciosPorSucursal)) {
+          const sucursalData = producto.sucursales?.find(s => s.sucursal === sucursal);
+          
+          promesas.push(
+            productosService.actualizarSucursal(
+              productoId,
+              sucursal,
+              {
+                precio: Number(precioNuevo),
+                stock: sucursalData?.stock || 0,
+                stock_minimo: sucursalData?.stock_minimo || 0
+              }
+            )
+          );
+        }
+      }
+      
+      await Promise.all(promesas);
+      
+      message.success(`✅ ${promesas.length} precios actualizados correctamente`);
+      
+      // Limpiar estados y recargar
+      setPreciosEditados({});
+      setPrecioBase1(0);
+      setPrecioBase2(0);
+      setSucursalesBase1([]);
+      setSucursalesBase2([]);
+      
+      await cargarProductos();
+      await cargarProductosConSucursales();
+      
+    } catch (error) {
+      message.error('❌ Error al guardar precios');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAgregarMarca = async () => {
     if (!nuevaMarca.trim()) {
       message.warning('Por favor ingresa un nombre para la marca');
@@ -539,6 +663,23 @@ const Products: React.FC = () => {
   /**
    * Efecto: Cargar productos cuando cambia la sucursal
    */
+  /**
+   * Productos filtrados para el modal de gestión de precios
+   */
+  const productosFiltrados = useMemo(() => {
+    return productos.filter((producto) => {
+      const terminoBusqueda = busquedaModalGestion.toLowerCase();
+      const cumpleBusqueda = !terminoBusqueda || 
+        producto.nombre.toLowerCase().includes(terminoBusqueda) ||
+        (producto.marca && producto.marca.toLowerCase().includes(terminoBusqueda));
+      const cumpleTipo = tipoFiltroModalGestion === 'todos' || 
+        producto.tipo === tipoFiltroModalGestion;
+      const cumpleMarca = marcaFiltroModalGestion === 'todas' || 
+        producto.marca === marcaFiltroModalGestion;
+      return cumpleBusqueda && cumpleTipo && cumpleMarca;
+    });
+  }, [productos, busquedaModalGestion, tipoFiltroModalGestion, marcaFiltroModalGestion]);
+
   useEffect(() => {
     cargarProductos();
   }, [sucursalSeleccionada]);
@@ -1885,21 +2026,167 @@ const Products: React.FC = () => {
         </Spin>
       </Modal>
 
-      {/* 🎯 Modal: Gestionar Precios */}
+      {/* 🎯 Modal: Gestionar Precios - NUEVO DISEÑO */}
       <Modal
         title={
           <Space>
             <DollarOutlined style={{ color: '#667eea', fontSize: 20 }} />
-            <span style={{ fontSize: 18, fontWeight: 600, color: '#000' }}>Gestionar Precios por Sucursal</span>
+            <span style={{ fontSize: 18, fontWeight: 600, color: '#000' }}>Gestionar Precios - Edición Masiva</span>
           </Space>
         }
         open={modalGestionarPrecios}
-        onCancel={() => setModalGestionarPrecios(false)}
-        footer={null}
-        width={1200}
-        style={{ top: 20 }}
+        onCancel={() => {
+          setModalGestionarPrecios(false);
+          setPreciosEditados({});
+          setPrecioBase1(0);
+          setPrecioBase2(0);
+          setSucursalesBase1([]);
+          setSucursalesBase2([]);
+        }}
+        footer={
+          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+            <div>
+              <Text type="secondary">
+                {Object.keys(preciosEditados).length > 0 ? `${Object.keys(preciosEditados).length} productos con cambios` : 'Sin cambios'}
+              </Text>
+            </div>
+            <Space>
+              <Button 
+                onClick={() => {
+                  setModalGestionarPrecios(false);
+                  setPreciosEditados({});
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="primary" 
+                icon={<SaveOutlined />}
+                onClick={guardarPreciosEditados}
+                loading={loading}
+                disabled={Object.keys(preciosEditados).length === 0}
+              >
+                💾 Guardar Cambios
+              </Button>
+            </Space>
+          </Space>
+        }
+        width="95%"
+        style={{ top: 20, maxWidth: 1600 }}
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          
+          {/* 🎯 Precio Base */}
+          <Card 
+            title={<><ThunderboltOutlined /> Precios Base - Aplicar Masivamente</>}
+            bodyStyle={{ padding: '16px' }}
+            headStyle={{ background: '#f0f5ff', fontWeight: 600 }}
+          >
+            <Row gutter={[16, 16]}>
+              {/* Precio Base 1 */}
+              <Col xs={24} lg={12}>
+                <Card 
+                  size="small" 
+                  title="💰 Precio Base 1"
+                  extra={
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      onClick={aplicarPrecioBase1}
+                      disabled={!precioBase1 || sucursalesBase1.length === 0}
+                    >
+                      Aplicar
+                    </Button>
+                  }
+                  style={{ background: '#f6ffed' }}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }} size="small">
+                    <div>
+                      <Text strong>Precio:</Text>
+                      <InputNumber
+                        prefix="$"
+                        value={precioBase1}
+                        onChange={(val) => setPrecioBase1(val || 0)}
+                        style={{ width: '100%', marginTop: 4 }}
+                        size="large"
+                        min={0}
+                        placeholder="Ingresa el precio"
+                      />
+                    </div>
+                    <div>
+                      <Text strong>Sucursales afectadas:</Text>
+                      <Select
+                        mode="multiple"
+                        placeholder="Selecciona sucursales"
+                        value={sucursalesBase1}
+                        onChange={setSucursalesBase1}
+                        style={{ width: '100%', marginTop: 4 }}
+                        size="large"
+                      >
+                        {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
+                          <Select.Option key={s.sucursal} value={s.sucursal}>
+                            {s.sucursal.toUpperCase()}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </div>
+                  </Space>
+                </Card>
+              </Col>
+
+              {/* Precio Base 2 */}
+              <Col xs={24} lg={12}>
+                <Card 
+                  size="small" 
+                  title="💵 Precio Base 2"
+                  extra={
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      onClick={aplicarPrecioBase2}
+                      disabled={!precioBase2 || sucursalesBase2.length === 0}
+                    >
+                      Aplicar
+                    </Button>
+                  }
+                  style={{ background: '#fff7e6' }}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }} size="small">
+                    <div>
+                      <Text strong>Precio:</Text>
+                      <InputNumber
+                        prefix="$"
+                        value={precioBase2}
+                        onChange={(val) => setPrecioBase2(val || 0)}
+                        style={{ width: '100%', marginTop: 4 }}
+                        size="large"
+                        min={0}
+                        placeholder="Ingresa el precio"
+                      />
+                    </div>
+                    <div>
+                      <Text strong>Sucursales afectadas:</Text>
+                      <Select
+                        mode="multiple"
+                        placeholder="Selecciona sucursales"
+                        value={sucursalesBase2}
+                        onChange={setSucursalesBase2}
+                        style={{ width: '100%', marginTop: 4 }}
+                        size="large"
+                      >
+                        {sucursales.filter(s => s.sucursal.toLowerCase() !== 'administrador').map(s => (
+                          <Select.Option key={s.sucursal} value={s.sucursal}>
+                            {s.sucursal.toUpperCase()}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </div>
+                  </Space>
+                </Card>
+              </Col>
+            </Row>
+          </Card>
+
           {/* Filtros */}
           <Card bodyStyle={{ padding: '16px' }}>
             <Row gutter={[16, 16]}>
@@ -1921,9 +2208,9 @@ const Products: React.FC = () => {
                   style={{ width: '100%' }}
                   size="large"
                 >
-                  <Option value="todos">Todos los tipos</Option>
+                  <Select.Option value="todos">Todos los tipos</Select.Option>
                   {tipos.map(tipo => (
-                    <Option key={tipo.valor} value={tipo.valor}>{tipo.valor}</Option>
+                    <Select.Option key={tipo.valor} value={tipo.valor}>{tipo.valor}</Select.Option>
                   ))}
                 </Select>
               </Col>
@@ -1935,90 +2222,101 @@ const Products: React.FC = () => {
                   style={{ width: '100%' }}
                   size="large"
                 >
-                  <Option value="todas">Todas las marcas</Option>
+                  <Select.Option value="todas">Todas las marcas</Select.Option>
                   {marcas.map(marca => (
-                    <Option key={marca.valor} value={marca.valor}>{marca.valor}</Option>
+                    <Select.Option key={marca.valor} value={marca.valor}>{marca.valor}</Select.Option>
                   ))}
                 </Select>
               </Col>
             </Row>
           </Card>
 
-          {/* Tabla de Productos */}
-          <Table
-            columns={[
-              {
-                title: 'Producto',
-                key: 'producto',
-                width: 300,
-                render: (_, record: ProductoCompleto) => (
-                  <Space direction="vertical" size={0}>
-                    <Text strong>{record.nombre}</Text>
-                    <Space size={4}>
-                      <Tag color="blue" style={{ fontSize: 11 }}>{record.marca}</Tag>
-                      <Tag color="cyan" style={{ fontSize: 11 }}>{record.tipo}</Tag>
-                    </Space>
-                  </Space>
-                ),
-              },
-              {
-                title: 'Precios por Sucursal',
-                key: 'precios',
-                render: (_, record: ProductoCompleto) => (
-                  <Space wrap size={[4, 4]}>
-                    {record.sucursales?.slice(0, 3).map((suc: any) => (
-                      <Tag key={suc.sucursal} color={suc.precio > 0 ? 'green' : 'default'}>
-                        {formatearNombreSucursal(suc.sucursal)}: ${suc.precio?.toFixed(0) || '0'}
-                      </Tag>
-                    ))}
-                    {record.sucursales && record.sucursales.length > 3 && (
-                      <Tag>+{record.sucursales.length - 3} más</Tag>
-                    )}
-                  </Space>
-                ),
-              },
-              {
-                title: 'Acción',
-                key: 'accion',
-                width: 120,
-                align: 'center' as const,
-                render: (_, record: ProductoCompleto) => (
-                  <Button
-                    type="primary"
-                    icon={<EditOutlined />}
-                    onClick={() => {
-                      setProductoEditandoPrecios(record);
-                      // Inicializar precios actuales
-                      const preciosActuales: { [key: string]: number } = {};
-                      record.sucursales?.forEach((suc: any) => {
-                        preciosActuales[suc.sucursal] = suc.precio || 0;
-                      });
-                      setPreciosPorSucursal(preciosActuales);
-                      setModalEditarPrecios(true);
-                    }}
-                    size="small"
-                  >
-                    Editar
-                  </Button>
-                ),
-              },
-            ]}
-            dataSource={productos.filter((producto) => {
-              const terminoBusqueda = busquedaModalGestion.toLowerCase();
-              const cumpleBusqueda = !terminoBusqueda || 
-                producto.nombre.toLowerCase().includes(terminoBusqueda) ||
-                producto.marca.toLowerCase().includes(terminoBusqueda);
-              const cumpleTipo = tipoFiltroModalGestion === 'todos' || 
-                producto.tipo === tipoFiltroModalGestion;
-              const cumpleMarca = marcaFiltroModalGestion === 'todas' || 
-                producto.marca === marcaFiltroModalGestion;
-              return cumpleBusqueda && cumpleTipo && cumpleMarca;
-            })}
-            rowKey="id"
-            pagination={{ pageSize: 10, showSizeChanger: true }}
-            size="small"
-            loading={loading}
+          <Alert
+            message={`📊 Mostrando ${productosFiltrados.length} productos`}
+            type="info"
+            showIcon
           />
+
+          {/* Tabla de Productos con Precios por Sucursal - Edición Inline */}
+          <div style={{ overflowX: 'auto' }}>
+            <Table
+              columns={[
+                // Columna Producto (fija)
+                {
+                  title: 'Producto',
+                  key: 'producto',
+                  width: 250,
+                  fixed: 'left',
+                  render: (_, record: ProductoCompleto) => (
+                    <Space direction="vertical" size={0}>
+                      <Text strong style={{ fontSize: 13 }}>{record.nombre}</Text>
+                      <Space size={4}>
+                        <Tag color="blue" style={{ fontSize: 10 }}>{record.marca}</Tag>
+                        <Tag color="cyan" style={{ fontSize: 10 }}>{record.tipo}</Tag>
+                      </Space>
+                    </Space>
+                  ),
+                },
+                // Columnas dinámicas por cada sucursal
+                ...sucursales
+                  .filter(s => s.sucursal.toLowerCase() !== 'administrador')
+                  .map(suc => ({
+                    title: suc.sucursal.toUpperCase(),
+                    key: suc.sucursal,
+                    width: 120,
+                    align: 'center' as const,
+                    render: (_: any, record: ProductoCompleto) => {
+                      const sucursalData = record.sucursales?.find(s => s.sucursal === suc.sucursal);
+                      const precioActual = sucursalData?.precio || 0;
+                      const precioEditado = preciosEditados[record.id]?.[suc.sucursal];
+                      const precioMostrar = precioEditado !== undefined ? precioEditado : precioActual;
+                      const tieneCambios = precioEditado !== undefined && precioEditado !== precioActual;
+
+                      return (
+                        <InputNumber
+                          prefix="$"
+                          value={precioMostrar}
+                          onChange={(val) => {
+                            const nuevosPrecios = { ...preciosEditados };
+                            if (!nuevosPrecios[record.id]) {
+                              nuevosPrecios[record.id] = {};
+                            }
+                            if (val !== null && val !== undefined) {
+                              nuevosPrecios[record.id][suc.sucursal] = val;
+                            } else {
+                              delete nuevosPrecios[record.id][suc.sucursal];
+                              if (Object.keys(nuevosPrecios[record.id]).length === 0) {
+                                delete nuevosPrecios[record.id];
+                              }
+                            }
+                            setPreciosEditados(nuevosPrecios);
+                          }}
+                          min={0}
+                          size="small"
+                          style={{
+                            width: '100%',
+                            background: tieneCambios ? '#fff7e6' : 'white',
+                            borderColor: tieneCambios ? '#faad14' : undefined,
+                            fontWeight: tieneCambios ? 'bold' : 'normal'
+                          }}
+                        />
+                      );
+                    }
+                  }))
+              ]}
+              dataSource={productosFiltrados}
+              rowKey="id"
+              pagination={{ 
+                pageSize: 20, 
+                showSizeChanger: true,
+                showTotal: (total) => `Total: ${total} productos`
+              }}
+              size="small"
+              loading={loading}
+              scroll={{ x: 'max-content', y: 500 }}
+              bordered
+            />
+          </div>
         </Space>
       </Modal>
 
