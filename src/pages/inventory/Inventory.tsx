@@ -7,7 +7,6 @@ import {
   Space,
   Tag,
   Input,
-  Select,
   Row,
   Col,
   Badge,
@@ -55,7 +54,6 @@ declare module 'jspdf' {
 }
 
 const { Title, Text } = Typography;
-const { Option } = Select;
 const { RangePicker } = DatePicker;
 
 interface InventoryItem {
@@ -1179,21 +1177,33 @@ const Inventory: React.FC = () => {
               {esAdmin && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Sucursal:</span>
-                  <Select
-                    value={sucursalFallasSeleccionada}
-                    onChange={cambiarSucursalFallas}
-                    style={{ width: 180 }}
-                    size="middle"
-                    placeholder="Selecciona sucursal"
-                  >
-                    {sucursales
-                      .filter(s => s.toLowerCase() !== 'administrador' && s.toLowerCase() !== 'administracion')
-                      .map(s => (
-                        <Option key={s} value={s.toLowerCase()}>
-                          {s.toUpperCase()}
-                        </Option>
-                      ))}
-                  </Select>
+                  <div style={{ width: 180 }}>
+                    <ReactSelect
+                      value={{
+                        value: sucursalFallasSeleccionada,
+                        label: sucursalFallasSeleccionada.toUpperCase()
+                      }}
+                      onChange={(option) => {
+                        if (option) {
+                          cambiarSucursalFallas(option.value);
+                        }
+                      }}
+                      options={sucursales
+                        .filter(s => s.toLowerCase() !== 'administrador' && s.toLowerCase() !== 'administracion')
+                        .map(s => ({
+                          value: s.toLowerCase(),
+                          label: s.toUpperCase()
+                        }))
+                      }
+                      styles={customSelectStyles}
+                      isClearable={false}
+                      isSearchable={false}
+                      placeholder="Selecciona sucursal"
+                      noOptionsMessage={() => 'No hay sucursales'}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                    />
+                  </div>
                 </div>
               )}
             </div>
