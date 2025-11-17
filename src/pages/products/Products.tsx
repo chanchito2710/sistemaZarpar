@@ -216,6 +216,13 @@ const Products: React.FC = () => {
   const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
   const [marcaFiltroModalGestion, setMarcaFiltroModalGestion] = useState<string>('todas');
   
+  // Estados para Precio Base GLOBAL (pre-configuración)
+  const [precioBaseGlobal1, setPrecioBaseGlobal1] = useState<number>(0);
+  const [precioBaseGlobal2, setPrecioBaseGlobal2] = useState<number>(0);
+  const [sucursalesBaseGlobal1, setSucursalesBaseGlobal1] = useState<string[]>([]);
+  const [sucursalesBaseGlobal2, setSucursalesBaseGlobal2] = useState<string[]>([]);
+  const [modalConfigPrecioBase, setModalConfigPrecioBase] = useState(false);
+  
   // Estados para Precio Base por producto
   const [preciosBase, setPreciosBase] = useState<{
     [productoId: number]: {
@@ -432,6 +439,29 @@ const Products: React.FC = () => {
   /**
    * Agregar nueva marca
    */
+  /**
+   * Guardar configuración de Precio Base Global
+   */
+  const guardarConfigPrecioBaseGlobal = () => {
+    if (!precioBaseGlobal1 && !precioBaseGlobal2) {
+      message.warning('⚠️ Configura al menos un precio base');
+      return;
+    }
+    
+    setModalConfigPrecioBase(false);
+    
+    let mensaje = '';
+    if (precioBaseGlobal1 && sucursalesBaseGlobal1.length > 0) {
+      mensaje += `Precio Base 1: $${precioBaseGlobal1} (${sucursalesBaseGlobal1.length} sucursales)`;
+    }
+    if (precioBaseGlobal2 && sucursalesBaseGlobal2.length > 0) {
+      if (mensaje) mensaje += ' | ';
+      mensaje += `Precio Base 2: $${precioBaseGlobal2} (${sucursalesBaseGlobal2.length} sucursales)`;
+    }
+    
+    message.success(`✅ Configuración guardada: ${mensaje}`);
+  };
+
   /**
    * Aplicar Precio Base 1 a un producto específico
    */
@@ -2119,11 +2149,29 @@ const Products: React.FC = () => {
             </Row>
           </Card>
 
-          <Alert
-            message={`📊 Mostrando ${productosFiltrados.length} productos`}
-            type="info"
-            showIcon
-          />
+          <Row gutter={[8, 8]} align="middle">
+            <Col flex="auto">
+              <Alert
+                message={`📊 Mostrando ${productosFiltrados.length} productos`}
+                type="info"
+                showIcon
+              />
+            </Col>
+            <Col>
+              <Button
+                type="primary"
+                icon={<SettingOutlined />}
+                onClick={() => setModalConfigPrecioBase(true)}
+                style={{ 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none',
+                  fontWeight: 'bold'
+                }}
+              >
+                Establecer Precio Base
+              </Button>
+            </Col>
+          </Row>
 
           {/* Tabla de Productos con Precios por Sucursal - Edición Inline */}
           <div style={{ overflowX: 'auto' }}>
@@ -2136,7 +2184,12 @@ const Products: React.FC = () => {
                   width: 400,
                   fixed: 'left',
                   render: (_, record: ProductoCompleto) => {
-                    const config = preciosBase[record.id] || { precio1: 0, precio2: 0, sucursales1: [], sucursales2: [] };
+                    const config = preciosBase[record.id] || { 
+                      precio1: precioBaseGlobal1, 
+                      precio2: precioBaseGlobal2, 
+                      sucursales1: sucursalesBaseGlobal1, 
+                      sucursales2: sucursalesBaseGlobal2 
+                    };
                     
                     return (
                       <Space direction="vertical" size={6} style={{ width: '100%' }}>
@@ -2777,6 +2830,147 @@ const Products: React.FC = () => {
           box-shadow: 0 2px 8px rgba(255, 133, 192, 0.4) !important;
         }
       `}</style>
+
+      {/* Modal: Establecer Precio Base Global */}
+      <Modal
+        title={
+          <Space>
+            <SettingOutlined style={{ color: '#667eea', fontSize: 20 }} />
+            <span style={{ fontSize: 18, fontWeight: 600, color: '#000' }}>Establecer Precio Base</span>
+          </Space>
+        }
+        open={modalConfigPrecioBase}
+        onCancel={() => setModalConfigPrecioBase(false)}
+        footer={
+          <Space>
+            <Button onClick={() => setModalConfigPrecioBase(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              type="primary" 
+              icon={<SaveOutlined />}
+              onClick={guardarConfigPrecioBaseGlobal}
+            >
+              💾 Guardar Configuración
+            </Button>
+          </Space>
+        }
+        width={700}
+      >
+        <Alert
+          message="💡 Configuración Global"
+          description="Los valores configurados aquí se pre-cargarán automáticamente en todos los productos del modal de Gestionar Precios."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          {/* Precio Base 1 */}
+          <Card 
+            size="small"
+            title={<Text strong style={{ color: '#52c41a' }}>💰 Precio Base 1</Text>}
+            style={{ background: '#f6ffed' }}
+          >
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <div>
+                <Text strong>Precio:</Text>
+                <InputNumber
+                  prefix="$"
+                  value={precioBaseGlobal1}
+                  onChange={(val) => setPrecioBaseGlobal1(val || 0)}
+                  style={{ width: '100%', marginTop: 8 }}
+                  size="large"
+                  min={0}
+                  placeholder="Ej: 1000"
+                />
+              </div>
+              <div>
+                <Text strong>Sucursales afectadas:</Text>
+                <div style={{ marginTop: 8 }}>
+                  <ReactSelect
+                    isMulti
+                    placeholder="Selecciona sucursales..."
+                    value={sucursalesBaseGlobal1.map(s => ({ value: s, label: s.toUpperCase() }))}
+                    onChange={(options) => {
+                      const vals = options ? options.map((opt: any) => opt.value) : [];
+                      setSucursalesBaseGlobal1(vals);
+                    }}
+                    options={sucursales
+                      .filter(s => s.sucursal.toLowerCase() !== 'administrador')
+                      .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
+                    }
+                    styles={{
+                      ...customSelectStyles,
+                      menu: (provided: any) => ({
+                        ...provided,
+                        zIndex: 9999
+                      })
+                    }}
+                    isClearable={true}
+                    isSearchable={true}
+                    noOptionsMessage={() => 'No hay opciones'}
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
+                  />
+                </div>
+              </div>
+            </Space>
+          </Card>
+
+          {/* Precio Base 2 */}
+          <Card 
+            size="small"
+            title={<Text strong style={{ color: '#fa8c16' }}>💵 Precio Base 2</Text>}
+            style={{ background: '#fff7e6' }}
+          >
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <div>
+                <Text strong>Precio:</Text>
+                <InputNumber
+                  prefix="$"
+                  value={precioBaseGlobal2}
+                  onChange={(val) => setPrecioBaseGlobal2(val || 0)}
+                  style={{ width: '100%', marginTop: 8 }}
+                  size="large"
+                  min={0}
+                  placeholder="Ej: 1500"
+                />
+              </div>
+              <div>
+                <Text strong>Sucursales afectadas:</Text>
+                <div style={{ marginTop: 8 }}>
+                  <ReactSelect
+                    isMulti
+                    placeholder="Selecciona sucursales..."
+                    value={sucursalesBaseGlobal2.map(s => ({ value: s, label: s.toUpperCase() }))}
+                    onChange={(options) => {
+                      const vals = options ? options.map((opt: any) => opt.value) : [];
+                      setSucursalesBaseGlobal2(vals);
+                    }}
+                    options={sucursales
+                      .filter(s => s.sucursal.toLowerCase() !== 'administrador')
+                      .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
+                    }
+                    styles={{
+                      ...customSelectStyles,
+                      menu: (provided: any) => ({
+                        ...provided,
+                        zIndex: 9999
+                      })
+                    }}
+                    isClearable={true}
+                    isSearchable={true}
+                    noOptionsMessage={() => 'No hay opciones'}
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
+                  />
+                </div>
+              </div>
+            </Space>
+          </Card>
+        </Space>
+      </Modal>
     </div>
   );
 };
