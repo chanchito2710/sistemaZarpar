@@ -10,7 +10,8 @@ import {
   Modal,
   Input,
   message,
-  Spin
+  Spin,
+  Tooltip
 } from 'antd';
 import {
   ShopOutlined,
@@ -498,19 +499,26 @@ const POS: React.FC = () => {
                       menuPortalTarget={document.body}
                       menuPosition="fixed"
                     />
-                    <Button
-                      type="dashed"
-                      icon={<PlusOutlined />}
-                      onClick={handleAddClient}
-                      style={{
-                        width: '100%',
-                        marginTop: '8px',
-                        borderColor: '#52c41a',
-                        color: '#52c41a'
-                      }}
+                    <Tooltip 
+                      title={!selectedBranch ? "⚠️ Debes seleccionar una sucursal primero" : ""}
+                      placement="bottom"
                     >
-                      Nuevo Cliente
-                    </Button>
+                      <Button
+                        type="dashed"
+                        icon={<PlusOutlined />}
+                        onClick={handleAddClient}
+                        disabled={!selectedBranch}
+                        style={{
+                          width: '100%',
+                          marginTop: '8px',
+                          borderColor: !selectedBranch ? '#d9d9d9' : '#52c41a',
+                          color: !selectedBranch ? '#d9d9d9' : '#52c41a',
+                          cursor: !selectedBranch ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        Nuevo Cliente
+                      </Button>
+                    </Tooltip>
                   </Space>
                 </Card>
               </Col>
