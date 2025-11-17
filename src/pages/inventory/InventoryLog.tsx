@@ -527,7 +527,7 @@ const GlobalSales: React.FC = () => {
   };
 
   /**
-   * Filtrar ventas por método de pago y rango de fechas específico
+   * Filtrar ventas por método de pago, sucursal y rango de fechas específico
    */
   const filtrarVentasPorMetodo = (
     metodo: string,
@@ -535,7 +535,11 @@ const GlobalSales: React.FC = () => {
     fechaDesdeEspecifica: Dayjs | null,
     fechaHastaEspecifica: Dayjs | null
   ): VentaDetallada[] => {
-    let ventasFiltradas = ventas.filter(v => v.metodo_pago === metodo);
+    // Filtrar por método de pago Y sucursal
+    let ventasFiltradas = ventas.filter(v => 
+      v.metodo_pago === metodo && 
+      (sucursalSeleccionada === 'todas' || v.sucursal === sucursalSeleccionada)
+    );
     
     if (usarFiltrosEspecificos) {
       if (fechaDesdeEspecifica) {
@@ -596,15 +600,24 @@ const GlobalSales: React.FC = () => {
   };
 
   /**
-   * Inicializar filtros de métodos de pago cuando se cargan las ventas
+   * Inicializar filtros de métodos de pago cuando se cargan las ventas o cambia la sucursal
    */
   useEffect(() => {
     if (ventas.length > 0) {
-      setVentasEfectivo(ventas.filter(v => v.metodo_pago === 'efectivo'));
-      setVentasTransferencia(ventas.filter(v => v.metodo_pago === 'transferencia'));
-      setVentasCuentaCorriente(ventas.filter(v => v.metodo_pago === 'cuenta_corriente'));
+      setVentasEfectivo(ventas.filter(v => 
+        v.metodo_pago === 'efectivo' && 
+        (sucursalSeleccionada === 'todas' || v.sucursal === sucursalSeleccionada)
+      ));
+      setVentasTransferencia(ventas.filter(v => 
+        v.metodo_pago === 'transferencia' && 
+        (sucursalSeleccionada === 'todas' || v.sucursal === sucursalSeleccionada)
+      ));
+      setVentasCuentaCorriente(ventas.filter(v => 
+        v.metodo_pago === 'cuenta_corriente' && 
+        (sucursalSeleccionada === 'todas' || v.sucursal === sucursalSeleccionada)
+      ));
     }
-  }, [ventas]);
+  }, [ventas, sucursalSeleccionada]);
 
   /**
    * Manejar cambio de rango de fechas
@@ -1678,7 +1691,10 @@ const GlobalSales: React.FC = () => {
               label: (
                 <span>
                   <DollarOutlined />
-                  {' '}Efectivo ({ventas.filter(v => v.metodo_pago === 'efectivo').length})
+                  {' '}Efectivo ({ventas.filter(v => 
+                    v.metodo_pago === 'efectivo' && 
+                    (sucursalSeleccionada === 'todas' || v.sucursal === sucursalSeleccionada)
+                  ).length})
                 </span>
               ),
               children: (
@@ -1813,7 +1829,10 @@ const GlobalSales: React.FC = () => {
               label: (
                 <span>
                   <ThunderboltOutlined />
-                  {' '}Transferencia ({ventas.filter(v => v.metodo_pago === 'transferencia').length})
+                  {' '}Transferencia ({ventas.filter(v => 
+                    v.metodo_pago === 'transferencia' && 
+                    (sucursalSeleccionada === 'todas' || v.sucursal === sucursalSeleccionada)
+                  ).length})
                 </span>
               ),
               children: (
@@ -1948,7 +1967,10 @@ const GlobalSales: React.FC = () => {
               label: (
                 <span>
                   <CreditCardOutlined />
-                  {' '}Cuenta Corriente ({ventas.filter(v => v.metodo_pago === 'cuenta_corriente').length})
+                  {' '}Cuenta Corriente ({ventas.filter(v => 
+                    v.metodo_pago === 'cuenta_corriente' && 
+                    (sucursalSeleccionada === 'todas' || v.sucursal === sucursalSeleccionada)
+                  ).length})
                 </span>
               ),
               children: (
