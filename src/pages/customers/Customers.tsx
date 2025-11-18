@@ -434,13 +434,19 @@ const Customers: React.FC = () => {
         case '4': // Productos
           console.log('📦 [DEBUG] Cargando Productos...');
           await cargarProductosCliente(clienteId);
-          console.log('💵 [DEBUG] Cargando Saldo Cuenta Corriente...');
+          console.log('💵 [DEBUG] Cargando Saldo Cuenta Corriente (timeout 5s)...');
           try {
-            await cargarSaldoCuentaCorriente(clienteId);
+            // Timeout de 5 segundos para evitar que se cuelgue
+            await Promise.race([
+              cargarSaldoCuentaCorriente(clienteId),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), 5000)
+              )
+            ]);
             console.log('✅ [DEBUG] Saldo cargado exitosamente');
           } catch (saldoError) {
-            console.warn('⚠️ [DEBUG] Error al cargar saldo (no crítico):', saldoError);
-            // No bloqueamos la pestaña si el saldo falla
+            console.warn('⚠️ [DEBUG] Error al cargar saldo (no crítico):', saldoError.message);
+            // No bloqueamos la pestaña si el saldo falla o timeout
           }
           console.log('✅ [DEBUG] Productos cargados (tab completa)');
           break;
