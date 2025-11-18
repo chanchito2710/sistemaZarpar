@@ -39,6 +39,7 @@ import {
   CalendarOutlined,
   InfoCircleOutlined,
   UserOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { devolucionesService, vendedoresService } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -732,8 +733,8 @@ const Returns: React.FC = () => {
             <Statistic
               title="Saldos a Favor"
               value="Ver"
-              prefix={<FileExcelOutlined />}
-              valueStyle={{ color: '#faad14', fontSize: '18px' }}
+              prefix={<DollarOutlined />}
+              valueStyle={{ color: '#52c41a', fontSize: '18px' }}
             />
           </Card>
         </Col>

@@ -636,27 +636,47 @@ export const obtenerStockFallasPorFecha = async (req: Request, res: Response): P
 /**
  * Obtener saldos a favor de clientes
  * GET /api/devoluciones/saldos-favor
+ * 
+ * Calcula el saldo a favor de cada cliente sumando:
+ * - HABER (créditos, devoluciones): suma positiva
+ * - DEBE (débitos, compras a crédito): resta
+ * 
+ * Solo retorna clientes con saldo positivo (a favor del cliente)
  */
 export const obtenerSaldosFavor = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sucursal } = req.query;
     
+    console.log('💰 Obteniendo saldos a favor de clientes...');
+    console.log('📍 Sucursal:', sucursal || 'TODAS');
+    
     let query = `
-      SELECT *
-      FROM saldos_favor_clientes
-      WHERE saldo_actual > 0
+      SELECT 
+        ccm.cliente_id as id,
+        ccm.sucursal,
+        ccm.cliente_nombre,
+        SUM(ccm.haber) - SUM(ccm.debe) as saldo_actual,
+        MAX(ccm.fecha_movimiento) as updated_at
+      FROM cuenta_corriente_movimientos ccm
     `;
     
     const params: any[] = [];
     
+    // Filtrar por sucursal si se especifica
     if (sucursal && sucursal !== 'todas') {
-      query += ` AND sucursal = ?`;
+      query += ` WHERE ccm.sucursal = ?`;
       params.push(sucursal);
     }
     
-    query += ` ORDER BY saldo_actual DESC, cliente_nombre`;
+    query += `
+      GROUP BY ccm.cliente_id, ccm.sucursal, ccm.cliente_nombre
+      HAVING saldo_actual > 0
+      ORDER BY saldo_actual DESC, ccm.cliente_nombre
+    `;
     
     const [saldos] = await pool.execute<RowDataPacket[]>(query, params);
+    
+    console.log(`✅ ${saldos.length} clientes con saldo a favor encontrados`);
     
     res.status(200).json({
       success: true,
