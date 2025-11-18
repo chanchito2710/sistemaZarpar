@@ -368,9 +368,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     
     setLoadingAlertas(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
+      // ⭐ DETECCIÓN AUTOMÁTICA DE URL (misma lógica que api.ts)
+      const API_URL = import.meta.env.VITE_API_URL || 
+        (window.location.hostname !== 'localhost' 
+          ? '/api' 
+          : 'http://localhost:3456/api');
+      
       const fullURL = `${API_URL}/productos/alertas-stock`;
       
+      console.log('🔍 [DEBUG] Hostname:', window.location.hostname);
       console.log('🔍 [DEBUG] API_URL:', API_URL);
       console.log('🔍 [DEBUG] Full URL:', fullURL);
       console.log('🔍 [DEBUG] Token existe?', !!localStorage.getItem('token'));
