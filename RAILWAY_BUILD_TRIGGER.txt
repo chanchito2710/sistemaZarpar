@@ -1,4 +1,0 @@
-Trigger para forzar redeploy en Railway
-Timestamp: 2025-11-17T03:30:00Z
-Build: Force restart backend to load new stock alerts system
-
