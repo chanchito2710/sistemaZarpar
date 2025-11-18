@@ -358,25 +358,45 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // ⭐ Función para cargar alertas de stock bajo
   const cargarAlertasStock = async () => {
-    if (!usuario?.esAdmin) return; // Solo para administradores
+    console.log('🔍 [DEBUG] Iniciando carga de alertas de stock');
+    console.log('🔍 [DEBUG] Usuario es admin?', usuario?.esAdmin);
+    
+    if (!usuario?.esAdmin) {
+      console.log('⚠️ [DEBUG] Usuario NO es admin, saltando carga de alertas');
+      return; // Solo para administradores
+    }
     
     setLoadingAlertas(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3456/api';
-      const response = await fetch(`${API_URL}/productos/alertas-stock`, {
+      const fullURL = `${API_URL}/productos/alertas-stock`;
+      
+      console.log('🔍 [DEBUG] API_URL:', API_URL);
+      console.log('🔍 [DEBUG] Full URL:', fullURL);
+      console.log('🔍 [DEBUG] Token existe?', !!localStorage.getItem('token'));
+      
+      const response = await fetch(fullURL, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
+      console.log('🔍 [DEBUG] Response status:', response.status);
+      console.log('🔍 [DEBUG] Response ok?', response.ok);
+      
       const data = await response.json();
+      console.log('🔍 [DEBUG] Response data:', JSON.stringify(data, null, 2));
       
       if (data.success) {
         setAlertasStock(data.data || []);
-        console.log(`⚠️ ${data.data?.length || 0} alertas de stock detectadas`);
+        console.log(`✅ ${data.data?.length || 0} alertas de stock detectadas`);
+      } else {
+        console.error('❌ [DEBUG] Response success = false');
+        console.error('❌ [DEBUG] Error en respuesta:', data.error || data.message);
       }
     } catch (error) {
-      console.error('Error al cargar alertas de stock:', error);
+      console.error('❌ [DEBUG] Error al cargar alertas de stock:', error);
+      console.error('❌ [DEBUG] Error detallado:', JSON.stringify(error, null, 2));
     } finally {
       setLoadingAlertas(false);
     }
