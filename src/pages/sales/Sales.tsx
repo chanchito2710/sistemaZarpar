@@ -38,6 +38,9 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import { ventasService, type Venta, vendedoresService } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -205,6 +208,247 @@ const Sales: React.FC = () => {
       console.error('Error al obtener detalle:', error);
       message.error('Error al cargar el detalle de la venta');
     }
+  };
+
+  /**
+   * ⭐ Exportar a Excel con datos filtrados
+   */
+  const exportarExcel = () => {
+    try {
+      if (ventas.length === 0) {
+        message.warning('No hay datos para exportar');
+        return;
+      }
+
+      // Preparar datos para Excel
+      const datosExcel = ventas.map((venta, index) => ({
+        '#': index + 1,
+        'Número Venta': venta.numero_venta,
+        'Fecha': dayjs(venta.fecha_venta).format('DD/MM/YYYY HH:mm'),
+        'Sucursal': venta.sucursal.toUpperCase(),
+        'Cliente': venta.cliente_nombre || 'Venta Rápida',
+        'Método Pago': formatearMetodoPagoTexto(venta.metodo_pago),
+        'Estado': venta.estado_pago?.toUpperCase() || 'COMPLETADO',
+        'Subtotal': Number(venta.subtotal || 0).toFixed(2),
+        'Descuento': Number(venta.descuento || 0).toFixed(2),
+        'Total': Number(venta.total).toFixed(2),
+        'Vendedor': venta.vendedor_nombre || 'N/A'
+      }));
+
+      // Agregar fila de totales
+      datosExcel.push({
+        '#': '',
+        'Número Venta': '',
+        'Fecha': '',
+        'Sucursal': '',
+        'Cliente': '',
+        'Método Pago': 'TOTALES:',
+        'Estado': '',
+        'Subtotal': ventas.reduce((sum, v) => sum + Number(v.subtotal || 0), 0).toFixed(2),
+        'Descuento': totalDescuentos.toFixed(2),
+        'Total': totalIngresos.toFixed(2),
+        'Vendedor': ''
+      });
+
+      // Crear libro de Excel
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Ventas');
+
+      // Ajustar ancho de columnas
+      const columnWidths = [
+        { wch: 5 },   // #
+        { wch: 18 },  // Número Venta
+        { wch: 16 },  // Fecha
+        { wch: 12 },  // Sucursal
+        { wch: 25 },  // Cliente
+        { wch: 15 },  // Método Pago
+        { wch: 12 },  // Estado
+        { wch: 10 },  // Subtotal
+        { wch: 10 },  // Descuento
+        { wch: 10 },  // Total
+        { wch: 20 }   // Vendedor
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Generar nombre de archivo con filtros
+      const filtrosTexto = [];
+      if (fechaDesde && fechaHasta) {
+        filtrosTexto.push(`${fechaDesde.format('DD-MM-YYYY')}_al_${fechaHasta.format('DD-MM-YYYY')}`);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtrosTexto.push(sucursalSeleccionada);
+      }
+      const nombreArchivo = `Ventas${filtrosTexto.length > 0 ? '_' + filtrosTexto.join('_') : ''}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(workbook, nombreArchivo);
+      
+      message.success(`✅ Excel exportado: ${ventas.length} ventas`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * ⭐ Exportar a PDF con datos filtrados
+   */
+  const exportarPDF = () => {
+    try {
+      if (ventas.length === 0) {
+        message.warning('No hay datos para exportar');
+        return;
+      }
+
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('HISTORIAL DE VENTAS', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      // Información de filtros
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+
+      if (fechaDesde && fechaHasta) {
+        doc.text(`Período: ${fechaDesde.format('DD/MM/YYYY')} - ${fechaHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      if (metodoPagoSeleccionado && metodoPagoSeleccionado !== 'todos') {
+        doc.text(`Método de Pago: ${formatearMetodoPagoTexto(metodoPagoSeleccionado)}`, 14, yPos);
+        yPos += 5;
+      }
+
+      if (soloConDescuentos) {
+        doc.text('🏷️ Solo ventas con descuentos', 14, yPos);
+        yPos += 5;
+      }
+
+      // Tabla de ventas
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['#', 'N° Venta', 'Fecha', 'Sucursal', 'Cliente', 'Método', 'Subtotal', 'Desc.', 'Total']],
+        body: ventas.map((venta, index) => [
+          index + 1,
+          venta.numero_venta,
+          dayjs(venta.fecha_venta).format('DD/MM HH:mm'),
+          venta.sucursal.substring(0, 3).toUpperCase(),
+          (venta.cliente_nombre || 'Rápida').substring(0, 15),
+          formatearMetodoPagoTexto(venta.metodo_pago).substring(0, 8),
+          `$${Number(venta.subtotal || 0).toFixed(2)}`,
+          `$${Number(venta.descuento || 0).toFixed(2)}`,
+          `$${Number(venta.total).toFixed(2)}`
+        ]),
+        foot: [[
+          '',
+          '',
+          '',
+          '',
+          '',
+          'TOTALES:',
+          `$${ventas.reduce((sum, v) => sum + Number(v.subtotal || 0), 0).toFixed(2)}`,
+          `$${totalDescuentos.toFixed(2)}`,
+          `$${totalIngresos.toFixed(2)}`
+        ]],
+        theme: 'striped',
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          cellPadding: 2
+        },
+        footStyles: {
+          fillColor: [240, 240, 240],
+          textColor: 0,
+          fontSize: 9,
+          fontStyle: 'bold'
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { halign: 'center', cellWidth: 25 },
+          2: { halign: 'center', cellWidth: 22 },
+          3: { halign: 'center', cellWidth: 20 },
+          4: { halign: 'left', cellWidth: 35 },
+          5: { halign: 'center', cellWidth: 20 },
+          6: { halign: 'right', cellWidth: 20 },
+          7: { halign: 'right', cellWidth: 18 },
+          8: { halign: 'right', cellWidth: 22 }
+        },
+        didDrawPage: (data) => {
+          // Footer de página
+          doc.setFontSize(8);
+          doc.setTextColor(128);
+          doc.text(
+            `Página ${doc.getCurrentPageInfo().pageNumber} - Generado el ${dayjs().format('DD/MM/YYYY HH:mm')}`,
+            doc.internal.pageSize.width / 2,
+            doc.internal.pageSize.height - 10,
+            { align: 'center' }
+          );
+        }
+      });
+
+      // Resumen de estadísticas
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RESUMEN:', 14, finalY);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total de Ventas: ${totalVentas}`, 14, finalY + 6);
+      doc.text(`Ingresos Totales: $${totalIngresos.toFixed(2)}`, 14, finalY + 12);
+      doc.text(`Descuentos Aplicados: $${totalDescuentos.toFixed(2)}`, 14, finalY + 18);
+      doc.text(`Promedio por Venta: $${promedioVenta.toFixed(2)}`, 14, finalY + 24);
+
+      // Generar nombre de archivo con filtros
+      const filtrosTexto = [];
+      if (fechaDesde && fechaHasta) {
+        filtrosTexto.push(`${fechaDesde.format('DD-MM-YYYY')}_al_${fechaHasta.format('DD-MM-YYYY')}`);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtrosTexto.push(sucursalSeleccionada);
+      }
+      const nombreArchivo = `Ventas${filtrosTexto.length > 0 ? '_' + filtrosTexto.join('_') : ''}_${dayjs().format('DD-MM-YYYY')}.pdf`;
+
+      // Descargar PDF
+      doc.save(nombreArchivo);
+      
+      message.success(`✅ PDF exportado: ${ventas.length} ventas`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
+    }
+  };
+
+  /**
+   * Función helper para formatear método de pago como texto
+   */
+  const formatearMetodoPagoTexto = (metodo: string): string => {
+    const textos: Record<string, string> = {
+      'efectivo': 'Efectivo',
+      'transferencia': 'Transferencia',
+      'cuenta_corriente': 'Cuenta Corriente',
+      'tarjeta': 'Tarjeta'
+    };
+    return textos[metodo] || metodo;
   };
 
   /**
@@ -501,14 +745,24 @@ const Sales: React.FC = () => {
               </Button>
             </Col>
             <Col>
-              <Button icon={<FileExcelOutlined />} style={{ color: '#52c41a' }}>
+              <Button 
+                icon={<FileExcelOutlined />} 
+                style={{ color: '#52c41a' }}
+                onClick={exportarExcel}
+                disabled={loading || ventas.length === 0}
+              >
                 Exportar Excel
               </Button>
             </Col>
             <Col>
-              <Button icon={<FilePdfOutlined />} style={{ color: '#ff4d4f' }}>
+              <Button 
+                icon={<FilePdfOutlined />} 
+                style={{ color: '#ff4d4f' }}
+                onClick={exportarPDF}
+                disabled={loading || ventas.length === 0}
+              >
                 Exportar PDF
-            </Button>
+              </Button>
             </Col>
           </Row>
         </Space>
