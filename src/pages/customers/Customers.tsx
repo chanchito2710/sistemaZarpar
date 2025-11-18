@@ -454,6 +454,7 @@ const Customers: React.FC = () => {
    */
   const cargarVentasGlobalesCliente = async (clienteId: number) => {
     try {
+      console.log('🔍 [DEBUG Ventas Cliente] API_URL:', API_URL);
       const response = await fetch(
         `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
@@ -463,6 +464,7 @@ const Customers: React.FC = () => {
           },
         }
       );
+      console.log('🔍 [DEBUG] Ventas Response status:', response.status);
       const data = await response.json();
       setVentasGlobalesCliente(data.data || []);
     } catch (error) {
@@ -517,8 +519,17 @@ const Customers: React.FC = () => {
    */
   const cargarProductosCliente = async (clienteId: number) => {
     try {
+      console.log('🔍 [DEBUG Productos Cliente] Iniciando carga de productos');
+      console.log('🔍 [DEBUG] Hostname:', window.location.hostname);
+      console.log('🔍 [DEBUG] API_URL:', API_URL);
+      console.log('🔍 [DEBUG] Cliente ID:', clienteId);
+      console.log('🔍 [DEBUG] Sucursal:', sucursalSeleccionada);
+      
+      const fullURL = `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/productos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`;
+      console.log('🔍 [DEBUG] Full URL:', fullURL);
+      
       const response = await fetch(
-        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/productos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        fullURL,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -526,6 +537,9 @@ const Customers: React.FC = () => {
           },
         }
       );
+      
+      console.log('🔍 [DEBUG] Response status:', response.status);
+      console.log('🔍 [DEBUG] Response ok?', response.ok);
       const data = await response.json();
       setProductosCliente(data.data || []);
     } catch (error) {
