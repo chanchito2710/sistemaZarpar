@@ -3250,6 +3250,220 @@ Este proyecto está diseñado para ser:
 5. **Copiar** código sin entender
 6. **Dejar** console.log en producción sin razón
 7. **Modificar** `.cursorrules` sin actualizar changelog
+8. **Crear archivos MD** explicativos innecesarios (ver REGLA #16)
+
+---
+
+## 🆕 REGLA #16: NO GENERAR ARCHIVOS .MD INNECESARIOS
+
+### 🎯 FILOSOFÍA: "Menos archivos, más eficiencia"
+
+**IMPORTANTE:** Para ahorrar tokens y evitar archivos innecesarios, NO crear archivos `.md` explicativos a menos que el usuario lo solicite explícitamente.
+
+#### ❌ NUNCA CREAR:
+- `INSTRUCCIONES_*.md` (a menos que sea crítico para Railway)
+- `README_*.md` (solo si es documentación permanente)
+- `GUIA_*.md` (explicar directamente al usuario)
+- `SOLUCION_*.md` (documentar en commits y respuestas)
+
+#### ✅ ALTERNATIVAS:
+1. **Explicar directamente** en la respuesta al usuario
+2. **Documentar en commits** con mensajes detallados
+3. **Agregar comentarios** en el código
+4. **Actualizar CHANGELOG.md** si es un cambio importante
+
+#### 🔹 EXCEPCIONES (sí crear):
+- Documentación permanente del proyecto (ej: `README.md` principal)
+- Migraciones críticas de Railway que requieren instrucciones paso a paso
+- Arquitectura o diseño que debe persistir
+
+---
+
+## 🆕 REGLA #17: INFORMACIÓN DE DESPLIEGUE - RAILWAY
+
+### 🚀 DESPLIEGUE EN PRODUCCIÓN
+
+#### 📍 **DÓNDE ESTÁ DESPLEGADO:**
+
+**Plataforma:** Railway (https://railway.app)
+
+**Repositorio GitHub:** https://github.com/chanchito2710/sistemaZarpar.git
+
+**Branch Principal:** `Proyecto_depurado`
+
+**Despliegue Automático:**
+- ✅ Cada `git push origin Proyecto_depurado` → Railway redespliega automáticamente
+- ⏱️ Tiempo de redeploy: 1-3 minutos
+- 📊 Logs en tiempo real: Panel de Railway
+
+---
+
+### 🗄️ BASE DE DATOS EN RAILWAY (MySQL)
+
+#### **Acceso a la Base de Datos en Producción:**
+
+**IMPORTANTE:** Railway tiene su propia instancia de MySQL separada del Docker local.
+
+#### **MÉTODO 1: Railway Web Console (Recomendado)**
+
+1. Ir a Railway Dashboard: https://railway.app
+2. Seleccionar el proyecto "Sistema Zarpar"
+3. Click en el servicio "MySQL"
+4. Click en pestaña "Data"
+5. Ejecutar SQL directamente en el navegador
+
+#### **MÉTODO 2: MySQL Workbench (Conexión Externa)**
+
+1. En Railway Dashboard → MySQL → Variables
+2. Copiar credenciales:
+   - `MYSQLHOST`
+   - `MYSQLPORT`
+   - `MYSQLUSER`
+   - `MYSQLDATABASE`
+   - `MYSQLPASSWORD`
+3. Configurar conexión en MySQL Workbench con esos datos
+
+#### **MÉTODO 3: CLI de Railway**
+
+```bash
+# Instalar Railway CLI
+npm install -g @railway/cli
+
+# Login
+railway login
+
+# Conectar al proyecto
+railway link
+
+# Acceder a MySQL
+railway run mysql -u root -p
+```
+
+---
+
+### 📝 MODIFICAR BASE DE DATOS EN RAILWAY
+
+#### **OPCIÓN A: Migraciones Automáticas (Preferido)**
+
+1. Crear archivo de migración en `database/migrations/XXX_descripcion.sql`
+2. Hacer commit y push
+3. Railway ejecuta migraciones automáticamente al iniciar el servidor
+4. Verificar en logs de Railway: `✅ Migración ejecutada: XXX_descripcion.sql`
+
+**Sistema de Migraciones:**
+- Ubicación: `api/utils/migraciones.ts`
+- Tabla de control: `migraciones` (registra cuáles ya se ejecutaron)
+- Ejecuta solo migraciones nuevas (evita duplicados)
+
+#### **OPCIÓN B: Ejecución Manual SQL (Fallback)**
+
+**Cuando usar:**
+- Migración automática falla
+- Necesitas ejecutar SQL urgente
+- Debugging en producción
+
+**Pasos:**
+1. Crear archivo SQL (ej: `EJECUTAR_EN_RAILWAY.sql`)
+2. Documentar claramente qué hace
+3. Acceder a Railway Web Console (Data tab)
+4. Copiar y pegar SQL completo
+5. Ejecutar y verificar resultados
+6. Registrar manualmente en tabla `migraciones` si es necesario:
+   ```sql
+   INSERT INTO migraciones (nombre) VALUES ('nombre_migracion.sql');
+   ```
+
+#### **VERIFICAR CAMBIOS:**
+
+```sql
+-- Ver migraciones ejecutadas
+SELECT * FROM migraciones ORDER BY ejecutado_en DESC;
+
+-- Ver estructura de tabla
+SHOW COLUMNS FROM nombre_tabla;
+
+-- Verificar índices
+SHOW INDEX FROM nombre_tabla;
+```
+
+---
+
+### 🔍 DEBUGGING EN RAILWAY
+
+#### **Ver Logs en Tiempo Real:**
+
+1. Railway Dashboard → Servicio → Pestaña "Deployments"
+2. Click en el deployment activo
+3. Ver logs en tiempo real
+4. Buscar errores o warnings
+
+#### **Logs de Backend:**
+
+```
+[nodemon] starting `tsx api/server.ts`
+🚀 Servidor iniciado en http://localhost:3456
+✅ Conexión exitosa a MySQL
+📦 Ejecutando migraciones...
+✅ Migración ejecutada: 007_agregar_stock_minimo.sql
+```
+
+#### **Errores Comunes:**
+
+1. **`ECONNREFUSED`** → MySQL no está listo (esperar 30s)
+2. **`ER_ACCESS_DENIED`** → Credenciales incorrectas (verificar variables)
+3. **`ER_NO_SUCH_TABLE`** → Migración no ejecutada (verificar tabla `migraciones`)
+
+---
+
+### ⚠️ IMPORTANTE: DIFERENCIAS LOCAL vs RAILWAY
+
+| Aspecto | Local (Docker) | Railway (Producción) |
+|---------|----------------|----------------------|
+| **MySQL Port** | 3307 | Variable (env) |
+| **API URL** | `http://localhost:3456/api` | Relativa `/api` |
+| **CORS** | Permisivo | Estricto |
+| **Migraciones** | Manual o auto | Solo auto |
+| **Logs** | Terminal local | Dashboard Railway |
+| **Acceso DB** | Docker exec | Web Console o CLI |
+
+#### **API_URL Automático:**
+
+El frontend detecta automáticamente el entorno:
+
+```typescript
+const API_URL = import.meta.env.VITE_API_URL || 
+  (window.location.hostname !== 'localhost' 
+    ? '/api' 
+    : 'http://localhost:3456/api');
+```
+
+**Local:** `http://localhost:3456/api`  
+**Railway:** `/api` (relativo, evita CORS)
+
+---
+
+### 📋 CHECKLIST: DEPLOY A RAILWAY
+
+Antes de hacer push a `Proyecto_depurado`:
+
+```
+[ ] Código funciona en local
+[ ] No hay errores de linter
+[ ] Migraciones SQL están en /database/migrations/
+[ ] Commits tienen mensajes descriptivos
+[ ] Se probaron todas las funcionalidades críticas
+[ ] Variables de entorno están configuradas en Railway
+```
+
+**Después del push:**
+
+```
+[ ] Esperar 1-3 minutos (redeploy)
+[ ] Verificar logs de Railway (sin errores)
+[ ] Probar funcionalidad en la URL de producción
+[ ] Abrir consola del navegador (F12) para debug
+[ ] Verificar que migraciones se ejecutaron (si aplica)
+```
 
 ---
 
