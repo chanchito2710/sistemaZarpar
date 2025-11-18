@@ -541,9 +541,15 @@ const Customers: React.FC = () => {
       console.log('🔍 [DEBUG] Response status:', response.status);
       console.log('🔍 [DEBUG] Response ok?', response.ok);
       const data = await response.json();
+      console.log('🔍 [DEBUG] Data recibida:', data);
+      console.log('🔍 [DEBUG] Productos array:', data.data);
+      console.log('🔍 [DEBUG] Cantidad de productos:', data.data?.length || 0);
+      
       setProductosCliente(data.data || []);
+      console.log('✅ [DEBUG] Productos guardados en estado');
     } catch (error) {
-      console.error('Error al cargar productos:', error);
+      console.error('❌ [DEBUG] Error al cargar productos:', error);
+      console.error('❌ [DEBUG] Error completo:', JSON.stringify(error, null, 2));
     }
   };
 
