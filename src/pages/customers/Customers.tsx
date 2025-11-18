@@ -434,13 +434,13 @@ const Customers: React.FC = () => {
         case '4': // Productos
           console.log('📦 [DEBUG] Cargando Productos...');
           await cargarProductosCliente(clienteId);
-          console.log('💵 [DEBUG] Cargando Saldo Cuenta Corriente (timeout 5s)...');
+          console.log('💵 [DEBUG] Cargando Saldo Cuenta Corriente (timeout 2s)...');
           try {
-            // Timeout de 5 segundos para evitar que se cuelgue
+            // Timeout de 2 segundos para evitar que se cuelgue
             await Promise.race([
               cargarSaldoCuentaCorriente(clienteId),
               new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 5000)
+                setTimeout(() => reject(new Error('Timeout')), 2000)
               )
             ]);
             console.log('✅ [DEBUG] Saldo cargado exitosamente');
