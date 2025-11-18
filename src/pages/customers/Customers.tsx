@@ -435,8 +435,14 @@ const Customers: React.FC = () => {
           console.log('📦 [DEBUG] Cargando Productos...');
           await cargarProductosCliente(clienteId);
           console.log('💵 [DEBUG] Cargando Saldo Cuenta Corriente...');
-          await cargarSaldoCuentaCorriente(clienteId);
-          console.log('✅ [DEBUG] Productos y saldo cargados');
+          try {
+            await cargarSaldoCuentaCorriente(clienteId);
+            console.log('✅ [DEBUG] Saldo cargado exitosamente');
+          } catch (saldoError) {
+            console.warn('⚠️ [DEBUG] Error al cargar saldo (no crítico):', saldoError);
+            // No bloqueamos la pestaña si el saldo falla
+          }
+          console.log('✅ [DEBUG] Productos cargados (tab completa)');
           break;
       }
       // Marcar esta pestaña como cargada
