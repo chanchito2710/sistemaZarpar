@@ -407,34 +407,46 @@ const Customers: React.FC = () => {
    * Cargar datos solo de la pestaña activa (lazy loading con cache)
    */
   const cargarDatosTabActiva = async (tab: string, clienteId: number) => {
+    console.log('🔍 [DEBUG cargarDatosTabActiva] Tab:', tab, 'Cliente ID:', clienteId);
+    
     // Si ya cargamos esta pestaña, no volver a cargar
     if (tabsCargadas.has(tab)) {
+      console.log('⚠️ [DEBUG] Tab ya cargada previamente, saltando...');
       return;
     }
 
+    console.log('🔄 [DEBUG] Iniciando carga de tab, setLoadingDrawer(true)');
     setLoadingDrawer(true);
     try {
       switch (tab) {
         case '1': // Ventas Globales
+          console.log('📊 [DEBUG] Cargando Ventas Globales...');
           await cargarVentasGlobalesCliente(clienteId);
           break;
         case '2': // Pagos
+          console.log('💰 [DEBUG] Cargando Pagos...');
           await cargarPagosCliente(clienteId);
           break;
         case '3': // Reemplazos/Devoluciones
+          console.log('🔄 [DEBUG] Cargando Reemplazos...');
           await cargarReemplazosCliente(clienteId);
           break;
         case '4': // Productos
+          console.log('📦 [DEBUG] Cargando Productos...');
           await cargarProductosCliente(clienteId);
+          console.log('💵 [DEBUG] Cargando Saldo Cuenta Corriente...');
           await cargarSaldoCuentaCorriente(clienteId);
+          console.log('✅ [DEBUG] Productos y saldo cargados');
           break;
       }
       // Marcar esta pestaña como cargada
+      console.log('✅ [DEBUG] Marcando tab como cargada');
       setTabsCargadas(prev => new Set(prev).add(tab));
     } catch (error) {
-      console.error('Error al cargar datos del cliente:', error);
+      console.error('❌ [DEBUG] Error al cargar datos del cliente:', error);
       message.error('Error al cargar datos del cliente');
     } finally {
+      console.log('🏁 [DEBUG] Finally: setLoadingDrawer(false)');
       setLoadingDrawer(false);
     }
   };
