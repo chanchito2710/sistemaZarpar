@@ -1781,7 +1781,14 @@ const Products: React.FC = () => {
               <Col xs={24} sm={12}>
                 <Text strong>🏷️ Marca</Text>
                 <Space.Compact style={{ width: '100%', marginTop: 8 }}>
-                  <Form.Item name="marca" noStyle>
+                  <Form.Item 
+                    name="marca" 
+                    noStyle
+                    getValueFromEvent={(option) => option?.value || null}
+                    getValueProps={(value) => ({
+                      value: value ? { label: value, value: value } : null
+                    })}
+                  >
                     <ReactSelect
                       placeholder="Selecciona marca"
                       isLoading={loadingMarcas}
@@ -1817,7 +1824,14 @@ const Products: React.FC = () => {
               <Col xs={24} sm={12}>
                 <Text strong>🔧 Tipo</Text>
                 <Space.Compact style={{ width: '100%', marginTop: 8 }}>
-                  <Form.Item name="tipo" noStyle>
+                  <Form.Item 
+                    name="tipo" 
+                    noStyle
+                    getValueFromEvent={(option) => option?.value || null}
+                    getValueProps={(value) => ({
+                      value: value ? { label: value, value: value } : null
+                    })}
+                  >
                     <ReactSelect
                       placeholder="Selecciona tipo"
                       isLoading={loadingTipos}
@@ -1853,7 +1867,14 @@ const Products: React.FC = () => {
               <Col xs={24} sm={12}>
                 <Text strong>⭐ Calidad</Text>
                 <Space.Compact style={{ width: '100%', marginTop: 8 }}>
-                  <Form.Item name="calidad" noStyle>
+                  <Form.Item 
+                    name="calidad" 
+                    noStyle
+                    getValueFromEvent={(option) => option?.value || null}
+                    getValueProps={(value) => ({
+                      value: value ? { label: value, value: value } : null
+                    })}
+                  >
                     <ReactSelect
                       placeholder="Selecciona calidad"
                       isLoading={loadingCalidades}
@@ -1949,7 +1970,14 @@ const Products: React.FC = () => {
               <Col span={12}>
                 <Form.Item label="Calidad" name="calidad" style={{ marginBottom: 0 }}>
                   <Input.Group compact style={{ display: 'flex' }}>
-                    <Form.Item name="calidad" noStyle>
+                    <Form.Item 
+                      name="calidad" 
+                      noStyle
+                      getValueFromEvent={(option) => option?.value || null}
+                      getValueProps={(value) => ({
+                        value: value ? { label: value, value: value } : null
+                      })}
+                    >
                       <ReactSelect
                         placeholder="Selecciona una calidad"
                         isLoading={loadingCalidades}
