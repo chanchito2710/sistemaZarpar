@@ -2253,10 +2253,15 @@ export const descuentosService = {
    */
   desactivarUnaVez: async (sucursal: string): Promise<any> => {
     try {
+      console.log(`📡 [API] DELETE /descuentos/${sucursal}/una-vez`);
       const response: AxiosResponse<ApiResponse<any>> = await apiClient.delete(`/descuentos/${sucursal}/una-vez`);
+      console.log(`✅ [API] Descuento desactivado exitosamente:`, response.data);
       return response.data;
-    } catch (error) {
-      console.error('Error al desactivar descuento una vez:', error);
+    } catch (error: any) {
+      console.error(`❌ [API] Error al desactivar descuento una vez para ${sucursal}:`, error);
+      console.error(`❌ [API] URL intentada:`, error.config?.url);
+      console.error(`❌ [API] Status:`, error.response?.status);
+      console.error(`❌ [API] Data:`, error.response?.data);
       throw error;
     }
   },

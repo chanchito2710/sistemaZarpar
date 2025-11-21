@@ -333,16 +333,31 @@ const StaffSellers: React.FC = () => {
    */
   const handleCancelarUnaVez = async (sucursal: string) => {
     try {
-      console.log(`🔄 Cancelando descuento UNA VEZ para ${sucursal}`);
-      await descuentosService.desactivarUnaVez(sucursal);
+      console.log(`🔄 [FRONTEND] Cancelando descuento UNA VEZ para ${sucursal}`);
+      console.log(`📡 [FRONTEND] Llamando a descuentosService.desactivarUnaVez("${sucursal}")`);
       
-      messageApi.info(`Descuento de uso único cancelado para ${sucursal.toUpperCase()}`);
+      const response = await descuentosService.desactivarUnaVez(sucursal);
+      
+      console.log(`✅ [FRONTEND] Respuesta recibida:`, response);
+      
+      messageApi.success({
+        content: `✅ Descuento de uso único cancelado para ${sucursal.toUpperCase()}`,
+        duration: 3
+      });
       
       // Recargar configuración
+      console.log(`🔄 [FRONTEND] Recargando configuración de descuentos...`);
       await cargarDescuentos();
-    } catch (error) {
-      console.error('Error al cancelar descuento una vez:', error);
-      messageApi.error('Error al cancelar descuento de uso único');
+      console.log(`✅ [FRONTEND] Configuración recargada exitosamente`);
+    } catch (error: any) {
+      console.error('❌ [FRONTEND] Error al cancelar descuento una vez:', error);
+      console.error('❌ [FRONTEND] Error completo:', JSON.stringify(error, null, 2));
+      console.error('❌ [FRONTEND] Response:', error.response);
+      
+      messageApi.error({
+        content: `Error al cancelar descuento: ${error.response?.data?.message || error.message || 'Error desconocido'}`,
+        duration: 5
+      });
     }
   };
 
