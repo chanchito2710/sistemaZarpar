@@ -612,6 +612,15 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
       return;
     }
 
+    // ⭐ Obtener stock ANTERIOR para registrar en historial
+    const registroAnterior = await executeQuery<ProductoSucursal[]>(
+      `SELECT stock, stock_fallas FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?`,
+      [id, sucursal.toLowerCase()]
+    );
+
+    const stockAnterior = registroAnterior.length > 0 ? registroAnterior[0].stock : 0;
+    const stockFallasAnterior = registroAnterior.length > 0 ? (registroAnterior[0].stock_fallas || 0) : 0;
+
     // Verificar si ya existe el registro en productos_sucursal
     const registroExistente = await executeQuery<ProductoSucursal[]>(
       `SELECT * FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?`,
@@ -678,6 +687,34 @@ export const actualizarProductoSucursal = async (req: Request, res: Response): P
       `SELECT * FROM productos_sucursal WHERE producto_id = ? AND sucursal = ?`,
       [id, sucursal.toLowerCase()]
     );
+
+    // ⭐ REGISTRAR EN HISTORIAL SI HUBO CAMBIO DE STOCK
+    if (data.stock !== undefined && data.stock !== stockAnterior) {
+      const usuario = (req as any).usuario || { email: 'sistema@zarparuy.com' };
+      const productoNombre = productoExistente[0].nombre;
+      
+      const queryHistorial = `
+        INSERT INTO historial_stock 
+        (sucursal, producto_id, producto_nombre, stock_anterior, stock_nuevo, 
+         stock_fallas_anterior, stock_fallas_nuevo, tipo_movimiento, usuario_email, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      await executeQuery(queryHistorial, [
+        sucursal.toLowerCase(),
+        id,
+        productoNombre,
+        stockAnterior,
+        data.stock,
+        stockFallasAnterior,
+        stockFallasAnterior, // No cambia en ajuste manual normal
+        'ajuste_manual',
+        usuario.email,
+        `Ajuste manual de stock desde Gestionar Stock (Anterior: ${stockAnterior} → Nuevo: ${data.stock})`
+      ]);
+      
+      console.log(`✅ [HISTORIAL] Registrado ajuste manual: ${productoNombre} en ${sucursal} (${stockAnterior} → ${data.stock})`);
+    }
 
     res.json({
       success: true,
