@@ -10,6 +10,55 @@ import {
 
 const router = express.Router();
 
+// 🚀 ENDPOINT PÚBLICO DE PRUEBA (sin autenticación)
+router.get('/ping', (req, res) => {
+  res.status(200).json({
+    success: true,
+    mensaje: '✅ Rutas de descuentos funcionando correctamente',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🔍 ENDPOINT DE DIAGNÓSTICO PÚBLICO (temporal para debug Railway)
+router.get('/debug/estructura-simple', async (req, res) => {
+  try {
+    const { pool } = await import('../config/database.js');
+    
+    // Verificar estructura de la tabla
+    const [columns] = await pool.execute(`
+      SELECT COLUMN_NAME, DATA_TYPE
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'zarparDataBase'
+        AND TABLE_NAME = 'configuracion_descuentos_sucursal'
+      ORDER BY ORDINAL_POSITION
+    `);
+    
+    // Obtener datos actuales
+    const [data] = await pool.execute(`
+      SELECT sucursal, descuento_habilitado, una_vez_activo 
+      FROM configuracion_descuentos_sucursal
+      ORDER BY sucursal
+    `);
+    
+    // Verificar si existe la columna una_vez_activo
+    const tieneColumna = columns.some((col: any) => col.COLUMN_NAME === 'una_vez_activo');
+    
+    res.status(200).json({
+      success: true,
+      tieneColumnaUnaVez: tieneColumna,
+      estructura: columns,
+      datos: data,
+      totalSucursales: (data as any[]).length
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      code: error.code
+    });
+  }
+});
+
 // Todas las rutas requieren autenticación
 router.use(verificarAutenticacion);
 
@@ -27,83 +76,6 @@ router.post('/:sucursal/una-vez', verificarAdmin, habilitarUnaVez);
 
 // Desactivar descuento "una vez" después de usarse (cualquier usuario puede desactivar)
 router.delete('/:sucursal/una-vez', desactivarUnaVez);
-
-// 🔍 ENDPOINT DE DIAGNÓSTICO (temporal para debug)
-router.get('/debug/estructura', verificarAdmin, async (req, res) => {
-  try {
-    const { pool } = await import('../config/database.js');
-    
-    // Verificar estructura de la tabla
-    const [columns] = await pool.execute(`
-      SELECT COLUMN_NAME, DATA_TYPE, COLUMN_DEFAULT, COLUMN_COMMENT
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = 'zarparDataBase'
-        AND TABLE_NAME = 'configuracion_descuentos_sucursal'
-      ORDER BY ORDINAL_POSITION
-    `);
-    
-    // Obtener datos actuales
-    const [data] = await pool.execute(`
-      SELECT * FROM configuracion_descuentos_sucursal
-      ORDER BY sucursal
-    `);
-    
-    res.status(200).json({
-      success: true,
-      estructura: columns,
-      datos: data,
-      mensaje: 'Revisa si existe la columna una_vez_activo'
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// 🧪 ENDPOINT DE PRUEBA: Habilitar una vez FORZADO (sin verificación)
-router.post('/debug/test-una-vez/:sucursal', verificarAdmin, async (req, res) => {
-  try {
-    const { pool } = await import('../config/database.js');
-    const { sucursal } = req.params;
-    
-    console.log(`🧪 [TEST] Intentando habilitar una_vez para: ${sucursal}`);
-    
-    // Intentar UPDATE directo
-    const [result] = await pool.execute(`
-      UPDATE configuracion_descuentos_sucursal 
-      SET una_vez_activo = 1 
-      WHERE sucursal = ?
-    `, [sucursal.toLowerCase()]);
-    
-    console.log(`🧪 [TEST] Resultado UPDATE:`, result);
-    
-    // Verificar que se actualizó
-    const [verificacion] = await pool.execute(`
-      SELECT * FROM configuracion_descuentos_sucursal 
-      WHERE sucursal = ?
-    `, [sucursal.toLowerCase()]);
-    
-    console.log(`🧪 [TEST] Datos después de UPDATE:`, verificacion);
-    
-    res.status(200).json({
-      success: true,
-      sucursal: sucursal.toLowerCase(),
-      resultado: result,
-      datosActuales: verificacion,
-      mensaje: 'UPDATE ejecutado. Revisa si una_vez_activo = 1'
-    });
-  } catch (error: any) {
-    console.error('🧪 [TEST] Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code,
-      errno: error.errno
-    });
-  }
-});
 
 export default router;
 
