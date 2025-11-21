@@ -1779,8 +1779,8 @@ const StaffSellers: React.FC = () => {
               </>
             ),
           },
-          // ⭐ Tab "Descuentos" SOLO para administradores
-          esAdministrador && {
+          // ⭐ Tab "Descuentos" - Todos pueden ver, pero cada uno ve su sucursal (admin ve todas)
+          {
             key: 'descuentos',
             label: (
               <Space>
@@ -1792,7 +1792,11 @@ const StaffSellers: React.FC = () => {
               <>
                 <Alert
                   message="💡 Control de Descuentos por Sucursal"
-                  description="Habilita o deshabilita la posibilidad de aplicar descuentos en el POS para cada sucursal. Los cambios se actualizan en tiempo real."
+                  description={
+                    esAdministrador 
+                      ? "Habilita o deshabilita la posibilidad de aplicar descuentos en el POS para cada sucursal. Los cambios se actualizan en tiempo real."
+                      : "Gestiona los descuentos disponibles para tu sucursal. El descuento 'una vez' te permite aplicar un descuento único que se desactiva automáticamente después del primer uso."
+                  }
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
@@ -1801,7 +1805,14 @@ const StaffSellers: React.FC = () => {
                 <Card>
                   <Spin spinning={descuentosLoading}>
                     <Table
-                      dataSource={configuracionDescuentos}
+                      dataSource={
+                        // ✅ Si NO es admin, filtrar solo SU sucursal
+                        esAdministrador 
+                          ? configuracionDescuentos 
+                          : configuracionDescuentos.filter(config => 
+                              config.sucursal.toLowerCase() === (usuario?.email?.split('@')[0].toLowerCase() || '')
+                            )
+                      }
                       rowKey="id"
                       size="middle"
                       pagination={false}

@@ -211,7 +211,24 @@ export const habilitarUnaVez = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    console.log(`🎯 Habilitando descuento UNA VEZ para ${sucursal.toUpperCase()}`);
+    // ✅ VALIDACIÓN DE PERMISOS: Verificar si el usuario tiene permiso para habilitar descuento en esta sucursal
+    const esAdmin = usuario?.email === 'admin@zarparuy.com';
+    
+    if (!esAdmin) {
+      // Si NO es admin, solo puede habilitar descuento en SU propia sucursal
+      const sucursalDelUsuario = usuario?.email?.split('@')[0].toLowerCase(); // Ej: maldonado@zarparuy.com → maldonado
+      
+      if (sucursalDelUsuario !== sucursal.toLowerCase()) {
+        console.log(`❌ Usuario ${usuario?.email} intentó habilitar descuento en ${sucursal} (no autorizado)`);
+        res.status(403).json({
+          success: false,
+          message: `No tienes permiso para habilitar descuentos en la sucursal ${sucursal.toUpperCase()}. Solo puedes gestionar descuentos de tu propia sucursal (${sucursalDelUsuario?.toUpperCase()}).`
+        });
+        return;
+      }
+    }
+
+    console.log(`🎯 Habilitando descuento UNA VEZ para ${sucursal.toUpperCase()} (por ${usuario?.email})`);
 
     // Verificar si la configuración existe
     const [existe] = await pool.execute<RowDataPacket[]>(
@@ -274,10 +291,11 @@ export const habilitarUnaVez = async (req: Request, res: Response): Promise<void
   }
 };
 
-// Desactivar descuento "una vez" (después de usarse)
+// Desactivar descuento "una vez" (después de usarse o manualmente)
 export const desactivarUnaVez = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sucursal } = req.params;
+    const usuario = (req as any).user;
 
     if (!sucursal) {
       res.status(400).json({
@@ -287,7 +305,24 @@ export const desactivarUnaVez = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    console.log(`🔄 Desactivando descuento UNA VEZ para ${sucursal.toUpperCase()} (ya fue usado)`);
+    // ✅ VALIDACIÓN DE PERMISOS: Verificar si el usuario tiene permiso para desactivar descuento en esta sucursal
+    const esAdmin = usuario?.email === 'admin@zarparuy.com';
+    
+    if (!esAdmin) {
+      // Si NO es admin, solo puede desactivar descuento en SU propia sucursal
+      const sucursalDelUsuario = usuario?.email?.split('@')[0].toLowerCase();
+      
+      if (sucursalDelUsuario !== sucursal.toLowerCase()) {
+        console.log(`❌ Usuario ${usuario?.email} intentó desactivar descuento en ${sucursal} (no autorizado)`);
+        res.status(403).json({
+          success: false,
+          message: `No tienes permiso para desactivar descuentos en la sucursal ${sucursal.toUpperCase()}. Solo puedes gestionar descuentos de tu propia sucursal (${sucursalDelUsuario?.toUpperCase()}).`
+        });
+        return;
+      }
+    }
+
+    console.log(`🔄 Desactivando descuento UNA VEZ para ${sucursal.toUpperCase()} (por ${usuario?.email})`);
 
     await pool.execute(
       'UPDATE configuracion_descuentos_sucursal SET una_vez_activo = 0 WHERE sucursal = ?',

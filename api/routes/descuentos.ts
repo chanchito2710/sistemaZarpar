@@ -71,10 +71,14 @@ router.get('/:sucursal', obtenerConfiguracionPorSucursal);
 // Actualizar configuración de descuento (solo admin)
 router.put('/:sucursal', verificarAdmin, actualizarConfiguracionDescuento);
 
-// Habilitar descuento "una vez" (solo admin)
-router.post('/:sucursal/una-vez', verificarAdmin, habilitarUnaVez);
+// Habilitar descuento "una vez"
+// ✅ Admin → puede habilitar en cualquier sucursal
+// ✅ Usuario de sucursal → solo puede habilitar en SU sucursal (validación en controlador)
+router.post('/:sucursal/una-vez', habilitarUnaVez);
 
-// Desactivar descuento "una vez" después de usarse (cualquier usuario puede desactivar)
+// Desactivar descuento "una vez"
+// ✅ Admin → puede desactivar en cualquier sucursal
+// ✅ Usuario de sucursal → solo puede desactivar en SU sucursal (validación en controlador)
 router.delete('/:sucursal/una-vez', desactivarUnaVez);
 
 export default router;
