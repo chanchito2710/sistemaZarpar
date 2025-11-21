@@ -1854,20 +1854,24 @@ const Products: React.FC = () => {
                 <Text strong>⭐ Calidad</Text>
                 <Space.Compact style={{ width: '100%', marginTop: 8 }}>
                   <Form.Item name="calidad" noStyle>
-                    <Select
+                    <ReactSelect
                       placeholder="Selecciona calidad"
-                      loading={loadingCalidades}
-                      showSearch
-                      allowClear
-                      size="large"
-                      style={{ flex: 1 }}
+                      isLoading={loadingCalidades}
+                      isClearable
+                      isSearchable
                       options={Array.isArray(calidades) ? calidades.map(c => ({ 
                         label: c?.valor || 'Sin calidad', 
                         value: c?.valor || '' 
                       })) : []}
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
+                      styles={{
+                        ...customSelectStyles,
+                        control: (provided, state) => ({
+                          ...customSelectStyles.control ? customSelectStyles.control(provided, state) : provided,
+                          flex: 1
+                        })
+                      }}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
                     />
                   </Form.Item>
                   <Tooltip title="Agregar nueva calidad">
