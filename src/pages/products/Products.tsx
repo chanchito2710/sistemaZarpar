@@ -1416,9 +1416,16 @@ const Products: React.FC = () => {
                   <Button 
                     type="primary" 
                     icon={<PlusOutlined />}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation(); // ✅ Prevenir propagación de eventos
                       console.log('🖱️ [DEBUG] Click en Nuevo Producto (solo abriendo modal)');
+                      console.log('📋 [DEBUG] Modales actuales:', {
+                        modalCrear: modalCrearVisible,
+                        modalPrecios: modalGestionarPrecios,
+                        modalStock: modalGestionarStock
+                      });
                       setModalCrearVisible(true);
+                      console.log('✅ [DEBUG] Modal Crear abierto');
                     }}
                     size="large"
                   >
@@ -1428,8 +1435,14 @@ const Products: React.FC = () => {
                   {/* 🎯 Botón Gestionar Precios y Stock */}
                   <Button
                     icon={<SettingOutlined />}
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation(); // ✅ Prevenir propagación de eventos
                       console.log('🖱️ [DEBUG] Click en Gestionar Precios');
+                      console.log('📋 [DEBUG] Modales antes:', {
+                        modalCrear: modalCrearVisible,
+                        modalPrecios: modalGestionarPrecios,
+                        modalStock: modalGestionarStock
+                      });
                       setModalCargando('precios'); // ✅ Indicar que este modal se está cargando
                       console.log('🔄 [DEBUG] Modal cargando = precios');
                       // Limpiar filtros al abrir el modal
@@ -1446,6 +1459,11 @@ const Products: React.FC = () => {
                       console.log('🔄 [DEBUG] Modal cargando = null');
                       setModalCargando(null); // ✅ Resetear estado de carga
                       console.log('🎉 [DEBUG] Proceso completo de Gestionar Precios');
+                      console.log('📋 [DEBUG] Modales después:', {
+                        modalCrear: modalCrearVisible,
+                        modalPrecios: true,
+                        modalStock: modalGestionarStock
+                      });
                     }}
                     size="large"
                     loading={modalCargando === 'precios'} // ✅ Solo mostrar spinner si este botón está cargando
@@ -1497,16 +1515,34 @@ const Products: React.FC = () => {
               {/* 📦 Botón Gestionar Stock */}
               <Button
                 icon={<InboxOutlined />}
-                onClick={async () => {
+                onClick={async (e) => {
+                  e.stopPropagation(); // ✅ Prevenir propagación de eventos
+                  console.log('🖱️ [DEBUG] Click en Gestionar Stock');
+                  console.log('📋 [DEBUG] Modales antes:', {
+                    modalCrear: modalCrearVisible,
+                    modalPrecios: modalGestionarPrecios,
+                    modalStock: modalGestionarStock
+                  });
                   setModalCargando('stock'); // ✅ Indicar que este modal se está cargando
+                  console.log('🔄 [DEBUG] Modal cargando = stock');
                   // Limpiar filtros al abrir el modal
                   setBusquedaModalGestionStock('');
                   setTipoFiltroModalGestionStock('todos');
                   setMarcaFiltroModalGestionStock('todas');
+                  console.log('🧹 [DEBUG] Filtros Stock limpiados');
                   // Cargar productos con información de todas las sucursales
+                  console.log('📞 [DEBUG] Llamando a cargarProductosConSucursales (Stock)...');
                   await cargarProductosConSucursales(); // ✅ Esperar a que se carguen los datos
+                  console.log('✅ [DEBUG] cargarProductosConSucursales completado (Stock)');
                   setModalGestionarStock(true); // ✅ Abrir modal DESPUÉS de cargar datos
+                  console.log('🔄 [DEBUG] Modal cargando = null');
                   setModalCargando(null); // ✅ Resetear estado de carga
+                  console.log('🎉 [DEBUG] Proceso completo de Gestionar Stock');
+                  console.log('📋 [DEBUG] Modales después:', {
+                    modalCrear: modalCrearVisible,
+                    modalPrecios: modalGestionarPrecios,
+                    modalStock: true
+                  });
                 }}
                 size="large"
                 loading={modalCargando === 'stock'} // ✅ Solo mostrar spinner si este botón está cargando
