@@ -185,12 +185,26 @@ const ProductPrices: React.FC = () => {
     
     setLoading(true);
     try {
+      console.log(`🔄 Cargando productos para sucursal: ${sucursalSeleccionada}`);
       const response = await productosService.obtenerPorSucursal(sucursalSeleccionada);
+      console.log(`📦 Total productos recibidos de API: ${response.length}`);
       
       // Filtrar solo productos activos con precio > 0
       const productosConPrecio = response.filter(p => 
         p.activo && p.precio && p.precio > 0
       );
+      console.log(`💰 Productos con precio > 0: ${productosConPrecio.length}`);
+      
+      // Mostrar algunos ejemplos de precios
+      if (productosConPrecio.length > 0) {
+        console.log('📊 Ejemplos de productos con precio:', 
+          productosConPrecio.slice(0, 3).map(p => ({
+            nombre: p.nombre,
+            precio: p.precio,
+            sucursal: sucursalSeleccionada
+          }))
+        );
+      }
       
       // Ordenar productos por tipo prioritario
       const productosOrdenados = ordenarProductosPorTipo(productosConPrecio);
@@ -198,9 +212,11 @@ const ProductPrices: React.FC = () => {
       
       if (productosOrdenados.length === 0) {
         message.info('No hay productos con precio asignado en esta sucursal');
+      } else {
+        message.success(`✅ ${productosOrdenados.length} productos cargados con precios`);
       }
     } catch (error) {
-      console.error('Error al cargar productos:', error);
+      console.error('❌ Error al cargar productos:', error);
       message.error('Error al cargar productos');
     } finally {
       setLoading(false);
@@ -216,6 +232,13 @@ const ProductPrices: React.FC = () => {
       return;
     }
 
+    console.log(`📄 Generando PDF con ${productos.length} productos`);
+    console.log(`🏪 Sucursal: ${sucursalSeleccionada}`);
+    console.log('📊 Primeros 3 productos:', productos.slice(0, 3).map(p => ({
+      nombre: p.nombre,
+      precio: p.precio
+    })));
+
     setGeneratingPDF(true);
     
     try {
@@ -224,8 +247,8 @@ const ProductPrices: React.FC = () => {
       const fechaActual = new Date().toLocaleDateString('es-UY');
       
       // Configuración de colores
-      const colorPrimario = [59, 130, 246]; // Azul
-      const colorSecundario = [100, 116, 139]; // Gris
+      const colorPrimario: [number, number, number] = [59, 130, 246]; // Azul
+      const colorSecundario: [number, number, number] = [100, 116, 139]; // Gris
       
       // ENCABEZADO
       doc.setFillColor(...colorPrimario);
@@ -274,15 +297,15 @@ const ProductPrices: React.FC = () => {
         body: datosTabla,
         theme: 'striped',
         headStyles: {
-          fillColor: colorPrimario,
-          textColor: [255, 255, 255],
+          fillColor: colorPrimario as unknown as [number, number, number],
+          textColor: [255, 255, 255] as [number, number, number],
           fontSize: 10,
           fontStyle: 'bold',
           halign: 'center'
         },
         bodyStyles: {
           fontSize: 9,
-          textColor: [50, 50, 50]
+          textColor: [50, 50, 50] as [number, number, number]
         },
         columnStyles: {
           0: { halign: 'center', cellWidth: 10 }, // #
@@ -323,7 +346,9 @@ const ProductPrices: React.FC = () => {
       const nombreArchivo = `Lista_Precios_${sucursalSeleccionada}_${fechaActual.replace(/\//g, '-')}.pdf`;
       doc.save(nombreArchivo);
       
-      message.success('PDF generado exitosamente');
+      console.log(`✅ PDF generado: ${nombreArchivo}`);
+      console.log(`📄 Contiene ${productos.length} productos con precios reales de ${sucursalSeleccionada.toUpperCase()}`);
+      message.success(`✅ PDF generado: ${productos.length} productos de ${sucursalSeleccionada.toUpperCase()}`);
     } catch (error) {
       console.error('Error al generar PDF:', error);
       message.error('Error al generar el PDF');
