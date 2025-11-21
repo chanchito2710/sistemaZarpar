@@ -4,7 +4,7 @@
  * Sistema ZARPAR
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
   Card,
   Table,
@@ -134,6 +134,47 @@ const customSelectStyles: StylesConfig = {
   menuPortal: (provided) => ({
     ...provided,
     zIndex: 9999
+  })
+};
+
+/**
+ * ⚡ ESTILOS COMPACTOS PARA REACT-SELECT EN MODAL DE GESTIÓN DE PRECIOS
+ * Optimizados para evitar re-renders y forced reflows
+ */
+const compactSelectStyles: StylesConfig = {
+  control: (provided, state) => ({
+    ...provided,
+    minHeight: '28px',
+    height: '28px',
+    fontSize: '12px',
+    borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
+    boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
+    '&:hover': { borderColor: '#1890ff' }
+  }),
+  valueContainer: (provided) => ({
+    ...provided,
+    height: '28px',
+    padding: '0 6px',
+    fontSize: '12px'
+  }),
+  input: (provided) => ({
+    ...provided,
+    margin: '0px',
+    padding: '0px',
+    fontSize: '12px'
+  }),
+  indicatorsContainer: (provided) => ({
+    ...provided,
+    height: '28px'
+  }),
+  multiValue: (provided) => ({
+    ...provided,
+    fontSize: '11px'
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 9999,
+    fontSize: '12px'
   })
 };
 
@@ -499,8 +540,9 @@ const Products: React.FC = () => {
 
   /**
    * Aplicar Precio Base 1 a un producto específico
+   * ⚡ Optimizado con useCallback para evitar re-renders
    */
-  const aplicarPrecioBase1Producto = (productoId: number, productoNombre: string) => {
+  const aplicarPrecioBase1Producto = useCallback((productoId: number, productoNombre: string) => {
     const config = preciosBase[productoId];
     if (!config || !config.precio1 || config.precio1 <= 0) {
       message.warning('⚠️ Ingresa un precio base 1 válido para este producto');
@@ -521,12 +563,13 @@ const Products: React.FC = () => {
 
     setPreciosEditados(nuevosPrecios);
     message.success(`✅ Precio Base 1 ($${config.precio1}) aplicado a "${productoNombre}" en ${config.sucursales1.length} sucursales`);
-  };
+  }, [preciosBase, preciosEditados]);
 
   /**
    * Aplicar Precio Base 2 a un producto específico
+   * ⚡ Optimizado con useCallback para evitar re-renders
    */
-  const aplicarPrecioBase2Producto = (productoId: number, productoNombre: string) => {
+  const aplicarPrecioBase2Producto = useCallback((productoId: number, productoNombre: string) => {
     const config = preciosBase[productoId];
     if (!config || !config.precio2 || config.precio2 <= 0) {
       message.warning('⚠️ Ingresa un precio base 2 válido para este producto');
@@ -731,9 +774,15 @@ const Products: React.FC = () => {
    * Productos filtrados para el modal de gestión de precios
    * ⭐ IMPORTANTE: Usa productosConSucursales para tener la información de precios
    */
+  /**
+   * ⚡ Productos filtrados - Optimizado con useMemo
+   * Evita recalcular el filtrado en cada render
+   */
   const productosFiltrados = useMemo(() => {
+    console.log('🔍 [DEBUG] Recalculando productos filtrados...');
+    const terminoBusqueda = busquedaModalGestion.toLowerCase();
+    
     return productosConSucursales.filter((producto) => {
-      const terminoBusqueda = busquedaModalGestion.toLowerCase();
       const cumpleBusqueda = !terminoBusqueda || 
         producto.nombre.toLowerCase().includes(terminoBusqueda) ||
         (producto.marca && producto.marca.toLowerCase().includes(terminoBusqueda));
@@ -744,6 +793,15 @@ const Products: React.FC = () => {
       return cumpleBusqueda && cumpleTipo && cumpleMarca;
     });
   }, [productosConSucursales, busquedaModalGestion, tipoFiltroModalGestion, marcaFiltroModalGestion]);
+  
+  /**
+   * ⚡ Calcular precio promedio de un producto
+   * Memoizado para evitar recálculos innecesarios
+   */
+  const calcularPrecioPromedio = useCallback((sucursales: any[]) => {
+    if (!sucursales || sucursales.length === 0) return 0;
+    return Math.round(sucursales.reduce((sum, s) => sum + (s.precio || 0), 0) / sucursales.length);
+  }, []);
 
   useEffect(() => {
     cargarProductos();
@@ -2319,43 +2377,7 @@ const Products: React.FC = () => {
                                 .filter(s => s.sucursal.toLowerCase() !== 'administrador')
                                 .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
                               }
-                              styles={{
-                                ...customSelectStyles,
-                                control: (provided: any, state: any) => ({
-                                  ...provided,
-                                  minHeight: '28px',
-                                  height: '28px',
-                                  fontSize: '12px',
-                                  borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
-                                  boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
-                                  '&:hover': { borderColor: '#1890ff' }
-                                }),
-                                valueContainer: (provided: any) => ({
-                                  ...provided,
-                                  height: '28px',
-                                  padding: '0 6px',
-                                  fontSize: '12px'
-                                }),
-                                input: (provided: any) => ({
-                                  ...provided,
-                                  margin: '0px',
-                                  padding: '0px',
-                                  fontSize: '12px'
-                                }),
-                                indicatorsContainer: (provided: any) => ({
-                                  ...provided,
-                                  height: '28px'
-                                }),
-                                multiValue: (provided: any) => ({
-                                  ...provided,
-                                  fontSize: '11px'
-                                }),
-                                menu: (provided: any) => ({
-                                  ...provided,
-                                  zIndex: 9999,
-                                  fontSize: '12px'
-                                })
-                              }}
+                              styles={compactSelectStyles}
                               isClearable={true}
                               isSearchable={true}
                               noOptionsMessage={() => 'No hay opciones'}
@@ -2408,43 +2430,7 @@ const Products: React.FC = () => {
                                 .filter(s => s.sucursal.toLowerCase() !== 'administrador')
                                 .map(s => ({ value: s.sucursal, label: s.sucursal.toUpperCase() }))
                               }
-                              styles={{
-                                ...customSelectStyles,
-                                control: (provided: any, state: any) => ({
-                                  ...provided,
-                                  minHeight: '28px',
-                                  height: '28px',
-                                  fontSize: '12px',
-                                  borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
-                                  boxShadow: state.isFocused ? '0 0 0 2px rgba(24, 144, 255, 0.2)' : 'none',
-                                  '&:hover': { borderColor: '#1890ff' }
-                                }),
-                                valueContainer: (provided: any) => ({
-                                  ...provided,
-                                  height: '28px',
-                                  padding: '0 6px',
-                                  fontSize: '12px'
-                                }),
-                                input: (provided: any) => ({
-                                  ...provided,
-                                  margin: '0px',
-                                  padding: '0px',
-                                  fontSize: '12px'
-                                }),
-                                indicatorsContainer: (provided: any) => ({
-                                  ...provided,
-                                  height: '28px'
-                                }),
-                                multiValue: (provided: any) => ({
-                                  ...provided,
-                                  fontSize: '11px'
-                                }),
-                                menu: (provided: any) => ({
-                                  ...provided,
-                                  zIndex: 9999,
-                                  fontSize: '12px'
-                                })
-                              }}
+                              styles={compactSelectStyles}
                               isClearable={true}
                               isSearchable={true}
                               noOptionsMessage={() => 'No hay opciones'}
