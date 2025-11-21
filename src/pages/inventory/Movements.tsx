@@ -62,6 +62,8 @@ interface MovimientoStock {
   sucursal: string;
   producto_id: number;
   producto_nombre: string;
+  marca: string | null;
+  tipo: string | null;
   cliente_id: number | null;
   cliente_nombre: string | null;
   stock_anterior: number;
@@ -298,8 +300,10 @@ const Movements: React.FC = () => {
         'Fecha': dayjs(mov.created_at).format('DD/MM/YYYY HH:mm'),
         'Sucursal': mov.sucursal.toUpperCase(),
         'Producto': mov.producto_nombre,
+        'Marca': mov.marca || '-',
+        'Tipo Producto': mov.tipo || '-',
         'Cliente': mov.cliente_nombre || '-',
-        'Tipo': getTipoMovimientoConfig(mov.tipo_movimiento).label,
+        'Tipo Movimiento': getTipoMovimientoConfig(mov.tipo_movimiento).label,
         'Stock Anterior': mov.stock_anterior,
         'Stock Actual': mov.stock_nuevo,
         'Fallas Anterior': mov.stock_fallas_anterior,
@@ -402,11 +406,13 @@ const Movements: React.FC = () => {
 
       // Tabla
       const tablaMovimientos = movimientos.map(mov => [
-        dayjs(mov.created_at).format('DD/MM/YYYY HH:mm'),
+        dayjs(mov.created_at).format('DD/MM HH:mm'),
         mov.sucursal.toUpperCase(),
-        mov.producto_nombre.substring(0, 25),
-        mov.cliente_nombre?.substring(0, 20) || '-',
-        getTipoMovimientoConfig(mov.tipo_movimiento).label,
+        mov.producto_nombre.substring(0, 20),
+        mov.marca?.substring(0, 12) || '-',
+        mov.tipo?.substring(0, 10) || '-',
+        mov.cliente_nombre?.substring(0, 15) || '-',
+        getTipoMovimientoConfig(mov.tipo_movimiento).label.substring(0, 12),
         mov.stock_anterior.toString(),
         mov.stock_nuevo.toString(),
         mov.stock_fallas_anterior.toString(),
@@ -415,30 +421,32 @@ const Movements: React.FC = () => {
 
       autoTable(doc, {
         startY: yPos + 5,
-        head: [['Fecha', 'Sucursal', 'Producto', 'Cliente', 'Tipo', 'Stock Ant.', 'Stock Act.', 'Fallas Ant.', 'Fallas Act.']],
+        head: [['Fecha', 'Sucursal', 'Producto', 'Marca', 'Tipo', 'Cliente', 'Mov.', 'Stock Ant.', 'Stock Act.', 'Fallas Ant.', 'Fallas Act.']],
         body: tablaMovimientos,
         theme: 'striped',
         headStyles: {
           fillColor: [102, 126, 234],
           textColor: 255,
-          fontSize: 8,
+          fontSize: 7,
           fontStyle: 'bold',
           halign: 'center'
         },
         bodyStyles: {
-          fontSize: 7,
-          cellPadding: 2
+          fontSize: 6,
+          cellPadding: 1.5
         },
         columnStyles: {
-          0: { cellWidth: 28 }, // Fecha
-          1: { cellWidth: 20 }, // Sucursal
-          2: { cellWidth: 45 }, // Producto
-          3: { cellWidth: 35 }, // Cliente
-          4: { cellWidth: 30 }, // Tipo
-          5: { cellWidth: 18, halign: 'center' }, // Stock Ant.
-          6: { cellWidth: 18, halign: 'center' }, // Stock Act.
-          7: { cellWidth: 18, halign: 'center' }, // Fallas Ant.
-          8: { cellWidth: 18, halign: 'center' }, // Fallas Act.
+          0: { cellWidth: 22 }, // Fecha
+          1: { cellWidth: 18 }, // Sucursal
+          2: { cellWidth: 35 }, // Producto
+          3: { cellWidth: 22 }, // Marca
+          4: { cellWidth: 18 }, // Tipo
+          5: { cellWidth: 25 }, // Cliente
+          6: { cellWidth: 20 }, // Movimiento
+          7: { cellWidth: 15, halign: 'center' }, // Stock Ant.
+          8: { cellWidth: 15, halign: 'center' }, // Stock Act.
+          9: { cellWidth: 15, halign: 'center' }, // Fallas Ant.
+          10: { cellWidth: 15, halign: 'center' }, // Fallas Act.
         },
         styles: {
           overflow: 'linebreak',
@@ -527,13 +535,32 @@ const Movements: React.FC = () => {
       title: 'Producto',
       dataIndex: 'producto_nombre',
       key: 'producto_nombre',
-      width: 180,
+      width: 220,
       ellipsis: true,
-      render: (nombre: string) => (
-        <Tooltip title={nombre}>
-          <Text style={{ fontSize: 11 }}>{nombre}</Text>
-        </Tooltip>
-      ),
+      render: (_: string, record: MovimientoStock) => {
+        const detalleCompleto = `${record.producto_nombre}${record.marca ? ` | ${record.marca}` : ''}${record.tipo ? ` | ${record.tipo}` : ''}`;
+        return (
+          <Tooltip title={detalleCompleto}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Text strong style={{ fontSize: 11 }}>
+                {record.producto_nombre}
+              </Text>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {record.marca && (
+                  <Tag color="blue" style={{ margin: 0, fontSize: 9, padding: '0 4px' }}>
+                    {record.marca}
+                  </Tag>
+                )}
+                {record.tipo && (
+                  <Tag color="purple" style={{ margin: 0, fontSize: 9, padding: '0 4px' }}>
+                    {record.tipo}
+                  </Tag>
+                )}
+              </div>
+            </div>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Cliente',

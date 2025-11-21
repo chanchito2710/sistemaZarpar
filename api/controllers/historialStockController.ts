@@ -30,12 +30,15 @@ export const obtenerHistorialStock = async (req: Request, res: Response) => {
     console.log('======================================');
 
     // Construir query base - stock_actual muestra el stock que quedó después del movimiento
+    // Incluye LEFT JOIN con productos para obtener tipo y marca
     let query = `
       SELECT 
         h.id,
         h.sucursal,
         h.producto_id,
         h.producto_nombre,
+        p.marca,
+        p.tipo,
         h.cliente_id,
         h.cliente_nombre,
         h.stock_anterior,
@@ -50,6 +53,7 @@ export const obtenerHistorialStock = async (req: Request, res: Response) => {
         h.stock_nuevo as stock_actual,
         h.stock_fallas_nuevo as stock_fallas_actual
       FROM historial_stock h
+      LEFT JOIN productos p ON h.producto_id = p.id
       WHERE 1=1
     `;
 
