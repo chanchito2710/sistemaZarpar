@@ -34,10 +34,15 @@ import {
   EditOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  FileExcelOutlined,
+  FilePdfOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import { useAuth } from '../../contexts/AuthContext';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -274,6 +279,199 @@ const Movements: React.FC = () => {
     } else {
       setFechaDesde(null);
       setFechaHasta(null);
+    }
+  };
+
+  /**
+   * Exportar movimientos a Excel
+   */
+  const exportarExcel = () => {
+    try {
+      if (movimientos.length === 0) {
+        message.warning('No hay movimientos para exportar');
+        return;
+      }
+
+      // Preparar datos para Excel
+      const datosExcel = movimientos.map((mov, index) => ({
+        '#': index + 1,
+        'Fecha': dayjs(mov.created_at).format('DD/MM/YYYY HH:mm'),
+        'Sucursal': mov.sucursal.toUpperCase(),
+        'Producto': mov.producto_nombre,
+        'Cliente': mov.cliente_nombre || '-',
+        'Tipo': getTipoMovimientoConfig(mov.tipo_movimiento).label,
+        'Stock Anterior': mov.stock_anterior,
+        'Stock Actual': mov.stock_nuevo,
+        'Fallas Anterior': mov.stock_fallas_anterior,
+        'Fallas Actual': mov.stock_fallas_nuevo,
+        'Referencia': mov.referencia || '-',
+        'Usuario': mov.usuario_email,
+        'Observaciones': mov.observaciones || '-',
+      }));
+
+      // Crear workbook
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Movimientos');
+
+      // Ajustar anchos de columna
+      const columnWidths = [
+        { wch: 5 },  // #
+        { wch: 16 }, // Fecha
+        { wch: 12 }, // Sucursal
+        { wch: 30 }, // Producto
+        { wch: 25 }, // Cliente
+        { wch: 20 }, // Tipo
+        { wch: 12 }, // Stock Anterior
+        { wch: 12 }, // Stock Actual
+        { wch: 14 }, // Fallas Anterior
+        { wch: 12 }, // Fallas Actual
+        { wch: 15 }, // Referencia
+        { wch: 25 }, // Usuario
+        { wch: 30 }, // Observaciones
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Generar nombre de archivo
+      const sucursal = sucursalSeleccionada === 'todas' ? 'Todas' : sucursalSeleccionada.toUpperCase();
+      const fechaStr = fechaDesde && fechaHasta 
+        ? `${fechaDesde.format('DD-MM-YYYY')}_${fechaHasta.format('DD-MM-YYYY')}`
+        : dayjs().format('DD-MM-YYYY');
+      const nombreArchivo = `Movimientos_Stock_${sucursal}_${fechaStr}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(workbook, nombreArchivo);
+      
+      message.success(`✅ Excel exportado: ${movimientos.length} movimientos`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar movimientos a PDF
+   */
+  const exportarPDF = () => {
+    try {
+      if (movimientos.length === 0) {
+        message.warning('No hay movimientos para exportar');
+        return;
+      }
+
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('HISTORIAL DE MOVIMIENTOS DE STOCK', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      // Info de filtros
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+
+      const sucursal = sucursalSeleccionada === 'todas' ? 'Todas las Sucursales' : sucursalSeleccionada.toUpperCase();
+      doc.text(`Sucursal: ${sucursal}`, 14, yPos);
+      yPos += 5;
+
+      if (fechaDesde && fechaHasta) {
+        doc.text(`Período: ${fechaDesde.format('DD/MM/YYYY')} - ${fechaHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      } else {
+        doc.text('Período: Todos los registros', 14, yPos);
+        yPos += 5;
+      }
+
+      if (tipoMovimiento && tipoMovimiento !== 'todos') {
+        doc.text(`Tipo: ${getTipoMovimientoConfig(tipoMovimiento).label}`, 14, yPos);
+        yPos += 5;
+      }
+
+      if (productoNombre) {
+        doc.text(`Producto: ${productoNombre}`, 14, yPos);
+        yPos += 5;
+      }
+
+      doc.text(`Total de Movimientos: ${movimientos.length}`, 14, yPos);
+      yPos += 5;
+
+      // Tabla
+      const tablaMovimientos = movimientos.map(mov => [
+        dayjs(mov.created_at).format('DD/MM/YYYY HH:mm'),
+        mov.sucursal.toUpperCase(),
+        mov.producto_nombre.substring(0, 25),
+        mov.cliente_nombre?.substring(0, 20) || '-',
+        getTipoMovimientoConfig(mov.tipo_movimiento).label,
+        mov.stock_anterior.toString(),
+        mov.stock_nuevo.toString(),
+        mov.stock_fallas_anterior.toString(),
+        mov.stock_fallas_nuevo.toString(),
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['Fecha', 'Sucursal', 'Producto', 'Cliente', 'Tipo', 'Stock Ant.', 'Stock Act.', 'Fallas Ant.', 'Fallas Act.']],
+        body: tablaMovimientos,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [102, 126, 234],
+          textColor: 255,
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 7,
+          cellPadding: 2
+        },
+        columnStyles: {
+          0: { cellWidth: 28 }, // Fecha
+          1: { cellWidth: 20 }, // Sucursal
+          2: { cellWidth: 45 }, // Producto
+          3: { cellWidth: 35 }, // Cliente
+          4: { cellWidth: 30 }, // Tipo
+          5: { cellWidth: 18, halign: 'center' }, // Stock Ant.
+          6: { cellWidth: 18, halign: 'center' }, // Stock Act.
+          7: { cellWidth: 18, halign: 'center' }, // Fallas Ant.
+          8: { cellWidth: 18, halign: 'center' }, // Fallas Act.
+        },
+        styles: {
+          overflow: 'linebreak',
+        }
+      });
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128);
+        doc.text(
+          `Página ${i} de ${pageCount} - Generado: ${dayjs().format('DD/MM/YYYY HH:mm')}`,
+          doc.internal.pageSize.width / 2,
+          doc.internal.pageSize.height - 10,
+          { align: 'center' }
+        );
+      }
+
+      // Generar nombre de archivo
+      const sucursalStr = sucursalSeleccionada === 'todas' ? 'Todas' : sucursalSeleccionada.toUpperCase();
+      const fechaStr = fechaDesde && fechaHasta 
+        ? `${fechaDesde.format('DD-MM-YYYY')}_${fechaHasta.format('DD-MM-YYYY')}`
+        : dayjs().format('DD-MM-YYYY');
+      const nombreArchivo = `Movimientos_Stock_${sucursalStr}_${fechaStr}.pdf`;
+
+      doc.save(nombreArchivo);
+      
+      message.success(`✅ PDF exportado: ${movimientos.length} movimientos`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
     }
   };
 
@@ -645,6 +843,42 @@ const Movements: React.FC = () => {
                 block
               >
                 Limpiar Filtros
+              </Button>
+            </Col>
+          </Row>
+
+          {/* Botones de Exportación */}
+          <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
+            <Col xs={12}>
+              <Button
+                icon={<FileExcelOutlined />}
+                onClick={exportarExcel}
+                disabled={loading || movimientos.length === 0}
+                block
+                style={{
+                  background: 'linear-gradient(135deg, #52c41a 0%, #73d13d 100%)',
+                  border: 'none',
+                  color: 'white',
+                  fontWeight: 'bold',
+                }}
+              >
+                Exportar Excel
+              </Button>
+            </Col>
+            <Col xs={12}>
+              <Button
+                icon={<FilePdfOutlined />}
+                onClick={exportarPDF}
+                disabled={loading || movimientos.length === 0}
+                block
+                style={{
+                  background: 'linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%)',
+                  border: 'none',
+                  color: 'white',
+                  fontWeight: 'bold',
+                }}
+              >
+                Exportar PDF
               </Button>
             </Col>
           </Row>
