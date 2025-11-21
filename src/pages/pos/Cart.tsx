@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { productosService, descuentosService, type ProductoCompleto, type Venta } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import POSCheckout from '../../components/pos/POSCheckout';
 import VentaExitosa from '../../components/pos/VentaExitosa';
 
@@ -64,9 +65,13 @@ interface POSData {
 const Cart: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   
   // Datos del POS (sucursal, cliente, vendedor)
   const posData = location.state as POSData;
+  
+  // Verificar si el usuario es administrador
+  const esAdministrador = usuario?.esAdmin || usuario?.email === 'admin@zarparuy.com';
 
   // Estados
   const [productos, setProductos] = useState<ProductoCompleto[]>([]);
@@ -733,19 +738,23 @@ const Cart: React.FC = () => {
             </Col>
           </Row>
           
-          {/* Botón de Cuenta Corriente Manual (Migración) */}
-          <Divider style={{ margin: '12px 0' }} />
-          <Button
-            type="dashed"
-            icon={<ImportOutlined />}
-            onClick={() => setModalCuentaCorrienteVisible(true)}
-            style={{
-              borderColor: '#722ed1',
-              color: '#722ed1'
-            }}
-          >
-            <CreditCardOutlined /> Cuenta Corriente Manual (Migración)
-          </Button>
+          {/* Botón de Cuenta Corriente Manual (Migración) - SOLO ADMINISTRADOR */}
+          {esAdministrador && (
+            <>
+              <Divider style={{ margin: '12px 0' }} />
+              <Button
+                type="dashed"
+                icon={<ImportOutlined />}
+                onClick={() => setModalCuentaCorrienteVisible(true)}
+                style={{
+                  borderColor: '#722ed1',
+                  color: '#722ed1'
+                }}
+              >
+                <CreditCardOutlined /> Cuenta Corriente Manual (Migración)
+              </Button>
+            </>
+          )}
         </Space>
       </Card>
 

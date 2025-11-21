@@ -3,7 +3,7 @@ import {
   registrarSaldoInicial,
   obtenerSaldoCuentaCorriente
 } from '../controllers/cuentaCorrienteController.js';
-import { verificarAutenticacion } from '../middleware/auth.js';
+import { verificarAutenticacion, verificarAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -13,8 +13,9 @@ router.use(verificarAutenticacion);
 /**
  * POST /api/cuenta-corriente/saldo-inicial
  * Registrar saldo inicial de cuenta corriente (migración desde sistema anterior)
+ * SOLO ADMINISTRADOR
  */
-router.post('/saldo-inicial', registrarSaldoInicial);
+router.post('/saldo-inicial', verificarAdmin, registrarSaldoInicial);
 
 /**
  * GET /api/cuenta-corriente/saldo/:sucursal/:cliente_id
