@@ -356,7 +356,7 @@ const Expenses: React.FC = () => {
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             border: 'none',
           }}
-          bodyStyle={{ padding: '16px' }}
+          styles={{ body: { padding: '16px' } }}
         >
           <Row align="middle" justify="space-between" gutter={[16, 16]}>
             <Col xs={24} sm={12}>

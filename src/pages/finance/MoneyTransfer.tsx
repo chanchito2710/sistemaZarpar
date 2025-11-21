@@ -375,7 +375,7 @@ const MoneyTransfer: React.FC = () => {
                   width: '100%',
                   maxWidth: 500
                 }}
-                bodyStyle={{ padding: 32 }}
+                styles={{ body: { padding: 32 } }}
               >
                 <Statistic
                   title={

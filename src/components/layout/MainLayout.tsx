@@ -1037,7 +1037,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                   description="Sin ventas recientes"
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   style={{ margin: '10px 0' }}
-                  imageStyle={{ height: 40 }}
+                  styles={{ image: { height: 40 } }}
                 />
               ) : (
                 <Space direction="vertical" size={6} style={{ width: '100%' }}>

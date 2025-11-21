@@ -476,7 +476,7 @@ const Movements: React.FC = () => {
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           border: 'none',
         }}
-        bodyStyle={{ padding: '24px' }}
+        styles={{ body: { padding: '24px' } }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>

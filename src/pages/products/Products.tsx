@@ -2277,7 +2277,7 @@ const Products: React.FC = () => {
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           
           {/* Filtros */}
-          <Card bodyStyle={{ padding: '16px' }}>
+          <Card styles={{ body: { padding: '16px' } }}>
             <Row gutter={[16, 16]}>
               <Col xs={24} md={10}>
                 <Input
@@ -2621,7 +2621,7 @@ const Products: React.FC = () => {
               
               return (
                 <Col xs={24} sm={12} key={sucursalNombre}>
-                  <Card size="small" bodyStyle={{ padding: '12px' }}>
+                  <Card size="small" styles={{ body: { padding: '12px' } }}>
                     <Space direction="vertical" style={{ width: '100%' }} size={0}>
                       <Text strong style={{ fontSize: 13 }}>
                         <ShopOutlined /> {formatearNombreSucursal(sucursalNombre)}
@@ -2665,7 +2665,7 @@ const Products: React.FC = () => {
       >
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           {/* Filtros */}
-          <Card bodyStyle={{ padding: '16px' }}>
+          <Card styles={{ body: { padding: '16px' } }}>
             <Row gutter={[16, 16]}>
               <Col xs={24} md={10}>
                 <Input
@@ -2881,7 +2881,7 @@ const Products: React.FC = () => {
               
               return (
                 <Col xs={24} sm={12} key={sucursalNombre}>
-                  <Card size="small" bodyStyle={{ padding: '12px' }}>
+                  <Card size="small" styles={{ body: { padding: '12px' } }}>
                     <Space direction="vertical" style={{ width: '100%' }} size={0}>
                       <Text strong style={{ fontSize: 13 }}>
                         <ShopOutlined /> {formatearNombreSucursal(sucursalNombre)}
