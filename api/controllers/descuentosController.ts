@@ -2,16 +2,66 @@ import { Request, Response } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { pool } from '../config/database.js';
 
-// Obtener configuración de descuentos de todas las sucursales
+// Obtener configuración de descuentos de todas las sucursales (100% DINÁMICO)
 export const obtenerConfiguracionDescuentos = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [configuraciones] = await pool.execute<RowDataPacket[]>(
-      'SELECT * FROM configuracion_descuentos_sucursal ORDER BY sucursal'
+    console.log('📊 [DESCUENTOS] Obteniendo configuración dinámica...');
+    
+    // ✅ 1. Obtener TODAS las sucursales dinámicamente desde la BD
+    const { obtenerNombresSucursales } = await import('../utils/database.js');
+    const sucursalesReales = await obtenerNombresSucursales();
+    
+    console.log('🏪 [DESCUENTOS] Sucursales reales encontradas:', sucursalesReales);
+    
+    // ✅ 2. Obtener configuraciones existentes
+    const [configuracionesExistentes] = await pool.execute<RowDataPacket[]>(
+      'SELECT * FROM configuracion_descuentos_sucursal'
     );
+    
+    console.log('📋 [DESCUENTOS] Configuraciones existentes:', configuracionesExistentes.length);
+    
+    // ✅ 3. Filtrar SOLO las configuraciones de sucursales que realmente existen
+    const configuracionesFiltradas = configuracionesExistentes.filter((config: any) => 
+      sucursalesReales.includes(config.sucursal.toLowerCase())
+    );
+    
+    console.log('✅ [DESCUENTOS] Configuraciones filtradas:', configuracionesFiltradas.length);
+    
+    // ✅ 4. Agregar sucursales faltantes con configuración por defecto (deshabilitado)
+    const sucursalesConConfiguracion = configuracionesFiltradas.map((c: any) => c.sucursal.toLowerCase());
+    const sucursalesFaltantes = sucursalesReales.filter(s => !sucursalesConConfiguracion.includes(s));
+    
+    if (sucursalesFaltantes.length > 0) {
+      console.log('🆕 [DESCUENTOS] Creando configuración para sucursales nuevas:', sucursalesFaltantes);
+      
+      // Insertar configuraciones para sucursales nuevas
+      for (const sucursal of sucursalesFaltantes) {
+        await pool.execute(
+          `INSERT IGNORE INTO configuracion_descuentos_sucursal 
+           (sucursal, descuento_habilitado) VALUES (?, 0)`,
+          [sucursal]
+        );
+        
+        // Agregar a la lista de configuraciones
+        configuracionesFiltradas.push({
+          sucursal,
+          descuento_habilitado: 0,
+          updated_at: new Date(),
+          updated_by: null
+        });
+      }
+    }
+    
+    // ✅ 5. Ordenar por nombre de sucursal
+    const configuracionesFinales = configuracionesFiltradas.sort((a: any, b: any) => 
+      a.sucursal.localeCompare(b.sucursal)
+    );
+    
+    console.log('🎯 [DESCUENTOS] Total configuraciones finales:', configuracionesFinales.length);
 
     res.status(200).json({
       success: true,
-      data: configuraciones || []
+      data: configuracionesFinales
     });
   } catch (error) {
     console.error('❌ Error al obtener configuración de descuentos:', error);
