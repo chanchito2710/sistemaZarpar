@@ -1219,6 +1219,11 @@ const Products: React.FC = () => {
           }))
         : [],
       onFilter: (value, record) => record.marca === value,
+      sorter: (a, b) => {
+        const marcaA = (a.marca || '').toLowerCase();
+        const marcaB = (b.marca || '').toLowerCase();
+        return marcaA.localeCompare(marcaB, 'es');
+      },
       render: (marca: string) => marca ? <Text>{marca}</Text> : <Text type="secondary">-</Text>
     },
     {
