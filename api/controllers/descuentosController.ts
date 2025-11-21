@@ -240,12 +240,33 @@ export const habilitarUnaVez = async (req: Request, res: Response): Promise<void
         una_vez_activo: 1
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error al habilitar descuento una vez:', error);
+    console.error('❌ Código de error:', error.code);
+    console.error('❌ Errno:', error.errno);
+    console.error('❌ SQL State:', error.sqlState);
+    console.error('❌ SQL Message:', error.sqlMessage);
+    
+    // Si es error de columna inexistente, dar mensaje específico
+    if (error.errno === 1054 || error.code === 'ER_BAD_FIELD_ERROR') {
+      res.status(500).json({
+        success: false,
+        message: '⚠️ La columna una_vez_activo NO existe en la base de datos. Debes ejecutar la migración SQL en Railway.',
+        error: 'Columna una_vez_activo no encontrada',
+        instrucciones: 'Ejecuta el SQL de database/EJECUTAR_EN_RAILWAY_UNA_VEZ.sql en Railway MySQL Data tab'
+      });
+      return;
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error al habilitar descuento una vez',
-      error: error instanceof Error ? error.message : 'Error desconocido'
+      error: error instanceof Error ? error.message : 'Error desconocido',
+      detalles: {
+        code: error.code,
+        errno: error.errno,
+        sqlState: error.sqlState
+      }
     });
   }
 };

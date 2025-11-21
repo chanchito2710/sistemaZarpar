@@ -21,6 +21,10 @@ const server = app.listen(PORT, async () => {
   // Ejecutar migraciones pendientes automáticamente
   await ejecutarMigraciones();
   
+  // Verificar y crear columnas de descuentos si no existen (auto-fix para Railway)
+  const { verificarColumnasDescuentos } = await import('./utils/verificarColumnasDescuentos.js');
+  await verificarColumnasDescuentos();
+  
   // Inicializar tareas programadas (Cron Jobs)
   inicializarCronJobs();
 });
