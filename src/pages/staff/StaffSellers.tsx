@@ -1020,6 +1020,11 @@ const StaffSellers: React.FC = () => {
   const totalGerentes = vendedores.filter(v => v.cargo.toLowerCase().includes('gerente')).length;
   const totalSucursales = sucursales.length;
 
+  /**
+   * Verificar si el usuario actual es administrador
+   */
+  const esAdministrador = usuario?.email === 'admin@zarparuy.com';
+
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
       {/* Título Simple */}
