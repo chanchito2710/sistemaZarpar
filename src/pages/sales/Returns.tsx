@@ -320,9 +320,11 @@ const Returns: React.FC = () => {
   
   const [loading, setLoading] = useState(false);
   const [productosVendidos, setProductosVendidos] = useState<ProductoVendido[]>([]);
+  const [productosFiltrados, setProductosFiltrados] = useState<ProductoVendido[]>([]);
   const [sucursales, setSucursales] = useState<string[]>([]);
   const [sucursal, setSucursal] = useState<string>(esAdmin ? 'todas' : sucursalUsuario);
   const [fechaRango, setFechaRango] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [busqueda, setBusqueda] = useState<string>('');
   
   // Modal Devolución
   const [modalDevolucionVisible, setModalDevolucionVisible] = useState(false);
@@ -363,6 +365,28 @@ const Returns: React.FC = () => {
     cargarProductosVendidos();
   }, [sucursal, fechaRango]);
 
+  // Filtrar productos cuando cambia la búsqueda o se cargan nuevos productos
+  useEffect(() => {
+    if (busqueda.trim() === '') {
+      // Si no hay búsqueda, mostrar todos los productos
+      setProductosFiltrados(productosVendidos);
+    } else {
+      // Filtrar por cliente o producto
+      const busquedaLower = busqueda.toLowerCase();
+      const filtrados = productosVendidos.filter(producto => {
+        const nombreCliente = (producto.cliente_nombre || '').toLowerCase();
+        const nombreProducto = (producto.nombre_producto || '').toLowerCase();
+        const marca = (producto.marca || '').toLowerCase();
+        const tipo = (producto.tipo_producto || '').toLowerCase();
+        
+        return nombreCliente.includes(busquedaLower) || 
+               nombreProducto.includes(busquedaLower) ||
+               marca.includes(busquedaLower) ||
+               tipo.includes(busquedaLower);
+      });
+      setProductosFiltrados(filtrados);
+    }
+  }, [busqueda, productosVendidos]);
 
   const cargarProductosVendidos = async () => {
     setLoading(true);
@@ -378,6 +402,7 @@ const Returns: React.FC = () => {
       
       const data = await devolucionesService.obtenerProductosVendidos(filtros);
       setProductosVendidos(data);
+      // Los productos filtrados se actualizarán automáticamente por el useEffect
     } catch (error) {
       message.error('Error al cargar productos vendidos');
       console.error(error);
@@ -758,6 +783,15 @@ const Returns: React.FC = () => {
                 </Option>
               ))}
             </Select>
+            <Input.Search
+              placeholder="Buscar por cliente o producto..."
+              allowClear
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onSearch={(value) => setBusqueda(value)}
+              style={{ width: 280 }}
+              prefix={<SearchOutlined />}
+            />
             <RangePicker
               value={fechaRango}
               onChange={(dates) => setFechaRango(dates)}
@@ -777,7 +811,7 @@ const Returns: React.FC = () => {
       >
         <Table
           columns={columns}
-          dataSource={productosVendidos}
+          dataSource={productosFiltrados}
           rowKey="detalle_id"
           loading={loading}
           pagination={{
