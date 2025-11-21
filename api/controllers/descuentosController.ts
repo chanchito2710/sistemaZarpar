@@ -21,9 +21,16 @@ export const obtenerConfiguracionDescuentos = async (req: Request, res: Response
     console.log('📋 [DESCUENTOS] Configuraciones existentes:', configuracionesExistentes.length);
     
     // ✅ 3. Filtrar SOLO las configuraciones de sucursales que realmente existen
-    const configuracionesFiltradas = configuracionesExistentes.filter((config: any) => 
-      sucursalesReales.includes(config.sucursal.toLowerCase())
-    );
+    // Convertir a array genérico para poder agregar nuevos objetos
+    const configuracionesFiltradas: any[] = configuracionesExistentes
+      .filter((config: any) => sucursalesReales.includes(config.sucursal.toLowerCase()))
+      .map(config => ({
+        id: config.id,
+        sucursal: config.sucursal,
+        descuento_habilitado: config.descuento_habilitado,
+        updated_at: config.updated_at,
+        updated_by: config.updated_by
+      }));
     
     console.log('✅ [DESCUENTOS] Configuraciones filtradas:', configuracionesFiltradas.length);
     
@@ -53,7 +60,7 @@ export const obtenerConfiguracionDescuentos = async (req: Request, res: Response
     }
     
     // ✅ 5. Ordenar por nombre de sucursal
-    const configuracionesFinales = configuracionesFiltradas.sort((a: any, b: any) => 
+    const configuracionesFinales = configuracionesFiltradas.sort((a, b) => 
       a.sucursal.localeCompare(b.sucursal)
     );
     
