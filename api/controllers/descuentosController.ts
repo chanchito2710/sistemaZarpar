@@ -28,6 +28,7 @@ export const obtenerConfiguracionDescuentos = async (req: Request, res: Response
         id: config.id,
         sucursal: config.sucursal,
         descuento_habilitado: config.descuento_habilitado,
+        una_vez_activo: config.una_vez_activo || 0, // ⭐ Incluir campo una_vez_activo
         updated_at: config.updated_at,
         updated_by: config.updated_by
       }));
@@ -53,6 +54,7 @@ export const obtenerConfiguracionDescuentos = async (req: Request, res: Response
         configuracionesFiltradas.push({
           sucursal,
           descuento_habilitado: 0,
+          una_vez_activo: 0, // ⭐ Incluir campo una_vez_activo
           updated_at: new Date(),
           updated_by: null
         });
