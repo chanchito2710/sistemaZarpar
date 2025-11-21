@@ -1893,25 +1893,29 @@ export const eliminarProducto = async (req: Request, res: Response): Promise<voi
     console.error('❌ Name:', error.name);
     console.error('❌ ====================================================');
     
-    // Verificar si es un error de Foreign Key Constraint
-    // Códigos de error de MySQL para Foreign Key:
+    // Verificar si es un error de Foreign Key Constraint o TRIGGER personalizado
+    // Códigos de error de MySQL:
     // - ER_ROW_IS_REFERENCED: 1217
     // - ER_ROW_IS_REFERENCED_2: 1451
     // - ER_NO_REFERENCED_ROW: 1216
     // - ER_NO_REFERENCED_ROW_2: 1452
+    // - ER_SIGNAL_EXCEPTION: 1644 (trigger personalizado)
     if (
       error.code === 'ER_ROW_IS_REFERENCED_2' || 
       error.code === 'ER_ROW_IS_REFERENCED' ||
+      error.code === 'ER_SIGNAL_EXCEPTION' || // ⭐ TRIGGER personalizado
       error.errno === 1451 || 
       error.errno === 1217 ||
-      (error.sqlMessage && error.sqlMessage.includes('foreign key constraint'))
+      error.errno === 1644 || // ⭐ SIGNAL EXCEPTION
+      (error.sqlMessage && error.sqlMessage.includes('foreign key constraint')) ||
+      (error.sqlMessage && error.sqlMessage.toLowerCase().includes('ventas asociadas')) // ⭐ Mensaje del trigger
     ) {
-      console.log('✅ Detectado error de Foreign Key Constraint');
+      console.log('✅ Detectado error de protección de producto (Foreign Key o Trigger)');
       res.status(409).json({
         success: false,
-        message: 'No se puede eliminar este producto porque tiene ventas, transferencias u otros registros asociados. Por seguridad, se mantiene en el sistema.',
-        error: 'FOREIGN_KEY_CONSTRAINT',
-        detalles: 'El producto está siendo referenciado por otros registros (ventas, transferencias, etc.)'
+        message: error.sqlMessage || 'No se puede eliminar este producto porque tiene ventas, transferencias u otros registros asociados. Por seguridad, se mantiene en el sistema.',
+        error: 'PRODUCT_PROTECTION',
+        detalles: 'El producto está siendo protegido por tener registros asociados (ventas, transferencias, etc.)'
       });
       return;
     }

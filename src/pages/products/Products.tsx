@@ -1100,10 +1100,14 @@ const Products: React.FC = () => {
     } catch (error: any) {
       console.error('Error al eliminar producto:', error);
       
-      // Manejar error de Foreign Key (producto con ventas/transferencias)
-      if (error.response?.status === 409 || error.response?.data?.error === 'FOREIGN_KEY_CONSTRAINT') {
+      // Manejar error de producto protegido (Foreign Key, Trigger, o restricciones)
+      if (
+        error.response?.status === 409 || 
+        error.response?.data?.error === 'FOREIGN_KEY_CONSTRAINT' ||
+        error.response?.data?.error === 'PRODUCT_PROTECTION'
+      ) {
         message.error({
-          content: `No se puede eliminar "${nombre}" porque tiene ventas, transferencias u otros registros asociados. El producto se mantiene por seguridad e integridad de datos.`,
+          content: error.response?.data?.message || `No se puede eliminar "${nombre}" porque tiene ventas, transferencias u otros registros asociados. El producto se mantiene por seguridad e integridad de datos.`,
           duration: 6
         });
       } else {
@@ -1134,10 +1138,14 @@ const Products: React.FC = () => {
     } catch (error: any) {
       console.error('Error al eliminar productos:', error);
       
-      // Manejar error de Foreign Key (productos con ventas/transferencias)
-      if (error.response?.status === 409 || error.response?.data?.error === 'FOREIGN_KEY_CONSTRAINT') {
+      // Manejar error de productos protegidos (Foreign Key, Trigger, o restricciones)
+      if (
+        error.response?.status === 409 || 
+        error.response?.data?.error === 'FOREIGN_KEY_CONSTRAINT' ||
+        error.response?.data?.error === 'PRODUCT_PROTECTION'
+      ) {
         message.error({
-          content: 'Algunos productos no se pudieron eliminar porque tienen ventas, transferencias u otros registros asociados. Se mantienen por seguridad e integridad de datos.',
+          content: error.response?.data?.message || 'Algunos productos no se pudieron eliminar porque tienen ventas, transferencias u otros registros asociados. Se mantienen por seguridad e integridad de datos.',
           duration: 6
         });
         cargarProductos(); // Recargar para ver cuáles quedaron
