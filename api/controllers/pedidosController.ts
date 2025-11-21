@@ -8,7 +8,33 @@ import { RowDataPacket } from 'mysql2';
  */
 export const obtenerAnalisisPedidos = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { fecha_desde, fecha_hasta } = req.query;
+    
     console.log('📊 Obteniendo análisis de productos para pedidos...');
+    console.log('📅 Filtros:', { fecha_desde, fecha_hasta });
+
+    // Construcción de filtros de fecha
+    let ventasFechaCondicion = 'v.fecha_venta >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
+    let fallasFechaCondicion = '';
+    
+    const queryParams: any[] = [];
+    
+    if (fecha_desde && fecha_hasta) {
+      ventasFechaCondicion = 'v.fecha_venta BETWEEN ? AND ?';
+      queryParams.push(fecha_desde, fecha_hasta);
+      
+      // Para fallas: contar las registradas en el rango de fechas
+      fallasFechaCondicion = `
+        AND (SELECT COUNT(*) 
+             FROM historial_stock hs 
+             WHERE hs.producto_id = ps.producto_id 
+             AND hs.sucursal = ps.sucursal
+             AND hs.tipo_movimiento = 'falla_registrada'
+             AND hs.fecha BETWEEN ? AND ?
+            )
+      `;
+      queryParams.push(fecha_desde, fecha_hasta);
+    }
 
     // Query para obtener todos los productos con stock agregado, ventas y fallas
     const query = `
@@ -23,18 +49,28 @@ export const obtenerAnalisisPedidos = async (req: Request, res: Response): Promi
         -- Stock total de todas las sucursales
         COALESCE(SUM(ps.stock), 0) as stock_total,
         
-        -- Ventas globales (últimos 30 días)
+        -- Ventas globales (filtradas por fecha)
         COALESCE(
           (SELECT COUNT(*) 
            FROM ventas_detalle vd 
            INNER JOIN ventas v ON vd.venta_id = v.id
            WHERE vd.producto_id = p.id 
-           AND v.fecha_venta >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+           AND ${ventasFechaCondicion}
           ), 0
-        ) as ventas_30_dias,
+        ) as ventas_periodo,
         
-        -- Fallas totales
-        COALESCE(SUM(ps.stock_fallas), 0) as fallas_total,
+        -- Fallas totales (actuales o filtradas por fecha)
+        ${fecha_desde && fecha_hasta 
+          ? `COALESCE(
+              (SELECT COUNT(*) 
+               FROM historial_stock hs 
+               WHERE hs.producto_id = p.id
+               AND hs.tipo_movimiento = 'falla_registrada'
+               AND hs.fecha BETWEEN ? AND ?
+              ), 0
+            )`
+          : `COALESCE(SUM(ps.stock_fallas), 0)`
+        } as fallas_periodo,
         
         -- Stock mínimo (tomamos el máximo de todos los configurados)
         COALESCE(MAX(ps.stock_minimo), 0) as stock_minimo
@@ -46,7 +82,12 @@ export const obtenerAnalisisPedidos = async (req: Request, res: Response): Promi
       ORDER BY p.tipo ASC, p.marca ASC, p.nombre ASC
     `;
 
-    const [productos] = await pool.execute<RowDataPacket[]>(query);
+    // Agregar parámetros de fecha para fallas si aplica
+    if (fecha_desde && fecha_hasta) {
+      queryParams.push(fecha_desde, fecha_hasta);
+    }
+
+    const [productos] = await pool.execute<RowDataPacket[]>(query, queryParams);
 
     console.log(`✅ Análisis obtenido: ${productos.length} productos`);
 

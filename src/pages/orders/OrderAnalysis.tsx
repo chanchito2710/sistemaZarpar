@@ -13,8 +13,10 @@ import {
   Modal,
   Typography,
   Tag,
-  Tooltip
+  Tooltip,
+  DatePicker
 } from 'antd';
+import type { Dayjs } from 'dayjs';
 import {
   ShoppingCartOutlined,
   FileExcelOutlined,
@@ -42,17 +44,21 @@ interface ProductoAnalisis {
   calidad: string;
   codigo_barras: string;
   stock_total: number;
-  ventas_30_dias: number;
-  fallas_total: number;
+  ventas_periodo: number;
+  fallas_periodo: number;
   stock_minimo: number;
   nota?: number; // Cantidad a pedir (editable)
 }
+
+const { RangePicker } = DatePicker;
 
 const OrderAnalysis: React.FC = () => {
   const [productos, setProductos] = useState<ProductoAnalisis[]>([]);
   const [loading, setLoading] = useState(false);
   const [notas, setNotas] = useState<{ [key: number]: number }>({});
   const [notasTexto, setNotasTexto] = useState<{ [key: number]: string }>({});
+  const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(dayjs().subtract(30, 'days'));
+  const [fechaHasta, setFechaHasta] = useState<Dayjs | null>(dayjs());
   const [messageApi, contextHolder] = message.useMessage();
 
   // Cargar productos al montar
@@ -83,8 +89,21 @@ const OrderAnalysis: React.FC = () => {
           ? '/api' 
           : 'http://localhost:3456/api');
       
+      // Construir parámetros de consulta
+      let url = `${API_URL}/pedidos/analisis`;
+      const params = new URLSearchParams();
+      
+      if (fechaDesde && fechaHasta) {
+        params.append('fecha_desde', fechaDesde.format('YYYY-MM-DD'));
+        params.append('fecha_hasta', fechaHasta.format('YYYY-MM-DD'));
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/pedidos/analisis`, {
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -95,7 +114,10 @@ const OrderAnalysis: React.FC = () => {
 
       if (data.success) {
         setProductos(data.data);
-        messageApi.success(`✅ ${data.data.length} productos cargados`);
+        const periodo = fechaDesde && fechaHasta 
+          ? `del ${fechaDesde.format('DD/MM/YYYY')} al ${fechaHasta.format('DD/MM/YYYY')}`
+          : 'últimos 30 días';
+        messageApi.success(`✅ ${data.data.length} productos cargados (${periodo})`);
       } else {
         messageApi.error('Error al cargar productos');
       }
@@ -185,8 +207,8 @@ const OrderAnalysis: React.FC = () => {
       'Tipo': p.tipo,
       'Calidad': p.calidad,
       'Stock Total': p.stock_total,
-      'Ventas (30d)': p.ventas_30_dias,
-      'Fallas': p.fallas_total,
+      'Ventas': p.ventas_periodo,
+      'Fallas': p.fallas_periodo,
       'CANTIDAD A PEDIR': notas[p.id],
       'Notas': notasTexto[p.id] || ''
     }));
@@ -251,8 +273,8 @@ const OrderAnalysis: React.FC = () => {
       p.tipo,
       p.calidad,
       p.stock_total,
-      p.ventas_30_dias,
-      p.fallas_total,
+      p.ventas_periodo,
+      p.fallas_periodo,
       notas[p.id],
       (notasTexto[p.id] || '').substring(0, 30)
     ]);
@@ -303,20 +325,20 @@ const OrderAnalysis: React.FC = () => {
     {
       title: '#',
       key: 'index',
-      width: 50,
+      width: 40,
       align: 'center',
-      render: (_, __, index) => index + 1
+      render: (_, __, index) => <span style={{ fontSize: '11.5px' }}>{index + 1}</span>
     },
     {
       title: 'Producto',
       dataIndex: 'nombre',
       key: 'nombre',
-      width: 250,
+      width: 210,
       ellipsis: true,
       render: (text, record) => (
         <div>
-          <div style={{ fontWeight: 500 }}>{text}</div>
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <div style={{ fontWeight: 500, fontSize: '11.5px' }}>{text}</div>
+          <Text type="secondary" style={{ fontSize: '9.5px' }}>
             Código: {record.codigo_barras || 'N/A'}
           </Text>
         </div>
@@ -326,34 +348,34 @@ const OrderAnalysis: React.FC = () => {
       title: 'Marca',
       dataIndex: 'marca',
       key: 'marca',
-      width: 120,
-      render: (text) => <Tag color="blue">{text}</Tag>
+      width: 100,
+      render: (text) => <Tag color="blue" style={{ fontSize: '11px' }}>{text}</Tag>
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo',
       key: 'tipo',
-      width: 120,
-      render: (text) => <Tag color="purple">{text}</Tag>
+      width: 100,
+      render: (text) => <Tag color="purple" style={{ fontSize: '11px' }}>{text}</Tag>
     },
     {
       title: 'Calidad',
       dataIndex: 'calidad',
       key: 'calidad',
-      width: 100,
-      render: (text) => <Tag color="green">{text}</Tag>
+      width: 85,
+      render: (text) => <Tag color="green" style={{ fontSize: '11px' }}>{text}</Tag>
     },
     {
       title: 'Stock Total',
       dataIndex: 'stock_total',
       key: 'stock_total',
-      width: 100,
+      width: 90,
       align: 'center',
       render: (value, record) => {
         const esBajo = record.stock_minimo > 0 && value < record.stock_minimo;
         return (
           <Tooltip title={esBajo ? `⚠️ Bajo stock mínimo (${record.stock_minimo})` : ''}>
-            <Tag color={esBajo ? 'red' : value === 0 ? 'default' : 'cyan'}>
+            <Tag color={esBajo ? 'red' : value === 0 ? 'default' : 'cyan'} style={{ fontSize: '11px' }}>
               <ShopOutlined /> {value}
             </Tag>
           </Tooltip>
@@ -362,35 +384,35 @@ const OrderAnalysis: React.FC = () => {
       sorter: (a, b) => a.stock_total - b.stock_total
     },
     {
-      title: 'Ventas (30d)',
-      dataIndex: 'ventas_30_dias',
-      key: 'ventas_30_dias',
-      width: 110,
+      title: 'Ventas',
+      dataIndex: 'ventas_periodo',
+      key: 'ventas_periodo',
+      width: 90,
       align: 'center',
       render: (value) => (
-        <Tag color={value > 0 ? 'orange' : 'default'}>
+        <Tag color={value > 0 ? 'orange' : 'default'} style={{ fontSize: '11px' }}>
           <LineChartOutlined /> {value}
         </Tag>
       ),
-      sorter: (a, b) => a.ventas_30_dias - b.ventas_30_dias
+      sorter: (a, b) => a.ventas_periodo - b.ventas_periodo
     },
     {
       title: 'Fallas',
-      dataIndex: 'fallas_total',
-      key: 'fallas_total',
-      width: 80,
+      dataIndex: 'fallas_periodo',
+      key: 'fallas_periodo',
+      width: 70,
       align: 'center',
       render: (value) => (
-        <Tag color={value > 0 ? 'red' : 'default'}>
+        <Tag color={value > 0 ? 'red' : 'default'} style={{ fontSize: '11px' }}>
           <ToolOutlined /> {value}
         </Tag>
       ),
-      sorter: (a, b) => a.fallas_total - b.fallas_total
+      sorter: (a, b) => a.fallas_periodo - b.fallas_periodo
     },
     {
-      title: <span style={{ fontWeight: 'bold', color: '#52c41a' }}>📝 Notas</span>,
+      title: <span style={{ fontWeight: 'bold', color: '#52c41a', fontSize: '11.5px' }}>📝 Notas</span>,
       key: 'nota_texto',
-      width: 200,
+      width: 180,
       align: 'center',
       render: (_, record) => (
         <Input.TextArea
@@ -400,15 +422,15 @@ const OrderAnalysis: React.FC = () => {
           autoSize={{ minRows: 1, maxRows: 3 }}
           style={{ 
             width: '100%',
-            fontSize: 12
+            fontSize: '10.5px'
           }}
         />
       )
     },
     {
-      title: <span style={{ fontWeight: 'bold', color: '#fa8c16' }}>🔢 Cantidades a Pedir</span>,
+      title: <span style={{ fontWeight: 'bold', color: '#fa8c16', fontSize: '11.5px' }}>🔢 Cantidades a Pedir</span>,
       key: 'nota',
-      width: 150,
+      width: 130,
       align: 'center',
       render: (_, record) => (
         <InputNumber
@@ -417,11 +439,13 @@ const OrderAnalysis: React.FC = () => {
           value={notas[record.id] || null}
           onChange={(value) => handleNotaChange(record.id, value)}
           placeholder="0"
+          size="small"
           style={{ 
             width: '100%',
+            fontSize: '11px',
             fontWeight: notas[record.id] ? 'bold' : 'normal'
           }}
-          suffix="unidades"
+          suffix={<span style={{ fontSize: '10px' }}>unidades</span>}
         />
       ),
       fixed: 'right'
@@ -515,48 +539,81 @@ const OrderAnalysis: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Acciones */}
+      {/* Filtros y Acciones */}
       <Card style={{ marginBottom: 16 }}>
-        <Space wrap>
-          <Button
-            type="primary"
-            icon={<FileExcelOutlined />}
-            onClick={exportarExcel}
-            disabled={productosConNotas.length === 0}
-            size="large"
-            style={{
-              background: '#52c41a',
-              borderColor: '#52c41a'
-            }}
-          >
-            Exportar Excel
-          </Button>
-          <Button
-            type="primary"
-            icon={<FilePdfOutlined />}
-            onClick={exportarPDF}
-            disabled={productosConNotas.length === 0}
-            size="large"
-            style={{
-              background: '#ff4d4f',
-              borderColor: '#ff4d4f'
-            }}
-          >
-            Exportar PDF
-          </Button>
-          <Button
-            danger
-            icon={<DeleteOutlined />}
-            onClick={borrarTodasLasNotas}
-            disabled={Object.keys(notas).length === 0}
-            size="large"
-          >
-            Borrar Todas las Notas
-          </Button>
-          <Text type="secondary" style={{ marginLeft: 16 }}>
-            ℹ️ Solo se exportarán los productos con notas
-          </Text>
-        </Space>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={12}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text strong style={{ fontSize: '13px' }}>📅 Periodo de Análisis</Text>
+              <RangePicker
+                value={[fechaDesde, fechaHasta]}
+                onChange={(dates) => {
+                  if (dates) {
+                    setFechaDesde(dates[0]);
+                    setFechaHasta(dates[1]);
+                  } else {
+                    setFechaDesde(dayjs().subtract(30, 'days'));
+                    setFechaHasta(dayjs());
+                  }
+                }}
+                format="DD/MM/YYYY"
+                style={{ width: '100%' }}
+                placeholder={['Fecha desde', 'Fecha hasta']}
+              />
+              <Button
+                type="primary"
+                icon={<ReloadOutlined />}
+                onClick={cargarProductos}
+                loading={loading}
+                block
+              >
+                Aplicar Filtro
+              </Button>
+            </Space>
+          </Col>
+          <Col xs={24} md={12}>
+            <Space wrap>
+              <Button
+                type="primary"
+                icon={<FileExcelOutlined />}
+                onClick={exportarExcel}
+                disabled={productosConNotas.length === 0}
+                size="large"
+                style={{
+                  background: '#52c41a',
+                  borderColor: '#52c41a'
+                }}
+              >
+                Exportar Excel
+              </Button>
+              <Button
+                type="primary"
+                icon={<FilePdfOutlined />}
+                onClick={exportarPDF}
+                disabled={productosConNotas.length === 0}
+                size="large"
+                style={{
+                  background: '#ff4d4f',
+                  borderColor: '#ff4d4f'
+                }}
+              >
+                Exportar PDF
+              </Button>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={borrarTodasLasNotas}
+                disabled={Object.keys(notas).length === 0 && Object.keys(notasTexto).length === 0}
+                size="large"
+              >
+                Borrar Todas las Notas
+              </Button>
+            </Space>
+            <Text type="secondary" style={{ marginTop: 8, display: 'block', fontSize: '11px' }}>
+              ℹ️ Solo se exportarán los productos con notas
+            </Text>
+          </Col>
+        </Row>
       </Card>
 
       {/* Tabla */}
@@ -566,7 +623,7 @@ const OrderAnalysis: React.FC = () => {
           dataSource={productos}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1600 }}
+          scroll={{ x: 1300 }}
           pagination={{
             pageSize: 50,
             showTotal: (total) => `Total: ${total} productos`,
