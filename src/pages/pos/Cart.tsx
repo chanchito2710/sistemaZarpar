@@ -751,7 +751,7 @@ const Cart: React.FC = () => {
                   color: '#722ed1'
                 }}
               >
-                <CreditCardOutlined /> Cuenta Corriente Manual (Migración)
+                <CreditCardOutlined /> Cuenta corriente, ajuste manual
               </Button>
             </>
           )}
@@ -933,7 +933,7 @@ const Cart: React.FC = () => {
         title={
           <Space>
             <ImportOutlined style={{ color: '#722ed1' }} />
-            <span>Cuenta Corriente Manual - Migración de Sistema Anterior</span>
+            <span style={{ color: '#000' }}>Cuenta corriente, ajuste manual</span>
           </Space>
         }
         open={modalCuentaCorrienteVisible}
