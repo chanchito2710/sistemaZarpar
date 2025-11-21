@@ -2841,7 +2841,7 @@ const Products: React.FC = () => {
         title={
           <Space>
             <InboxOutlined style={{ color: '#52c41a' }} />
-            <span>{productoEditandoStock?.nombre} - Stock por Sucursal</span>
+            <span style={{ color: 'black' }}>{productoEditandoStock?.nombre} - Stock por Sucursal</span>
           </Space>
         }
         open={modalEditarStock}
