@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -60,6 +60,17 @@ const OrderAnalysis: React.FC = () => {
   const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(dayjs().subtract(30, 'days'));
   const [fechaHasta, setFechaHasta] = useState<Dayjs | null>(dayjs());
   const [messageApi, contextHolder] = message.useMessage();
+  
+  // Obtener valores únicos para filtros
+  const marcasUnicas = useMemo(() => {
+    const marcas = [...new Set(productos.map(p => p.marca).filter(Boolean))];
+    return marcas.sort();
+  }, [productos]);
+  
+  const tiposUnicos = useMemo(() => {
+    const tipos = [...new Set(productos.map(p => p.tipo).filter(Boolean))];
+    return tipos.sort();
+  }, [productos]);
 
   // Cargar productos al montar
   useEffect(() => {
@@ -349,6 +360,11 @@ const OrderAnalysis: React.FC = () => {
       dataIndex: 'marca',
       key: 'marca',
       width: 100,
+      filters: marcasUnicas.map(marca => ({ text: marca, value: marca })),
+      filterMode: 'tree',
+      filterSearch: true,
+      onFilter: (value, record) => record.marca === value,
+      sorter: (a, b) => (a.marca || '').localeCompare(b.marca || '', 'es'),
       render: (text) => <Tag color="blue" style={{ fontSize: '11px' }}>{text}</Tag>
     },
     {
@@ -356,6 +372,11 @@ const OrderAnalysis: React.FC = () => {
       dataIndex: 'tipo',
       key: 'tipo',
       width: 100,
+      filters: tiposUnicos.map(tipo => ({ text: tipo, value: tipo })),
+      filterMode: 'tree',
+      filterSearch: true,
+      onFilter: (value, record) => record.tipo === value,
+      sorter: (a, b) => (a.tipo || '').localeCompare(b.tipo || '', 'es'),
       render: (text) => <Tag color="purple" style={{ fontSize: '11px' }}>{text}</Tag>
     },
     {
