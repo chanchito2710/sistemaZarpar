@@ -1534,11 +1534,24 @@ export const obtenerUltimasVentas = async (req: Request, res: Response): Promise
 };
 
 /**
- * Obtener ventas del día actual (todas las sucursales)
+ * Obtener ventas del día actual
  * GET /api/ventas/ventas-del-dia
+ * Query params: sucursal (opcional) - Si se proporciona, filtra por sucursal
  */
 export const obtenerVentasDelDia = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { sucursal } = req.query;
+    
+    // Construir condición WHERE base
+    let whereCondition = 'WHERE DATE(fecha_venta) = CURDATE()';
+    const params: any[] = [];
+    
+    // Si se proporciona sucursal, agregar filtro
+    if (sucursal && sucursal !== 'todas') {
+      whereCondition += ' AND sucursal = ?';
+      params.push(sucursal);
+    }
+    
     // Query para obtener ventas del día actual
     const query = `
       SELECT 
@@ -1546,10 +1559,10 @@ export const obtenerVentasDelDia = async (req: Request, res: Response): Promise<
         COALESCE(SUM(total), 0) as total_ingresos,
         COALESCE(SUM(descuento), 0) as total_descuentos
       FROM ventas
-      WHERE DATE(fecha_venta) = CURDATE()
+      ${whereCondition}
     `;
 
-    const resultado = await executeQuery<RowDataPacket[]>(query);
+    const resultado = await executeQuery<RowDataPacket[]>(query, params);
     const resumen = resultado[0];
 
     // Query para obtener ventas por sucursal del día
@@ -1559,11 +1572,11 @@ export const obtenerVentasDelDia = async (req: Request, res: Response): Promise<
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE DATE(fecha_venta) = CURDATE()
+      ${whereCondition}
       GROUP BY sucursal
     `;
 
-    const porSucursal = await executeQuery<RowDataPacket[]>(queryPorSucursal);
+    const porSucursal = await executeQuery<RowDataPacket[]>(queryPorSucursal, params);
 
     // Query para obtener ventas por método de pago del día
     const queryPorMetodo = `
@@ -1572,11 +1585,11 @@ export const obtenerVentasDelDia = async (req: Request, res: Response): Promise<
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE DATE(fecha_venta) = CURDATE()
+      ${whereCondition}
       GROUP BY metodo_pago
     `;
 
-    const porMetodoPago = await executeQuery<RowDataPacket[]>(queryPorMetodo);
+    const porMetodoPago = await executeQuery<RowDataPacket[]>(queryPorMetodo, params);
 
     res.status(200).json({
       success: true,

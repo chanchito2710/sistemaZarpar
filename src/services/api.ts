@@ -1228,11 +1228,16 @@ export const ventasService = {
 
   /**
    * Obtener ventas del día actual
+   * @param sucursal - Sucursal a filtrar (opcional). Si no se proporciona, obtiene todas.
    */
-  obtenerVentasDelDia: async (): Promise<any> => {
+  obtenerVentasDelDia: async (sucursal?: string): Promise<any> => {
     try {
+      let url = '/ventas/ventas-del-dia';
+      if (sucursal && sucursal !== 'todas') {
+        url += `?sucursal=${sucursal}`;
+      }
       const response: AxiosResponse<ApiResponse<any>> = 
-        await apiClient.get('/ventas/ventas-del-dia');
+        await apiClient.get(url);
       return response.data.data;
     } catch (error) {
       console.error('Error al obtener ventas del día:', error);

@@ -203,22 +203,33 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   }, []);
 
-  // Cargar ventas del día
+  // Cargar ventas del día (filtradas por sucursal si no es admin)
   useEffect(() => {
     const cargarVentasDelDia = async () => {
       try {
-        const datos = await ventasService.obtenerVentasDelDia();
+        // Si el usuario no es admin, filtrar por su sucursal
+        let sucursalFiltro: string | undefined = undefined;
+        
+        if (usuario && !usuario.esAdmin) {
+          // Usuario de sucursal: obtener solo ventas de su sucursal
+          sucursalFiltro = usuario.sucursal?.toLowerCase() || '';
+        }
+        // Si es admin, no se pasa sucursal (obtiene todas)
+        
+        const datos = await ventasService.obtenerVentasDelDia(sucursalFiltro);
         setVentasDelDia(datos);
       } catch (error) {
         console.error('Error al cargar ventas del día:', error);
       }
     };
     
-    cargarVentasDelDia();
-    // Actualizar cada 5 minutos
-    const interval = setInterval(cargarVentasDelDia, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (usuario) {
+      cargarVentasDelDia();
+      // Actualizar cada 5 minutos
+      const interval = setInterval(cargarVentasDelDia, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [usuario]);
 
   // Cargar últimas ventas
   useEffect(() => {
