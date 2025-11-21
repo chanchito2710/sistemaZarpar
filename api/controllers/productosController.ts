@@ -1884,14 +1884,29 @@ export const eliminarProducto = async (req: Request, res: Response): Promise<voi
     // Rollback en caso de error
     await connection.rollback();
     
-    console.error('❌ Error al eliminar producto(s):', error);
+    console.error('❌ ============ ERROR AL ELIMINAR PRODUCTO ============');
+    console.error('❌ Error completo:', JSON.stringify(error, null, 2));
     console.error('❌ Código de error:', error.code);
     console.error('❌ Errno:', error.errno);
     console.error('❌ SQL State:', error.sqlState);
     console.error('❌ SQL Message:', error.sqlMessage);
+    console.error('❌ Name:', error.name);
+    console.error('❌ ====================================================');
     
     // Verificar si es un error de Foreign Key Constraint
-    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451) {
+    // Códigos de error de MySQL para Foreign Key:
+    // - ER_ROW_IS_REFERENCED: 1217
+    // - ER_ROW_IS_REFERENCED_2: 1451
+    // - ER_NO_REFERENCED_ROW: 1216
+    // - ER_NO_REFERENCED_ROW_2: 1452
+    if (
+      error.code === 'ER_ROW_IS_REFERENCED_2' || 
+      error.code === 'ER_ROW_IS_REFERENCED' ||
+      error.errno === 1451 || 
+      error.errno === 1217 ||
+      (error.sqlMessage && error.sqlMessage.includes('foreign key constraint'))
+    ) {
+      console.log('✅ Detectado error de Foreign Key Constraint');
       res.status(409).json({
         success: false,
         message: 'No se puede eliminar este producto porque tiene ventas, transferencias u otros registros asociados. Por seguridad, se mantiene en el sistema.',
@@ -1901,6 +1916,7 @@ export const eliminarProducto = async (req: Request, res: Response): Promise<voi
       return;
     }
     
+    console.log('⚠️ No es error de Foreign Key, devolviendo error 500 genérico');
     res.status(500).json({
       success: false,
       message: 'Error al eliminar producto(s)',
@@ -1908,7 +1924,8 @@ export const eliminarProducto = async (req: Request, res: Response): Promise<voi
       detalles: {
         code: error.code,
         errno: error.errno,
-        sqlMessage: error.sqlMessage
+        sqlMessage: error.sqlMessage,
+        fullError: JSON.stringify(error, null, 2)
       }
     });
   } finally {
