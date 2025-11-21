@@ -211,6 +211,9 @@ const Products: React.FC = () => {
   const [modalGestionarStock, setModalGestionarStock] = useState(false);
   const [modalEditarStock, setModalEditarStock] = useState(false);
   
+  // Estado para controlar qué modal se está cargando
+  const [modalCargando, setModalCargando] = useState<'precios' | 'stock' | null>(null);
+  
   // Estados para filtros del modal de gestión
   const [busquedaModalGestion, setBusquedaModalGestion] = useState('');
   const [tipoFiltroModalGestion, setTipoFiltroModalGestion] = useState<string>('todos');
@@ -1362,6 +1365,7 @@ const Products: React.FC = () => {
                   <Button
                     icon={<SettingOutlined />}
                     onClick={async () => {
+                      setModalCargando('precios'); // ✅ Indicar que este modal se está cargando
                       // Limpiar filtros al abrir el modal
                       setBusquedaModalGestion('');
                       setTipoFiltroModalGestion('todos');
@@ -1369,9 +1373,11 @@ const Products: React.FC = () => {
                       // ⭐ Cargar productos con información de todas las sucursales
                       await cargarProductosConSucursales(); // ✅ Esperar a que se carguen los datos
                       setModalGestionarPrecios(true); // ✅ Abrir modal DESPUÉS de cargar datos
+                      setModalCargando(null); // ✅ Resetear estado de carga
                     }}
                     size="large"
-                    loading={loadingProductosConSucursales} // ✅ Mostrar spinner mientras carga
+                    loading={modalCargando === 'precios'} // ✅ Solo mostrar spinner si este botón está cargando
+                    disabled={modalCargando !== null && modalCargando !== 'precios'} // ✅ Deshabilitar si otro modal está cargando
                     style={{
                       background: 'linear-gradient(135deg, #2c2416 0%, #3e2723 50%, #4a3728 100%)',
                       border: 'none',
@@ -1420,6 +1426,7 @@ const Products: React.FC = () => {
               <Button
                 icon={<InboxOutlined />}
                 onClick={async () => {
+                  setModalCargando('stock'); // ✅ Indicar que este modal se está cargando
                   // Limpiar filtros al abrir el modal
                   setBusquedaModalGestionStock('');
                   setTipoFiltroModalGestionStock('todos');
@@ -1427,9 +1434,11 @@ const Products: React.FC = () => {
                   // Cargar productos con información de todas las sucursales
                   await cargarProductosConSucursales(); // ✅ Esperar a que se carguen los datos
                   setModalGestionarStock(true); // ✅ Abrir modal DESPUÉS de cargar datos
+                  setModalCargando(null); // ✅ Resetear estado de carga
                 }}
                 size="large"
-                loading={loadingProductosConSucursales} // ✅ Mostrar spinner mientras carga
+                loading={modalCargando === 'stock'} // ✅ Solo mostrar spinner si este botón está cargando
+                disabled={modalCargando !== null && modalCargando !== 'stock'} // ✅ Deshabilitar si otro modal está cargando
                 style={{
                   background: 'linear-gradient(135deg, #ffb3d9 0%, #ff85c0 100%)',
                   border: 'none',
