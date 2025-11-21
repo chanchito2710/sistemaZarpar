@@ -41,7 +41,7 @@ router.get('/debug/estructura-simple', async (req, res) => {
     `);
     
     // Verificar si existe la columna una_vez_activo
-    const tieneColumna = columns.some((col: any) => col.COLUMN_NAME === 'una_vez_activo');
+    const tieneColumna = (columns as any[]).some((col: any) => col.COLUMN_NAME === 'una_vez_activo');
     
     res.status(200).json({
       success: true,
