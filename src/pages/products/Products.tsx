@@ -1656,7 +1656,7 @@ const Products: React.FC = () => {
                   value: sucursalSeleccionada, 
                   label: formatearNombreSucursal(sucursalSeleccionada) + (sucursalSeleccionada === 'maldonado' ? ' - Stock Principal' : '')
                 } : null}
-                onChange={(option) => setSucursalSeleccionada(option?.value || '')}
+                onChange={(option: any) => setSucursalSeleccionada(option?.value || '')}
                 options={sucursales.map(sucursalObj => ({
                   value: sucursalObj.sucursal,
                   label: formatearNombreSucursal(sucursalObj.sucursal) + (sucursalObj.sucursal === 'maldonado' ? ' - Stock Principal' : '')
@@ -1782,20 +1782,24 @@ const Products: React.FC = () => {
                 <Text strong>🏷️ Marca</Text>
                 <Space.Compact style={{ width: '100%', marginTop: 8 }}>
                   <Form.Item name="marca" noStyle>
-                    <Select
+                    <ReactSelect
                       placeholder="Selecciona marca"
-                      loading={loadingMarcas}
-                      showSearch
-                      allowClear
-                      size="large"
-                      style={{ flex: 1 }}
+                      isLoading={loadingMarcas}
+                      isClearable
+                      isSearchable
                       options={Array.isArray(marcas) ? marcas.map(m => ({ 
                         label: m?.valor || 'Sin marca', 
                         value: m?.valor || '' 
                       })) : []}
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
+                      styles={{
+                        ...customSelectStyles,
+                        control: (provided, state) => ({
+                          ...customSelectStyles.control ? customSelectStyles.control(provided, state) : provided,
+                          flex: 1
+                        })
+                      }}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
                     />
                   </Form.Item>
                   <Tooltip title="Agregar nueva marca">
@@ -1814,20 +1818,24 @@ const Products: React.FC = () => {
                 <Text strong>🔧 Tipo</Text>
                 <Space.Compact style={{ width: '100%', marginTop: 8 }}>
                   <Form.Item name="tipo" noStyle>
-                    <Select
+                    <ReactSelect
                       placeholder="Selecciona tipo"
-                      loading={loadingTipos}
-                      showSearch
-                      allowClear
-                      size="large"
-                      style={{ flex: 1 }}
+                      isLoading={loadingTipos}
+                      isClearable
+                      isSearchable
                       options={Array.isArray(tipos) ? tipos.map(t => ({ 
                         label: t?.valor || 'Sin tipo', 
                         value: t?.valor || '' 
                       })) : []}
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
+                      styles={{
+                        ...customSelectStyles,
+                        control: (provided, state) => ({
+                          ...customSelectStyles.control ? customSelectStyles.control(provided, state) : provided,
+                          flex: 1
+                        })
+                      }}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
                     />
                   </Form.Item>
                   <Tooltip title="Agregar nuevo tipo">
@@ -1938,13 +1946,21 @@ const Products: React.FC = () => {
                 <Form.Item label="Calidad" name="calidad" style={{ marginBottom: 0 }}>
                   <Input.Group compact style={{ display: 'flex' }}>
                     <Form.Item name="calidad" noStyle>
-                      <Select
+                      <ReactSelect
                         placeholder="Selecciona una calidad"
-                        loading={loadingCalidades}
-                        showSearch
-                        allowClear
-                        style={{ flex: 1 }}
+                        isLoading={loadingCalidades}
+                        isClearable
+                        isSearchable
                         options={calidades.map(c => ({ label: c.valor, value: c.valor }))}
+                        styles={{
+                          ...customSelectStyles,
+                          control: (provided, state) => ({
+                            ...customSelectStyles.control ? customSelectStyles.control(provided, state) : provided,
+                            flex: 1
+                          })
+                        }}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                       />
                     </Form.Item>
                     <Button
@@ -2317,32 +2333,36 @@ const Products: React.FC = () => {
                 />
               </Col>
               <Col xs={24} sm={12} md={7}>
-                <Select
+                <ReactSelect
                   placeholder="Filtrar por tipo"
-                  value={tipoFiltroModalGestion}
-                  onChange={setTipoFiltroModalGestion}
-                  style={{ width: '100%' }}
-                  size="large"
-                >
-                  <Select.Option value="todos">Todos los tipos</Select.Option>
-                  {tipos.map(tipo => (
-                    <Select.Option key={tipo.valor} value={tipo.valor}>{tipo.valor}</Select.Option>
-                  ))}
-                </Select>
+                  value={{ value: tipoFiltroModalGestion, label: tipoFiltroModalGestion === 'todos' ? 'Todos los tipos' : tipoFiltroModalGestion }}
+                  onChange={(option: any) => setTipoFiltroModalGestion(option?.value || 'todos')}
+                  options={[
+                    { value: 'todos', label: 'Todos los tipos' },
+                    ...tipos.map(tipo => ({ value: tipo.valor, label: tipo.valor }))
+                  ]}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={false}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
               </Col>
               <Col xs={24} sm={12} md={7}>
-                <Select
+                <ReactSelect
                   placeholder="Filtrar por marca"
-                  value={marcaFiltroModalGestion}
-                  onChange={setMarcaFiltroModalGestion}
-                  style={{ width: '100%' }}
-                  size="large"
-                >
-                  <Select.Option value="todas">Todas las marcas</Select.Option>
-                  {marcas.map(marca => (
-                    <Select.Option key={marca.valor} value={marca.valor}>{marca.valor}</Select.Option>
-                  ))}
-                </Select>
+                  value={{ value: marcaFiltroModalGestion, label: marcaFiltroModalGestion === 'todas' ? 'Todas las marcas' : marcaFiltroModalGestion }}
+                  onChange={(option: any) => setMarcaFiltroModalGestion(option?.value || 'todas')}
+                  options={[
+                    { value: 'todas', label: 'Todas las marcas' },
+                    ...marcas.map(marca => ({ value: marca.valor, label: marca.valor }))
+                  ]}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={false}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
               </Col>
             </Row>
           </Card>
@@ -2429,7 +2449,7 @@ const Products: React.FC = () => {
                               isMulti
                               placeholder="Sucursales..."
                               value={config.sucursales1.map(s => ({ value: s, label: s.toUpperCase() }))}
-                              onChange={(options) => {
+                              onChange={(options: any) => {
                                 const vals = options ? options.map((opt: any) => opt.value) : [];
                                 setPreciosBase({
                                   ...preciosBase,
@@ -2482,7 +2502,7 @@ const Products: React.FC = () => {
                               isMulti
                               placeholder="Sucursales..."
                               value={config.sucursales2.map(s => ({ value: s, label: s.toUpperCase() }))}
-                              onChange={(options) => {
+                              onChange={(options: any) => {
                                 const vals = options ? options.map((opt: any) => opt.value) : [];
                                 setPreciosBase({
                                   ...preciosBase,
@@ -2705,36 +2725,36 @@ const Products: React.FC = () => {
                 />
               </Col>
               <Col xs={24} sm={12} md={7}>
-                <Select
+                <ReactSelect
                   placeholder="Filtrar por tipo"
-                  value={tipoFiltroModalGestionStock}
-                  onChange={setTipoFiltroModalGestionStock}
-                  style={{ width: '100%' }}
-                  size="large"
-                >
-                  <Select.Option value="todos">Todos los tipos</Select.Option>
-                  {Array.isArray(tipos) && tipos.map(t => (
-                    <Select.Option key={t?.id || Math.random()} value={t?.valor || ''}>
-                      {t?.valor || 'Sin tipo'}
-                    </Select.Option>
-                  ))}
-                </Select>
+                  value={{ value: tipoFiltroModalGestionStock, label: tipoFiltroModalGestionStock === 'todos' ? 'Todos los tipos' : tipoFiltroModalGestionStock }}
+                  onChange={(option: any) => setTipoFiltroModalGestionStock(option?.value || 'todos')}
+                  options={[
+                    { value: 'todos', label: 'Todos los tipos' },
+                    ...(Array.isArray(tipos) ? tipos.map(t => ({ value: t?.valor || '', label: t?.valor || 'Sin tipo' })) : [])
+                  ]}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={false}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
               </Col>
               <Col xs={24} sm={12} md={7}>
-                <Select
+                <ReactSelect
                   placeholder="Filtrar por marca"
-                  value={marcaFiltroModalGestionStock}
-                  onChange={setMarcaFiltroModalGestionStock}
-                  style={{ width: '100%' }}
-                  size="large"
-                >
-                  <Select.Option value="todas">Todas las marcas</Select.Option>
-                  {Array.isArray(marcas) && marcas.map(m => (
-                    <Select.Option key={m?.id || Math.random()} value={m?.valor || ''}>
-                      {m?.valor || 'Sin marca'}
-                    </Select.Option>
-                  ))}
-                </Select>
+                  value={{ value: marcaFiltroModalGestionStock, label: marcaFiltroModalGestionStock === 'todas' ? 'Todas las marcas' : marcaFiltroModalGestionStock }}
+                  onChange={(option: any) => setMarcaFiltroModalGestionStock(option?.value || 'todas')}
+                  options={[
+                    { value: 'todas', label: 'Todas las marcas' },
+                    ...(Array.isArray(marcas) ? marcas.map(m => ({ value: m?.valor || '', label: m?.valor || 'Sin marca' })) : [])
+                  ]}
+                  styles={customSelectStyles}
+                  isClearable={false}
+                  isSearchable={false}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
               </Col>
             </Row>
           </Card>
@@ -3024,7 +3044,7 @@ const Products: React.FC = () => {
                     isMulti
                     placeholder="Selecciona sucursales..."
                     value={sucursalesBaseGlobal1.map(s => ({ value: s, label: s.toUpperCase() }))}
-                    onChange={(options) => {
+                    onChange={(options: any) => {
                       const vals = options ? options.map((opt: any) => opt.value) : [];
                       setSucursalesBaseGlobal1(vals);
                     }}
@@ -3067,7 +3087,7 @@ const Products: React.FC = () => {
                     isMulti
                     placeholder="Selecciona sucursales..."
                     value={sucursalesBaseGlobal2.map(s => ({ value: s, label: s.toUpperCase() }))}
-                    onChange={(options) => {
+                    onChange={(options: any) => {
                       const vals = options ? options.map((opt: any) => opt.value) : [];
                       setSucursalesBaseGlobal2(vals);
                     }}
