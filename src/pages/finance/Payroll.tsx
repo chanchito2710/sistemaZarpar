@@ -203,8 +203,7 @@ const Payroll: React.FC = () => {
       form.setFieldsValue({ vendedor_id: vendedores[0].id });
     }
     
-    // Establecer fecha de hoy por defecto
-    form.setFieldsValue({ fecha: dayjs() });
+    // ✅ Ya no es necesario establecer la fecha (se usa automáticamente la fecha actual)
     
     setModalVisible(true);
   };
@@ -216,10 +215,13 @@ const Payroll: React.FC = () => {
     try {
       const values = await form.validateFields();
       
+      // ✅ Usar siempre la fecha actual del sistema
+      const fechaActual = dayjs().format('YYYY-MM-DD');
+      
       await sueldosService.crearSueldo({
         vendedor_id: values.vendedor_id,
         monto: values.monto,
-        fecha: values.fecha.format('YYYY-MM-DD'),
+        fecha: fechaActual, // ⭐ Fecha actual automática
         notas: values.notas || null
       });
       
@@ -541,17 +543,28 @@ const Payroll: React.FC = () => {
             />
           </Form.Item>
           
-          <Form.Item
-            label="Fecha"
-            name="fecha"
-            rules={[{ required: true, message: 'Selecciona la fecha' }]}
-          >
-            <DatePicker
-              format="DD/MM/YYYY"
-              style={{ width: '100%' }}
-              placeholder="Selecciona la fecha"
-            />
-          </Form.Item>
+          {/* ⭐ Fecha automática (no editable) */}
+          <div style={{ marginBottom: 24 }}>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>Fecha:</Text>
+            <Card 
+              size="small" 
+              style={{ 
+                background: '#f0f2f5', 
+                border: '1px dashed #d9d9d9',
+                borderRadius: 6
+              }}
+            >
+              <Space>
+                <CalendarOutlined style={{ color: '#1890ff' }} />
+                <Text strong style={{ color: '#1890ff' }}>
+                  {dayjs().format('DD/MM/YYYY')} (Fecha actual)
+                </Text>
+              </Space>
+            </Card>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+              La comisión se registrará con la fecha de hoy automáticamente
+            </Text>
+          </div>
           
           <Form.Item
             label="Notas (Opcional)"
