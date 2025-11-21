@@ -28,7 +28,6 @@ import {
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { productosService, descuentosService, type ProductoCompleto, type Venta } from '../../services/api';
-import { tieneDescuentoUnaVez, consumirDescuentoUnaVez } from '../../utils/descuentoUnaVez';
 import POSCheckout from '../../components/pos/POSCheckout';
 import VentaExitosa from '../../components/pos/VentaExitosa';
 
@@ -137,18 +136,20 @@ const Cart: React.FC = () => {
 
   /**
    * Verificar si el descuento está habilitado para esta sucursal
-   * Considera: descuento normal Y descuento "una vez"
+   * Consulta la configuración desde la base de datos (descuento_habilitado y una_vez_activo)
    */
   const verificarDescuentoHabilitado = async () => {
     if (!posData?.sucursal) return;
 
     try {
-      // Verificar descuento normal desde el backend
+      // ✅ Obtener configuración desde la base de datos
       const config = await descuentosService.obtenerConfiguracionPorSucursal(posData.sucursal);
+      
+      // Verificar descuento normal (permanente)
       const descuentoNormal = config.descuento_habilitado === 1 || config.descuento_habilitado === true;
       
-      // Verificar descuento "una vez" desde localStorage
-      const descuentoUnaVez = tieneDescuentoUnaVez(posData.sucursal);
+      // ⭐ Verificar descuento "una vez" desde la BASE DE DATOS (no localStorage)
+      const descuentoUnaVez = config.una_vez_activo === 1 || config.una_vez_activo === true;
       
       // Habilitar si tiene descuento normal O descuento de una vez
       const habilitado = descuentoNormal || descuentoUnaVez;
@@ -158,14 +159,15 @@ const Cart: React.FC = () => {
         sucursal: posData.sucursal,
         descuentoNormal,
         descuentoUnaVez,
-        habilitado
+        habilitado,
+        config
       });
       
       // Mostrar mensaje si el descuento es de "una vez"
       if (descuentoUnaVez && !descuentoNormal) {
         message.info({
-          content: '⚡ Descuento de USO ÚNICO habilitado. Se desactivará después de esta venta.',
-          duration: 5
+          content: '⚡ Descuento de USO ÚNICO habilitado por el administrador. Se desactivará automáticamente después de esta venta.',
+          duration: 6
         });
       }
     } catch (error) {
@@ -368,19 +370,36 @@ const Cart: React.FC = () => {
   /**
    * Manejar venta completada exitosamente
    */
-  const handleVentaCompletada = (venta: Venta) => {
+  const handleVentaCompletada = async (venta: Venta) => {
     // Guardar la venta completada y el carrito para mostrar la página de éxito
     setCarritoVentaCompletada([...carrito]); // Guardar copia del carrito antes de limpiarlo
     setVentaCompletada(venta);
     
-    // Si se aplicó un descuento Y hay un descuento "una vez" activo, consumirlo
-    if (descuento > 0 && posData?.sucursal && tieneDescuentoUnaVez(posData.sucursal)) {
-      consumirDescuentoUnaVez(posData.sucursal);
-      message.success({
-        content: '⚡ Descuento de uso único aplicado y desactivado automáticamente.',
-        duration: 4
-      });
-      console.log('✅ Descuento "una vez" consumido para:', posData.sucursal);
+    // ⭐ Si se aplicó un descuento, verificar si fue con permiso "una vez" y desactivarlo en la BD
+    if (descuento > 0 && posData?.sucursal) {
+      try {
+        // Verificar si la sucursal tenía descuento "una vez" activo
+        const config = await descuentosService.obtenerConfiguracionPorSucursal(posData.sucursal);
+        const teniaUnaVezActivo = config.una_vez_activo === 1 || config.una_vez_activo === true;
+        
+        if (teniaUnaVezActivo) {
+          // ✅ Desactivar el descuento "una vez" en la base de datos
+          await descuentosService.desactivarUnaVez(posData.sucursal);
+          
+          message.success({
+            content: '⚡ Descuento de uso único aplicado y desactivado automáticamente. Solicita al administrador si necesitas aplicar descuento nuevamente.',
+            duration: 6
+          });
+          
+          console.log('✅ Descuento "una vez" desactivado en BD para:', posData.sucursal);
+          
+          // Refrescar el estado de descuento
+          setDescuentoHabilitado(false);
+        }
+      } catch (error) {
+        console.error('Error al desactivar descuento una vez:', error);
+        // No bloquear el flujo si falla la desactivación
+      }
     }
     
     // Limpiar carrito

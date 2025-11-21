@@ -1779,8 +1779,10 @@ const StaffSellers: React.FC = () => {
               </>
             ),
           },
-          // ⭐ Tab "Descuentos" - Todos pueden ver, pero cada uno ve su sucursal (admin ve todas)
-          {
+          // ⭐ Tab "Descuentos" - SOLO para Administradores
+          // Los vendedores de sucursal NO ven este tab
+          // Los vendedores USAN el descuento en el POS cuando el admin lo habilita
+          esAdministrador && {
             key: 'descuentos',
             label: (
               <Space>
@@ -1793,9 +1795,17 @@ const StaffSellers: React.FC = () => {
                 <Alert
                   message="💡 Control de Descuentos por Sucursal"
                   description={
-                    esAdministrador 
-                      ? "Habilita o deshabilita la posibilidad de aplicar descuentos en el POS para cada sucursal. Los cambios se actualizan en tiempo real."
-                      : "Gestiona los descuentos disponibles para tu sucursal. El descuento 'una vez' te permite aplicar un descuento único que se desactiva automáticamente después del primer uso."
+                    <div>
+                      <p><strong>Sistema de Autorización de Descuentos:</strong></p>
+                      <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                        <li><strong>Habilitar/Deshabilitar</strong> → Activa/desactiva descuentos permanentemente para la sucursal</li>
+                        <li><strong>Habilitar 1 vez</strong> → Autoriza a la sucursal a hacer UNA sola venta con descuento. Después de esa venta, el permiso se desactiva automáticamente.</li>
+                        <li><strong>Cancelar uso único</strong> → Cancela una autorización de "1 vez" antes de que el vendedor la use.</li>
+                      </ul>
+                      <p style={{ marginTop: 8, marginBottom: 0 }}>
+                        ⚠️ Los vendedores NO ven este tab. Ellos aplican el descuento en el POS cuando tú se los autorizas.
+                      </p>
+                    </div>
                   }
                   type="info"
                   showIcon
@@ -1805,14 +1815,7 @@ const StaffSellers: React.FC = () => {
                 <Card>
                   <Spin spinning={descuentosLoading}>
                     <Table
-                      dataSource={
-                        // ✅ Si NO es admin, filtrar solo SU sucursal
-                        esAdministrador 
-                          ? configuracionDescuentos 
-                          : configuracionDescuentos.filter(config => 
-                              config.sucursal.toLowerCase() === (usuario?.email?.split('@')[0].toLowerCase() || '')
-                            )
-                      }
+                      dataSource={configuracionDescuentos}
                       rowKey="id"
                       size="middle"
                       pagination={false}
