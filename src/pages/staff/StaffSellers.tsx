@@ -298,8 +298,12 @@ const StaffSellers: React.FC = () => {
    */
   const handleHabilitarUnaVez = async (sucursal: string) => {
     try {
-      console.log(`🎯 Habilitando descuento UNA VEZ para ${sucursal}`);
-      await descuentosService.habilitarUnaVez(sucursal);
+      console.log(`🎯 [DEBUG] Habilitando descuento UNA VEZ para ${sucursal}`);
+      console.log(`📡 [DEBUG] Llamando a API: POST /descuentos/${sucursal}/una-vez`);
+      
+      const response = await descuentosService.habilitarUnaVez(sucursal);
+      
+      console.log(`✅ [DEBUG] Respuesta del servidor:`, response);
       
       messageApi.success({
         content: `🎯 Descuento habilitado UNA VEZ para ${sucursal.toUpperCase()}. Se deshabilitará automáticamente después del primer uso.`,
@@ -307,10 +311,20 @@ const StaffSellers: React.FC = () => {
       });
       
       // Recargar configuración
+      console.log(`🔄 [DEBUG] Recargando configuración de descuentos...`);
       await cargarDescuentos();
-    } catch (error) {
-      console.error('Error al habilitar descuento una vez:', error);
-      messageApi.error('Error al habilitar descuento de uso único');
+      console.log(`✅ [DEBUG] Configuración recargada`);
+      
+    } catch (error: any) {
+      console.error('❌ [DEBUG] Error al habilitar descuento una vez:', error);
+      console.error('❌ [DEBUG] Error completo:', JSON.stringify(error, null, 2));
+      console.error('❌ [DEBUG] Response data:', error.response?.data);
+      console.error('❌ [DEBUG] Response status:', error.response?.status);
+      
+      messageApi.error({
+        content: `Error: ${error.response?.data?.message || error.message || 'Error desconocido'}`,
+        duration: 5
+      });
     }
   };
 

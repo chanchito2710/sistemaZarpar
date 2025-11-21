@@ -2235,10 +2235,15 @@ export const descuentosService = {
    */
   habilitarUnaVez: async (sucursal: string): Promise<any> => {
     try {
+      console.log(`📡 [API] POST /descuentos/${sucursal}/una-vez`);
       const response: AxiosResponse<ApiResponse<any>> = await apiClient.post(`/descuentos/${sucursal}/una-vez`);
+      console.log(`✅ [API] Respuesta exitosa:`, response.data);
       return response.data;
-    } catch (error) {
-      console.error('Error al habilitar descuento una vez:', error);
+    } catch (error: any) {
+      console.error(`❌ [API] Error al habilitar descuento una vez para ${sucursal}:`, error);
+      console.error(`❌ [API] URL intentada:`, error.config?.url);
+      console.error(`❌ [API] Status:`, error.response?.status);
+      console.error(`❌ [API] Data:`, error.response?.data);
       throw error;
     }
   },
