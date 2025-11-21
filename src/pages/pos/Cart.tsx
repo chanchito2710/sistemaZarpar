@@ -15,7 +15,10 @@ import {
   Divider,
   Badge,
   Statistic,
-  Tag
+  Tag,
+  Modal,
+  Form,
+  Alert
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -24,7 +27,9 @@ import {
   MinusOutlined,
   DeleteOutlined,
   ArrowLeftOutlined,
-  DollarOutlined
+  DollarOutlined,
+  CreditCardOutlined,
+  ImportOutlined
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { productosService, descuentosService, type ProductoCompleto, type Venta } from '../../services/api';
@@ -81,6 +86,11 @@ const Cart: React.FC = () => {
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [ventaCompletada, setVentaCompletada] = useState<Venta | null>(null);
   const [carritoVentaCompletada, setCarritoVentaCompletada] = useState<CarritoItem[]>([]);
+  
+  // Estado del modal de cuenta corriente manual (migración)
+  const [modalCuentaCorrienteVisible, setModalCuentaCorrienteVisible] = useState(false);
+  const [formCuentaCorriente] = Form.useForm();
+  const [loadingCuentaCorriente, setLoadingCuentaCorriente] = useState(false);
 
   // Verificar que tenemos los datos necesarios
   useEffect(() => {
@@ -417,6 +427,56 @@ const Cart: React.FC = () => {
   };
 
   /**
+   * Registrar saldo inicial de cuenta corriente (migración desde sistema viejo)
+   */
+  const handleRegistrarSaldoInicial = async () => {
+    try {
+      const values = await formCuentaCorriente.validateFields();
+      setLoadingCuentaCorriente(true);
+
+      const API_URL = import.meta.env.VITE_API_URL || 
+        (window.location.hostname !== 'localhost' 
+          ? '/api' 
+          : 'http://localhost:3456/api');
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/cuenta-corriente/saldo-inicial`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sucursal: posData.sucursal,
+          cliente_id: posData.clienteId,
+          cliente_nombre: posData.clienteNombre,
+          monto: values.monto,
+          concepto: values.concepto || 'Migración de saldo desde sistema anterior'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        message.success('✅ Saldo inicial registrado exitosamente');
+        formCuentaCorriente.resetFields();
+        setModalCuentaCorrienteVisible(false);
+      } else {
+        message.error(data.message || 'Error al registrar saldo inicial');
+      }
+    } catch (error: any) {
+      console.error('Error al registrar saldo inicial:', error);
+      if (error.errorFields) {
+        message.error('Por favor completa todos los campos requeridos');
+      } else {
+        message.error('Error al registrar saldo inicial');
+      }
+    } finally {
+      setLoadingCuentaCorriente(false);
+    }
+  };
+
+  /**
    * Calcular totales
    */
   const subtotal = carrito.reduce((sum, item) => {
@@ -672,6 +732,20 @@ const Cart: React.FC = () => {
               <Text type="secondary">Vendedor:</Text> <Text strong>{posData.vendedorNombre}</Text>
             </Col>
           </Row>
+          
+          {/* Botón de Cuenta Corriente Manual (Migración) */}
+          <Divider style={{ margin: '12px 0' }} />
+          <Button
+            type="dashed"
+            icon={<ImportOutlined />}
+            onClick={() => setModalCuentaCorrienteVisible(true)}
+            style={{
+              borderColor: '#722ed1',
+              color: '#722ed1'
+            }}
+          >
+            <CreditCardOutlined /> Cuenta Corriente Manual (Migración)
+          </Button>
         </Space>
       </Card>
 
@@ -844,6 +918,105 @@ const Cart: React.FC = () => {
           vendedorNombre={posData.vendedorNombre}
         />
       )}
+
+      {/* Modal de Cuenta Corriente Manual (Migración) */}
+      <Modal
+        title={
+          <Space>
+            <ImportOutlined style={{ color: '#722ed1' }} />
+            <span>Cuenta Corriente Manual - Migración de Sistema Anterior</span>
+          </Space>
+        }
+        open={modalCuentaCorrienteVisible}
+        onOk={handleRegistrarSaldoInicial}
+        onCancel={() => {
+          setModalCuentaCorrienteVisible(false);
+          formCuentaCorriente.resetFields();
+        }}
+        okText="💾 Registrar Saldo Inicial"
+        cancelText="Cancelar"
+        width={600}
+        confirmLoading={loadingCuentaCorriente}
+      >
+        <Alert
+          message="⚠️ Función de Migración"
+          description={
+            <div>
+              <p>Esta función está diseñada para <strong>migrar saldos pendientes</strong> desde el sistema anterior.</p>
+              <p>Al registrar un monto aquí, se creará o actualizará la cuenta corriente del cliente:</p>
+              <ul>
+                <li><strong>Monto positivo (+):</strong> El cliente debe dinero (deuda)</li>
+                <li><strong>Monto negativo (-):</strong> El cliente tiene saldo a favor</li>
+              </ul>
+              <p style={{ color: '#722ed1', fontWeight: 'bold', marginBottom: 0 }}>
+                ⚡ Si el cliente no tiene cuenta corriente, se creará automáticamente
+              </p>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+
+        <Form
+          form={formCuentaCorriente}
+          layout="vertical"
+        >
+          <Form.Item label="Cliente">
+            <Input 
+              value={posData.clienteNombre} 
+              disabled 
+              style={{ fontWeight: 'bold', color: '#1890ff' }}
+            />
+          </Form.Item>
+
+          <Form.Item label="Sucursal">
+            <Input 
+              value={posData.sucursal.toUpperCase()} 
+              disabled 
+              style={{ fontWeight: 'bold' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Monto Inicial"
+            name="monto"
+            rules={[
+              { required: true, message: 'El monto es obligatorio' },
+              { 
+                validator: (_, value) => {
+                  if (value === 0) {
+                    return Promise.reject(new Error('El monto no puede ser cero'));
+                  }
+                  return Promise.resolve();
+                }
+              }
+            ]}
+            extra="Ingresa un monto positivo si el cliente DEBE dinero, o negativo si tiene SALDO A FAVOR"
+          >
+            <InputNumber
+              prefix="$"
+              placeholder="Ejemplo: 500 (deuda) o -200 (saldo a favor)"
+              style={{ width: '100%' }}
+              min={undefined}
+              step={0.01}
+              precision={2}
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Concepto (Opcional)"
+            name="concepto"
+            extra="Describe el origen de este saldo (ej: 'Deuda pendiente desde enero 2024')"
+          >
+            <Input.TextArea
+              placeholder="Ej: Saldo pendiente del sistema anterior - Deuda acumulada hasta diciembre 2024"
+              rows={3}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
     </>
   );
