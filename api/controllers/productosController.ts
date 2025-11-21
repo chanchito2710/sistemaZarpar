@@ -1880,15 +1880,36 @@ export const eliminarProducto = async (req: Request, res: Response): Promise<voi
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     // Rollback en caso de error
     await connection.rollback();
     
     console.error('❌ Error al eliminar producto(s):', error);
+    console.error('❌ Código de error:', error.code);
+    console.error('❌ Errno:', error.errno);
+    console.error('❌ SQL State:', error.sqlState);
+    console.error('❌ SQL Message:', error.sqlMessage);
+    
+    // Verificar si es un error de Foreign Key Constraint
+    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451) {
+      res.status(409).json({
+        success: false,
+        message: 'No se puede eliminar este producto porque tiene ventas, transferencias u otros registros asociados. Por seguridad, se mantiene en el sistema.',
+        error: 'FOREIGN_KEY_CONSTRAINT',
+        detalles: 'El producto está siendo referenciado por otros registros (ventas, transferencias, etc.)'
+      });
+      return;
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error al eliminar producto(s)',
-      error: error instanceof Error ? error.message : 'Error desconocido'
+      error: error instanceof Error ? error.message : 'Error desconocido',
+      detalles: {
+        code: error.code,
+        errno: error.errno,
+        sqlMessage: error.sqlMessage
+      }
     });
   } finally {
     connection.release();

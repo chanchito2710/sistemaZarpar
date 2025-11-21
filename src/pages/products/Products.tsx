@@ -1097,9 +1097,18 @@ const Products: React.FC = () => {
       message.success(`Producto "${nombre}" eliminado permanentemente`);
       cargarProductos(); // Recargar lista
       setProductosSeleccionados(prev => prev.filter(pid => pid !== id)); // Quitar de selección
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar producto:', error);
-      message.error('Error al eliminar el producto');
+      
+      // Manejar error de Foreign Key (producto con ventas/transferencias)
+      if (error.response?.status === 409 || error.response?.data?.error === 'FOREIGN_KEY_CONSTRAINT') {
+        message.error({
+          content: `No se puede eliminar "${nombre}" porque tiene ventas, transferencias u otros registros asociados. El producto se mantiene por seguridad e integridad de datos.`,
+          duration: 6
+        });
+      } else {
+        message.error(`Error al eliminar el producto: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
+      }
     } finally {
       setLoadingEliminar(false);
     }
@@ -1122,9 +1131,19 @@ const Products: React.FC = () => {
       );
       setProductosSeleccionados([]); // Limpiar selección
       cargarProductos(); // Recargar lista
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar productos:', error);
-      message.error('Error al eliminar los productos seleccionados');
+      
+      // Manejar error de Foreign Key (productos con ventas/transferencias)
+      if (error.response?.status === 409 || error.response?.data?.error === 'FOREIGN_KEY_CONSTRAINT') {
+        message.error({
+          content: 'Algunos productos no se pudieron eliminar porque tienen ventas, transferencias u otros registros asociados. Se mantienen por seguridad e integridad de datos.',
+          duration: 6
+        });
+        cargarProductos(); // Recargar para ver cuáles quedaron
+      } else {
+        message.error(`Error al eliminar productos: ${error.response?.data?.message || error.message || 'Error desconocido'}`);
+      }
     } finally {
       setLoadingEliminar(false);
     }
