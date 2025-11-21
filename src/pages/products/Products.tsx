@@ -590,7 +590,7 @@ const Products: React.FC = () => {
 
     setPreciosEditados(nuevosPrecios);
     message.success(`✅ Precio Base 2 ($${config.precio2}) aplicado a "${productoNombre}" en ${config.sucursales2.length} sucursales`);
-  };
+  }, [preciosBase, preciosEditados]);
 
   /**
    * Guardar todos los precios editados
