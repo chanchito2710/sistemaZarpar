@@ -35,29 +35,32 @@ export const registrarSaldoInicial = async (req: Request, res: Response): Promis
 
     await connection.beginTransaction();
 
-    // Determinar tipo de movimiento según signo del monto
-    // Monto positivo = Cliente DEBE (cargo)
-    // Monto negativo = Cliente tiene SALDO A FAVOR (abono)
-    const tipo = monto > 0 ? 'cargo' : 'abono';
+    // Determinar DEBE y HABER según signo del monto
+    // Monto positivo = Cliente DEBE (deuda)
+    // Monto negativo = Cliente tiene SALDO A FAVOR (crédito/haber)
     const montoAbsoluto = Math.abs(monto);
+    const debe = monto > 0 ? montoAbsoluto : 0;
+    const haber = monto < 0 ? montoAbsoluto : 0;
+    const saldo = monto; // El saldo es el monto directamente (positivo=debe, negativo=a favor)
 
     // Registrar movimiento en cuenta_corriente_movimientos
     const [movimientoResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO cuenta_corriente_movimientos 
-       (sucursal, cliente_id, cliente_nombre, tipo, monto, saldo_resultante, concepto, fecha_movimiento)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+       (sucursal, cliente_id, cliente_nombre, tipo, debe, haber, saldo, descripcion, fecha_movimiento)
+       VALUES (?, ?, ?, 'ajuste', ?, ?, ?, ?, NOW())`,
       [
         sucursal,
         cliente_id,
         cliente_nombre,
-        tipo,
-        montoAbsoluto,
-        monto, // El saldo resultante es el monto inicial (positivo o negativo)
+        debe,
+        haber,
+        saldo,
         concepto || 'Migración de saldo desde sistema anterior'
       ]
     );
 
     console.log(`✅ Movimiento registrado con ID: ${movimientoResult.insertId}`);
+    console.log(`📊 Debe: $${debe}, Haber: $${haber}, Saldo: $${saldo}`);
 
     await connection.commit();
 
@@ -66,9 +69,9 @@ export const registrarSaldoInicial = async (req: Request, res: Response): Promis
       message: 'Saldo inicial registrado exitosamente',
       data: {
         movimiento_id: movimientoResult.insertId,
-        tipo,
-        monto: montoAbsoluto,
-        saldo_actual: monto
+        debe,
+        haber,
+        saldo
       }
     });
 
