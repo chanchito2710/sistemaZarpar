@@ -343,9 +343,11 @@ const Products: React.FC = () => {
    * Se usa para el modal "Gestionar Stock" que necesita calcular stock total
    */
   const cargarProductosConSucursales = async () => {
+    console.log('🔄 [DEBUG] Iniciando cargarProductosConSucursales...');
     setLoadingProductosConSucursales(true);
     try {
       const data = await productosService.obtenerConSucursales();
+      console.log(`📦 [DEBUG] Datos recibidos del backend: ${data.length} productos`);
       // Ordenar productos por tipo
       const datosOrdenados = [...data].sort((a, b) => {
         const ordenA = obtenerOrdenTipo(a.tipo);
@@ -356,12 +358,13 @@ const Products: React.FC = () => {
         return a.nombre.localeCompare(b.nombre);
       });
       setProductosConSucursales(datosOrdenados);
-      console.log(`✅ ${datosOrdenados.length} productos cargados con todas las sucursales`);
+      console.log(`✅ [DEBUG] ${datosOrdenados.length} productos cargados con todas las sucursales`);
     } catch (error) {
-      console.error('Error al cargar productos con sucursales:', error);
+      console.error('❌ [DEBUG] Error al cargar productos con sucursales:', error);
       message.error('Error al cargar productos');
     } finally {
       setLoadingProductosConSucursales(false);
+      console.log('🏁 [DEBUG] cargarProductosConSucursales terminó');
     }
   };
 
@@ -1355,7 +1358,10 @@ const Products: React.FC = () => {
                   <Button 
                     type="primary" 
                     icon={<PlusOutlined />}
-                    onClick={() => setModalCrearVisible(true)}
+                    onClick={() => {
+                      console.log('🖱️ [DEBUG] Click en Nuevo Producto (solo abriendo modal)');
+                      setModalCrearVisible(true);
+                    }}
                     size="large"
                   >
                     Nuevo Producto
@@ -1365,15 +1371,23 @@ const Products: React.FC = () => {
                   <Button
                     icon={<SettingOutlined />}
                     onClick={async () => {
+                      console.log('🖱️ [DEBUG] Click en Gestionar Precios');
                       setModalCargando('precios'); // ✅ Indicar que este modal se está cargando
+                      console.log('🔄 [DEBUG] Modal cargando = precios');
                       // Limpiar filtros al abrir el modal
                       setBusquedaModalGestion('');
                       setTipoFiltroModalGestion('todos');
                       setMarcaFiltroModalGestion('todas');
+                      console.log('🧹 [DEBUG] Filtros limpiados');
                       // ⭐ Cargar productos con información de todas las sucursales
+                      console.log('📞 [DEBUG] Llamando a cargarProductosConSucursales...');
                       await cargarProductosConSucursales(); // ✅ Esperar a que se carguen los datos
+                      console.log('✅ [DEBUG] cargarProductosConSucursales completado');
+                      console.log('🔓 [DEBUG] Abriendo modal de precios...');
                       setModalGestionarPrecios(true); // ✅ Abrir modal DESPUÉS de cargar datos
+                      console.log('🔄 [DEBUG] Modal cargando = null');
                       setModalCargando(null); // ✅ Resetear estado de carga
+                      console.log('🎉 [DEBUG] Proceso completo de Gestionar Precios');
                     }}
                     size="large"
                     loading={modalCargando === 'precios'} // ✅ Solo mostrar spinner si este botón está cargando
