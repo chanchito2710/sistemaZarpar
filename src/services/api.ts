@@ -2229,6 +2229,32 @@ export const descuentosService = {
       throw error;
     }
   },
+
+  /**
+   * Habilitar descuento "una vez" para una sucursal
+   */
+  habilitarUnaVez: async (sucursal: string): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.post(`/descuentos/${sucursal}/una-vez`);
+      return response.data;
+    } catch (error) {
+      console.error('Error al habilitar descuento una vez:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Desactivar descuento "una vez" (después de usarse o manualmente)
+   */
+  desactivarUnaVez: async (sucursal: string): Promise<any> => {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await apiClient.delete(`/descuentos/${sucursal}/una-vez`);
+      return response.data;
+    } catch (error) {
+      console.error('Error al desactivar descuento una vez:', error);
+      throw error;
+    }
+  },
 };
 
 /**

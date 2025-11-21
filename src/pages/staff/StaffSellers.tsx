@@ -196,11 +196,6 @@ const StaffSellers: React.FC = () => {
   // Estados para descuentos
   const [configuracionDescuentos, setConfiguracionDescuentos] = useState<any[]>([]);
   const [descuentosLoading, setDescuentosLoading] = useState(false);
-  const [sucursalUnaVez, setSucursalUnaVez] = useState<string[]>(() => {
-    // Cargar desde localStorage al iniciar
-    const stored = localStorage.getItem('descuentos_una_vez');
-    return stored ? JSON.parse(stored) : [];
-  }); // Sucursales con "una vez" activo
 
   // Estados para gestión de usuarios
   const [usuarios, setUsuarios] = useState<Vendedor[]>([]);
@@ -223,13 +218,6 @@ const StaffSellers: React.FC = () => {
       navigate('/');
     }
   }, [usuario, navigate, messageApi]);
-
-  /**
-   * Guardar estado de "una vez" en localStorage
-   */
-  useEffect(() => {
-    localStorage.setItem('descuentos_una_vez', JSON.stringify(sucursalUnaVez));
-  }, [sucursalUnaVez]);
 
   /**
    * Cargar datos iniciales
@@ -308,21 +296,40 @@ const StaffSellers: React.FC = () => {
   /**
    * Habilitar descuento una sola vez
    */
-  const handleHabilitarUnaVez = (sucursal: string) => {
-    // Agregar sucursal a la lista de "una vez activo"
-    setSucursalUnaVez(prev => [...prev, sucursal]);
-    messageApi.success({
-      content: `🎯 Descuento habilitado UNA VEZ para ${sucursal.toUpperCase()}. Se deshabilitará automáticamente después del primer uso.`,
-      duration: 4
-    });
+  const handleHabilitarUnaVez = async (sucursal: string) => {
+    try {
+      console.log(`🎯 Habilitando descuento UNA VEZ para ${sucursal}`);
+      await descuentosService.habilitarUnaVez(sucursal);
+      
+      messageApi.success({
+        content: `🎯 Descuento habilitado UNA VEZ para ${sucursal.toUpperCase()}. Se deshabilitará automáticamente después del primer uso.`,
+        duration: 4
+      });
+      
+      // Recargar configuración
+      await cargarDescuentos();
+    } catch (error) {
+      console.error('Error al habilitar descuento una vez:', error);
+      messageApi.error('Error al habilitar descuento de uso único');
+    }
   };
 
   /**
    * Cancelar descuento de "una vez" (manual o después de uso)
    */
-  const handleCancelarUnaVez = (sucursal: string) => {
-    setSucursalUnaVez(prev => prev.filter(s => s !== sucursal));
-    messageApi.info(`Descuento de uso único cancelado para ${sucursal.toUpperCase()}`);
+  const handleCancelarUnaVez = async (sucursal: string) => {
+    try {
+      console.log(`🔄 Cancelando descuento UNA VEZ para ${sucursal}`);
+      await descuentosService.desactivarUnaVez(sucursal);
+      
+      messageApi.info(`Descuento de uso único cancelado para ${sucursal.toUpperCase()}`);
+      
+      // Recargar configuración
+      await cargarDescuentos();
+    } catch (error) {
+      console.error('Error al cancelar descuento una vez:', error);
+      messageApi.error('Error al cancelar descuento de uso único');
+    }
   };
 
   /**
@@ -1835,7 +1842,7 @@ const StaffSellers: React.FC = () => {
                           key: 'accion',
                           align: 'center',
                           render: (_: any, record: any) => {
-                            const estaUnaVezActivo = sucursalUnaVez.includes(record.sucursal);
+                            const estaUnaVezActivo = record.una_vez_activo === 1;
                             
                             return (
                               <Space direction="vertical" size={4}>

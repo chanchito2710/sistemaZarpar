@@ -3,7 +3,9 @@ import { verificarAutenticacion, verificarAdmin } from '../middleware/auth.js';
 import {
   obtenerConfiguracionDescuentos,
   obtenerConfiguracionPorSucursal,
-  actualizarConfiguracionDescuento
+  actualizarConfiguracionDescuento,
+  habilitarUnaVez,
+  desactivarUnaVez
 } from '../controllers/descuentosController.js';
 
 const router = express.Router();
@@ -19,6 +21,12 @@ router.get('/:sucursal', obtenerConfiguracionPorSucursal);
 
 // Actualizar configuración de descuento (solo admin)
 router.put('/:sucursal', verificarAdmin, actualizarConfiguracionDescuento);
+
+// Habilitar descuento "una vez" (solo admin)
+router.post('/:sucursal/una-vez', verificarAdmin, habilitarUnaVez);
+
+// Desactivar descuento "una vez" después de usarse (cualquier usuario puede desactivar)
+router.delete('/:sucursal/una-vez', desactivarUnaVez);
 
 export default router;
 

@@ -194,6 +194,102 @@ export const actualizarConfiguracionDescuento = async (req: Request, res: Respon
   }
 };
 
+// Habilitar descuento "una vez" para una sucursal
+export const habilitarUnaVez = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal } = req.params;
+    const usuario = (req as any).user;
+
+    if (!sucursal) {
+      res.status(400).json({
+        success: false,
+        message: 'Sucursal requerida'
+      });
+      return;
+    }
+
+    console.log(`🎯 Habilitando descuento UNA VEZ para ${sucursal.toUpperCase()}`);
+
+    // Verificar si la configuración existe
+    const [existe] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM configuracion_descuentos_sucursal WHERE sucursal = ?',
+      [sucursal.toLowerCase()]
+    );
+
+    if (existe.length === 0) {
+      // Crear si no existe (con una_vez_activo = 1)
+      await pool.execute(
+        'INSERT INTO configuracion_descuentos_sucursal (sucursal, descuento_habilitado, una_vez_activo, updated_by) VALUES (?, 0, 1, ?)',
+        [sucursal.toLowerCase(), usuario?.email || null]
+      );
+    } else {
+      // Actualizar si existe (activar una_vez_activo)
+      await pool.execute(
+        'UPDATE configuracion_descuentos_sucursal SET una_vez_activo = 1, updated_by = ? WHERE sucursal = ?',
+        [usuario?.email || null, sucursal.toLowerCase()]
+      );
+    }
+
+    console.log(`✅ Descuento UNA VEZ habilitado para ${sucursal.toUpperCase()}`);
+
+    res.status(200).json({
+      success: true,
+      message: `Descuento habilitado UNA VEZ para ${sucursal.toUpperCase()}. Se desactivará automáticamente después del primer uso.`,
+      data: {
+        sucursal: sucursal.toLowerCase(),
+        una_vez_activo: 1
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al habilitar descuento una vez:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al habilitar descuento una vez',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+// Desactivar descuento "una vez" (después de usarse)
+export const desactivarUnaVez = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal } = req.params;
+
+    if (!sucursal) {
+      res.status(400).json({
+        success: false,
+        message: 'Sucursal requerida'
+      });
+      return;
+    }
+
+    console.log(`🔄 Desactivando descuento UNA VEZ para ${sucursal.toUpperCase()} (ya fue usado)`);
+
+    await pool.execute(
+      'UPDATE configuracion_descuentos_sucursal SET una_vez_activo = 0 WHERE sucursal = ?',
+      [sucursal.toLowerCase()]
+    );
+
+    console.log(`✅ Descuento UNA VEZ desactivado para ${sucursal.toUpperCase()}`);
+
+    res.status(200).json({
+      success: true,
+      message: `Descuento de uso único desactivado para ${sucursal.toUpperCase()}`,
+      data: {
+        sucursal: sucursal.toLowerCase(),
+        una_vez_activo: 0
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al desactivar descuento una vez:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al desactivar descuento una vez',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
 
 
 
