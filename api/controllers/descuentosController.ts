@@ -137,7 +137,7 @@ export const actualizarConfiguracionDescuento = async (req: Request, res: Respon
   try {
     const { sucursal } = req.params;
     const { descuento_habilitado } = req.body;
-    const usuario = (req as any).user;
+    const usuario = (req as any).usuario; // ✅ CORREGIDO: req.usuario (no req.user)
 
     if (!sucursal) {
       res.status(400).json({
@@ -201,7 +201,7 @@ export const actualizarConfiguracionDescuento = async (req: Request, res: Respon
 export const habilitarUnaVez = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sucursal } = req.params;
-    const usuario = (req as any).user;
+    const usuario = (req as any).usuario; // ✅ CORREGIDO: req.usuario (no req.user)
 
     if (!sucursal) {
       res.status(400).json({
@@ -210,6 +210,10 @@ export const habilitarUnaVez = async (req: Request, res: Response): Promise<void
       });
       return;
     }
+
+    console.log('🔍 [DEBUG] Usuario recibido en controlador:', usuario);
+    console.log('🔍 [DEBUG] Email del usuario:', usuario?.email);
+    console.log('🔍 [DEBUG] Sucursal solicitada:', sucursal);
 
     // ✅ VALIDACIÓN DE PERMISOS: Verificar si el usuario tiene permiso para habilitar descuento en esta sucursal
     const esAdmin = usuario?.email === 'admin@zarparuy.com';
@@ -295,7 +299,7 @@ export const habilitarUnaVez = async (req: Request, res: Response): Promise<void
 export const desactivarUnaVez = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sucursal } = req.params;
-    const usuario = (req as any).user;
+    const usuario = (req as any).usuario; // ✅ CORREGIDO: req.usuario (no req.user)
 
     if (!sucursal) {
       res.status(400).json({
@@ -304,6 +308,10 @@ export const desactivarUnaVez = async (req: Request, res: Response): Promise<voi
       });
       return;
     }
+
+    console.log('🔍 [DEBUG] Usuario recibido en desactivarUnaVez:', usuario);
+    console.log('🔍 [DEBUG] Email del usuario:', usuario?.email);
+    console.log('🔍 [DEBUG] Sucursal solicitada:', sucursal);
 
     // ✅ VALIDACIÓN DE PERMISOS: Verificar si el usuario tiene permiso para desactivar descuento en esta sucursal
     const esAdmin = usuario?.email === 'admin@zarparuy.com';
