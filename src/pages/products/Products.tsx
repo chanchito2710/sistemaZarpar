@@ -1218,6 +1218,8 @@ const Products: React.FC = () => {
             value: m?.valor || '' 
           }))
         : [],
+      filterMode: 'tree',
+      filterSearch: true,
       onFilter: (value, record) => record.marca === value,
       sorter: (a, b) => {
         const marcaA = (a.marca || '').toLowerCase();
@@ -1237,6 +1239,8 @@ const Products: React.FC = () => {
             value: t?.valor || '' 
           }))
         : [],
+      filterMode: 'tree',
+      filterSearch: true,
       onFilter: (value, record) => record.tipo === value,
       sorter: (a, b) => {
         const ordenA = obtenerOrdenTipo(a.tipo || '');
@@ -1272,6 +1276,8 @@ const Products: React.FC = () => {
             value: c?.valor || '' 
           }))
         : [],
+      filterMode: 'tree',
+      filterSearch: true,
       onFilter: (value, record) => record.calidad === value,
       render: (calidad: string) => {
         const color = {
