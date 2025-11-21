@@ -179,8 +179,8 @@ export const moduleInfo = {
     icon: <DollarOutlined />,
   },
   payroll: {
-    title: 'Comisiones',
-    description: 'Gestión de comisiones',
+    title: 'Sueldos',
+    description: 'Gestión de nómina',
     path: '/finance/payroll',
     color: moduleColors.payroll.color,
     gradient: moduleColors.payroll.gradient,
