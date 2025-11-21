@@ -211,6 +211,10 @@ const GlobalSales: React.FC = () => {
   const [movimientosCaja, setMovimientosCaja] = useState<any[]>([]);
   const [loadingMovimientosCaja, setLoadingMovimientosCaja] = useState(false);
   
+  // Estados para ajustes manuales de cuenta corriente
+  const [ajustesCuentaCorriente, setAjustesCuentaCorriente] = useState<any[]>([]);
+  const [loadingAjustesCC, setLoadingAjustesCC] = useState(false);
+  
   // Ventas filtradas por método de pago y fecha
   const [ventasEfectivo, setVentasEfectivo] = useState<VentaDetallada[]>([]);
   const [ventasTransferencia, setVentasTransferencia] = useState<VentaDetallada[]>([]);
@@ -236,6 +240,7 @@ const GlobalSales: React.FC = () => {
   useEffect(() => {
     cargarVentas();
     cargarMovimientosCaja();
+    cargarAjustesCuentaCorriente();
   }, []);
 
   /**
@@ -1428,6 +1433,56 @@ const GlobalSales: React.FC = () => {
   };
 
   /**
+   * Cargar ajustes manuales de cuenta corriente
+   */
+  const cargarAjustesCuentaCorriente = async () => {
+    setLoadingAjustesCC(true);
+    try {
+      const token = localStorage.getItem('token');
+      let url = `${API_URL}/cuenta-corriente/ajustes-manuales`;
+      
+      const params = new URLSearchParams();
+      
+      // Aplicar filtros de fecha
+      if (fechaDesde) {
+        params.append('fecha_desde', fechaDesde.format('YYYY-MM-DD'));
+      }
+      if (fechaHasta) {
+        params.append('fecha_hasta', fechaHasta.format('YYYY-MM-DD'));
+      }
+      
+      // Filtro de sucursal
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        params.append('sucursal', sucursalSeleccionada.toLowerCase());
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      console.log('🔍 [AJUSTES CC] Cargando ajustes de cuenta corriente:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setAjustesCuentaCorriente(data.data || []);
+        console.log(`✅ [AJUSTES CC] ${data.data?.length || 0} ajustes de cuenta corriente cargados`);
+      } else {
+        console.error('❌ [AJUSTES CC] Error al cargar ajustes CC:', data.message);
+      }
+    } catch (error) {
+      console.error('❌ [AJUSTES CC] Error al cargar ajustes de cuenta corriente:', error);
+    } finally {
+      setLoadingAjustesCC(false);
+    }
+  };
+
+  /**
    * Filtrar ventas por método de pago, sucursal y rango de fechas específico
    */
   const filtrarVentasPorMetodo = (
@@ -1886,8 +1941,9 @@ const GlobalSales: React.FC = () => {
                 onClick={() => {
                   cargarVentas();
                   cargarMovimientosCaja();
+                  cargarAjustesCuentaCorriente();
                 }}
-                loading={loading || loadingMovimientosCaja}
+                loading={loading || loadingMovimientosCaja || loadingAjustesCC}
                 block
                 style={{
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -2169,9 +2225,19 @@ const GlobalSales: React.FC = () => {
                 monto: movimiento.monto_nuevo,
                 detalles: `${movimiento.monto >= 0 ? '+' : ''}${formatearDinero(movimiento.monto)}`,
               })),
+              // Mapear ajustes manuales de cuenta corriente
+              ...ajustesCuentaCorriente.map((ajuste) => ({
+                ...ajuste,
+                tipo_registro: 'ajuste_cuenta_corriente',
+                fecha: ajuste.fecha_movimiento,
+                referencia: `Ajuste CC #${ajuste.id}`,
+                descripcion: ajuste.cliente_nombre || ajuste.descripcion,
+                monto: ajuste.debe > 0 ? ajuste.debe : -ajuste.haber,
+                detalles: ajuste.descripcion || `${ajuste.debe > 0 ? 'Debe' : 'Haber'}: ${formatearDinero(ajuste.debe > 0 ? ajuste.debe : ajuste.haber)}`,
+              })),
             ].sort((a, b) => dayjs(b.fecha).unix() - dayjs(a.fecha).unix())}
             rowKey={(record) => `${record.tipo_registro}-${record.id}`}
-            loading={loading || loadingMovimientosCaja}
+            loading={loading || loadingMovimientosCaja || loadingAjustesCC}
             pagination={{
               pageSize: 20,
               showSizeChanger: true,
