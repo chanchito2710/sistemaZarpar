@@ -224,7 +224,7 @@ const ProductPrices: React.FC = () => {
   };
 
   /**
-   * Generar PDF con la lista de precios
+   * Generar PDF con la lista de precios (DISEÑO PROFESIONAL)
    */
   const generarPDF = () => {
     if (productos.length === 0) {
@@ -246,98 +246,230 @@ const ProductPrices: React.FC = () => {
       const doc = new jsPDF();
       const fechaActual = new Date().toLocaleDateString('es-UY');
       
-      // Configuración de colores
-      const colorPrimario: [number, number, number] = [59, 130, 246]; // Azul
-      const colorSecundario: [number, number, number] = [100, 116, 139]; // Gris
+      // ========================================
+      // CONFIGURACIÓN DE COLORES
+      // ========================================
+      const colorPrimario: [number, number, number] = [41, 98, 255]; // Azul vibrante
+      const colorSecundario: [number, number, number] = [107, 114, 128]; // Gris elegante
+      const colorAcento: [number, number, number] = [16, 185, 129]; // Verde acento
       
-      // ENCABEZADO
-      doc.setFillColor(...colorPrimario);
-      doc.rect(0, 0, 210, 40, 'F');
+      let yPos = 20; // Posición vertical inicial
       
-      // Logo/Título
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
+      // ========================================
+      // ENCABEZADO CON LOGO EMPRESARIAL
+      // ========================================
+      const logoEmpresa = localStorage.getItem('logoEmpresa');
+      
+      if (logoEmpresa) {
+        try {
+          // Cargar logo desde localStorage
+          const img = new Image();
+          img.src = logoEmpresa;
+          
+          // Calcular dimensiones manteniendo proporción
+          const maxWidth = 60;
+          const maxHeight = 25;
+          let width = img.width;
+          let height = img.height;
+          const scale = Math.min(maxWidth / width, maxHeight / height);
+          width = width * scale;
+          height = height * scale;
+          
+          // Centrar logo
+          const xOffset = (210 - width) / 2;
+          doc.addImage(logoEmpresa, 'PNG', xOffset, yPos, width, height);
+          yPos += height + 10;
+        } catch (error) {
+          console.error('Error al cargar logo en PDF:', error);
+          // Si falla, usar texto por defecto
+          doc.setFontSize(24);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...colorPrimario);
+          doc.text('ZARPAR', 105, yPos, { align: 'center' });
+          yPos += 10;
+        }
+      } else {
+        // Logo por defecto (texto)
+        doc.setFontSize(24);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...colorPrimario);
+        doc.text('ZARPAR', 105, yPos, { align: 'center' });
+        yPos += 10;
+      }
+      
+      // Título del documento
+      doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('ZARPAR', 105, 20, { align: 'center' });
+      doc.setTextColor(...colorPrimario);
+      doc.text('Lista de Precios', 105, yPos, { align: 'center' });
+      yPos += 5;
       
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Lista de Precios', 105, 30, { align: 'center' });
+      // Línea decorativa bajo el título
+      doc.setDrawColor(...colorAcento);
+      doc.setLineWidth(0.8);
+      doc.line(70, yPos, 140, yPos);
+      yPos += 12;
+      
+      // ========================================
+      // INFORMACIÓN DE LA SUCURSAL
+      // ========================================
+      // Caja con fondo suave
+      doc.setFillColor(248, 250, 252); // Gris muy claro
+      doc.roundedRect(14, yPos - 5, 182, 18, 2, 2, 'F');
       
       // Información de la sucursal
-      doc.setFontSize(10);
-      doc.setTextColor(...colorSecundario);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, 50);
+      doc.setTextColor(...colorSecundario);
+      doc.text(`Sucursal:`, 18, yPos + 2);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Fecha: ${fechaActual}`, 14, 56);
-      doc.text(`Total de productos: ${productos.length}`, 14, 62);
+      doc.setTextColor(0, 0, 0);
+      doc.text(sucursalSeleccionada.toUpperCase(), 38, yPos + 2);
       
-      // Línea divisoria
-      doc.setDrawColor(...colorPrimario);
-      doc.setLineWidth(0.5);
-      doc.line(14, 68, 196, 68);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...colorSecundario);
+      doc.text(`Fecha:`, 18, yPos + 8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text(fechaActual, 33, yPos + 8);
       
-      // TABLA DE PRODUCTOS
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...colorSecundario);
+      doc.text(`Total:`, 130, yPos + 2);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text(`${productos.length} productos`, 145, yPos + 2);
+      
+      yPos += 23;
+      
+      // ========================================
+      // TABLA DE PRODUCTOS (PROFESIONAL)
+      // ========================================
       const datosTabla = productos.map((producto, index) => [
         index + 1,
-        producto.codigo_barras || '-',
         producto.nombre,
         producto.marca || '-',
         producto.tipo || '-',
-        `$ ${Number(producto.precio).toLocaleString('es-UY', { 
-          minimumFractionDigits: 2, 
+        `$${Number(producto.precio).toLocaleString('es-UY', { 
+          minimumFractionDigits: 0, 
           maximumFractionDigits: 2 
         })}`
       ]);
       
       autoTable(doc, {
-        startY: 75,
-        head: [['#', 'Código', 'Producto', 'Marca', 'Tipo', 'Precio']],
+        startY: yPos,
+        head: [['#', 'Producto', 'Marca', 'Tipo', 'Precio']],
         body: datosTabla,
-        theme: 'striped',
+        theme: 'grid',
         headStyles: {
           fillColor: colorPrimario as unknown as [number, number, number],
           textColor: [255, 255, 255] as [number, number, number],
           fontSize: 10,
           fontStyle: 'bold',
-          halign: 'center'
+          halign: 'center',
+          cellPadding: 4
         },
         bodyStyles: {
           fontSize: 9,
-          textColor: [50, 50, 50] as [number, number, number]
+          textColor: [30, 30, 30] as [number, number, number],
+          cellPadding: 3
         },
         columnStyles: {
-          0: { halign: 'center', cellWidth: 10 }, // #
-          1: { halign: 'center', cellWidth: 25 }, // Código
-          2: { halign: 'left', cellWidth: 60 }, // Producto
-          3: { halign: 'left', cellWidth: 30 }, // Marca
-          4: { halign: 'left', cellWidth: 25 }, // Tipo
-          5: { halign: 'right', cellWidth: 30, fontStyle: 'bold' } // Precio
+          0: { 
+            halign: 'center', 
+            cellWidth: 12,
+            fontStyle: 'bold',
+            textColor: [107, 114, 128] as [number, number, number]
+          }, // #
+          1: { 
+            halign: 'left', 
+            cellWidth: 70 
+          }, // Producto
+          2: { 
+            halign: 'left', 
+            cellWidth: 35,
+            textColor: [59, 130, 246] as [number, number, number]
+          }, // Marca
+          3: { 
+            halign: 'center', 
+            cellWidth: 35,
+            fontSize: 8,
+            textColor: [107, 114, 128] as [number, number, number]
+          }, // Tipo
+          4: { 
+            halign: 'right', 
+            cellWidth: 30,
+            fontStyle: 'bold',
+            fontSize: 10,
+            textColor: [16, 185, 129] as [number, number, number]
+          } // Precio
         },
         alternateRowStyles: {
-          fillColor: [245, 247, 250]
+          fillColor: [248, 250, 252] as [number, number, number]
         },
         margin: { left: 14, right: 14 },
+        didDrawCell: (data) => {
+          // Agregar separador visual entre tipos de productos
+          if (data.column.index === 0 && data.row.index > 0) {
+            const tipoActual = productos[data.row.index]?.tipo || '';
+            const tipoAnterior = productos[data.row.index - 1]?.tipo || '';
+            
+            if (tipoActual.toLowerCase() !== tipoAnterior.toLowerCase()) {
+              // Dibujar línea divisoria más gruesa entre diferentes tipos
+              doc.setDrawColor(...colorAcento);
+              doc.setLineWidth(0.5);
+              doc.line(
+                14,
+                data.cell.y,
+                196,
+                data.cell.y
+              );
+            }
+          }
+        },
         didDrawPage: (data) => {
-          // Pie de página
+          // ========================================
+          // PIE DE PÁGINA PROFESIONAL
+          // ========================================
           const pageCount = doc.getNumberOfPages();
           const pageHeight = doc.internal.pageSize.height;
           
-          doc.setFontSize(8);
+          // Línea superior del footer
+          doc.setDrawColor(...colorSecundario);
+          doc.setLineWidth(0.3);
+          doc.line(14, pageHeight - 20, 196, pageHeight - 20);
+          
+          // Número de página
+          doc.setFontSize(9);
           doc.setTextColor(...colorSecundario);
+          doc.setFont('helvetica', 'normal');
           doc.text(
             `Página ${data.pageNumber} de ${pageCount}`,
             105,
-            pageHeight - 10,
+            pageHeight - 12,
             { align: 'center' }
           );
           
+          // Nombre del sistema
+          doc.setFontSize(8);
+          doc.setTextColor(...colorSecundario);
           doc.text(
             'Sistema Zarpar - Gestión Comercial',
             105,
-            pageHeight - 5,
+            pageHeight - 7,
             { align: 'center' }
+          );
+          
+          // Fecha y hora de generación
+          const horaGeneracion = new Date().toLocaleTimeString('es-UY', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          doc.setFontSize(7);
+          doc.text(
+            `Generado: ${fechaActual} ${horaGeneracion}`,
+            14,
+            pageHeight - 7
           );
         }
       });
