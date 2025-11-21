@@ -4,6 +4,7 @@ import {
   Table,
   Button,
   InputNumber,
+  Input,
   Space,
   message,
   Statistic,
@@ -51,6 +52,7 @@ const OrderAnalysis: React.FC = () => {
   const [productos, setProductos] = useState<ProductoAnalisis[]>([]);
   const [loading, setLoading] = useState(false);
   const [notas, setNotas] = useState<{ [key: number]: number }>({});
+  const [notasTexto, setNotasTexto] = useState<{ [key: number]: string }>({});
   const [messageApi, contextHolder] = message.useMessage();
 
   // Cargar productos al montar
@@ -59,12 +61,19 @@ const OrderAnalysis: React.FC = () => {
     cargarNotasDesdeLocalStorage();
   }, []);
 
-  // Guardar notas en localStorage cada vez que cambien
+  // Guardar notas de cantidades en localStorage cada vez que cambien
   useEffect(() => {
     if (Object.keys(notas).length > 0) {
       localStorage.setItem('pedidos_notas', JSON.stringify(notas));
     }
   }, [notas]);
+
+  // Guardar notas de texto en localStorage cada vez que cambien
+  useEffect(() => {
+    if (Object.keys(notasTexto).length > 0) {
+      localStorage.setItem('pedidos_notas_texto', JSON.stringify(notasTexto));
+    }
+  }, [notasTexto]);
 
   const cargarProductos = async () => {
     setLoading(true);
@@ -103,6 +112,11 @@ const OrderAnalysis: React.FC = () => {
     if (notasGuardadas) {
       setNotas(JSON.parse(notasGuardadas));
     }
+    
+    const notasTextoGuardadas = localStorage.getItem('pedidos_notas_texto');
+    if (notasTextoGuardadas) {
+      setNotasTexto(JSON.parse(notasTextoGuardadas));
+    }
   };
 
   const handleNotaChange = (productoId: number, value: number | null) => {
@@ -119,12 +133,26 @@ const OrderAnalysis: React.FC = () => {
     }
   };
 
+  const handleNotaTextoChange = (productoId: number, value: string) => {
+    if (!value || value.trim() === '') {
+      // Eliminar nota de texto si está vacía
+      const newNotasTexto = { ...notasTexto };
+      delete newNotasTexto[productoId];
+      setNotasTexto(newNotasTexto);
+    } else {
+      setNotasTexto({
+        ...notasTexto,
+        [productoId]: value
+      });
+    }
+  };
+
   const borrarTodasLasNotas = () => {
     Modal.confirm({
       title: '⚠️ ¿Borrar todas las notas?',
       content: (
         <div>
-          <p>Esta acción <strong>eliminará permanentemente</strong> todas las cantidades que has ingresado en la columna de notas.</p>
+          <p>Esta acción <strong>eliminará permanentemente</strong> todas las cantidades y anotaciones que has ingresado.</p>
           <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>⚠️ Esta acción NO se puede deshacer.</p>
         </div>
       ),
@@ -134,7 +162,9 @@ const OrderAnalysis: React.FC = () => {
       cancelText: 'Cancelar',
       onOk: () => {
         setNotas({});
+        setNotasTexto({});
         localStorage.removeItem('pedidos_notas');
+        localStorage.removeItem('pedidos_notas_texto');
         messageApi.success('✅ Todas las notas han sido borradas');
       }
     });
@@ -157,7 +187,8 @@ const OrderAnalysis: React.FC = () => {
       'Stock Total': p.stock_total,
       'Ventas (30d)': p.ventas_30_dias,
       'Fallas': p.fallas_total,
-      'CANTIDAD A PEDIR': notas[p.id]
+      'CANTIDAD A PEDIR': notas[p.id],
+      'Notas': notasTexto[p.id] || ''
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
@@ -175,6 +206,7 @@ const OrderAnalysis: React.FC = () => {
       { wch: 12 }, // Ventas
       { wch: 10 }, // Fallas
       { wch: 18 }, // Cantidad a pedir
+      { wch: 40 }, // Notas
     ];
     worksheet['!cols'] = columnWidths;
 
@@ -214,41 +246,43 @@ const OrderAnalysis: React.FC = () => {
     // Tabla
     const tablaDatos = productosConNotas.map((p, index) => [
       index + 1,
-      p.nombre.substring(0, 30),
+      p.nombre.substring(0, 25),
       p.marca,
       p.tipo,
       p.calidad,
       p.stock_total,
       p.ventas_30_dias,
       p.fallas_total,
-      notas[p.id]
+      notas[p.id],
+      (notasTexto[p.id] || '').substring(0, 30)
     ]);
 
     autoTable(doc, {
       startY: yPos,
-      head: [['#', 'Producto', 'Marca', 'Tipo', 'Calidad', 'Stock', 'Ventas', 'Fallas', 'PEDIR']],
+      head: [['#', 'Producto', 'Marca', 'Tipo', 'Calidad', 'Stock', 'Ventas', 'Fallas', 'PEDIR', 'Notas']],
       body: tablaDatos,
       theme: 'striped',
       headStyles: { 
         fillColor: [59, 130, 246], 
         textColor: 255,
-        fontSize: 10,
+        fontSize: 9,
         fontStyle: 'bold'
       },
       bodyStyles: { 
-        fontSize: 9,
-        cellPadding: 2
+        fontSize: 8,
+        cellPadding: 1.5
       },
       columnStyles: {
-        0: { cellWidth: 8, halign: 'center' },
-        1: { cellWidth: 60 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 15, halign: 'center' },
-        6: { cellWidth: 15, halign: 'center' },
-        7: { cellWidth: 15, halign: 'center' },
-        8: { cellWidth: 18, halign: 'center', fillColor: [255, 247, 205], fontStyle: 'bold' }
+        0: { cellWidth: 6, halign: 'center' },
+        1: { cellWidth: 45 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 13, halign: 'center' },
+        6: { cellWidth: 13, halign: 'center' },
+        7: { cellWidth: 13, halign: 'center' },
+        8: { cellWidth: 15, halign: 'center', fillColor: [255, 247, 205], fontStyle: 'bold' },
+        9: { cellWidth: 50, fontSize: 7 }
       }
     });
 
@@ -354,7 +388,25 @@ const OrderAnalysis: React.FC = () => {
       sorter: (a, b) => a.fallas_total - b.fallas_total
     },
     {
-      title: <span style={{ fontWeight: 'bold', color: '#fa8c16' }}>📝 NOTAS (Cantidad a Pedir)</span>,
+      title: <span style={{ fontWeight: 'bold', color: '#52c41a' }}>📝 Notas</span>,
+      key: 'nota_texto',
+      width: 200,
+      align: 'center',
+      render: (_, record) => (
+        <Input.TextArea
+          value={notasTexto[record.id] || ''}
+          onChange={(e) => handleNotaTextoChange(record.id, e.target.value)}
+          placeholder="Anotaciones..."
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          style={{ 
+            width: '100%',
+            fontSize: 12
+          }}
+        />
+      )
+    },
+    {
+      title: <span style={{ fontWeight: 'bold', color: '#fa8c16' }}>🔢 Cantidades a Pedir</span>,
       key: 'nota',
       width: 150,
       align: 'center',
@@ -514,7 +566,7 @@ const OrderAnalysis: React.FC = () => {
           dataSource={productos}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1600 }}
           pagination={{
             pageSize: 50,
             showTotal: (total) => `Total: ${total} productos`,
