@@ -816,6 +816,109 @@ export const obtenerDetalleFallas = async (req: Request, res: Response): Promise
 };
 
 /**
+ * Obtener todas las devoluciones con filtros
+ * GET /api/devoluciones/listado
+ * Query params: sucursal, fecha_desde, fecha_hasta, metodo_devolucion
+ */
+export const obtenerListadoDevoluciones = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, fecha_desde, fecha_hasta, metodo_devolucion } = req.query;
+    
+    console.log('📋 Obteniendo listado de devoluciones:', { 
+      sucursal: sucursal || 'TODAS', 
+      fecha_desde, 
+      fecha_hasta,
+      metodo_devolucion: metodo_devolucion || 'TODOS'
+    });
+    
+    let query = `
+      SELECT 
+        dr.id,
+        dr.sucursal,
+        dr.venta_id,
+        dr.numero_venta,
+        dr.producto_id,
+        dr.producto_nombre,
+        dr.cliente_id,
+        dr.cliente_nombre,
+        dr.tipo,
+        dr.metodo_devolucion,
+        dr.monto_devuelto,
+        dr.fecha_proceso,
+        dr.fecha_venta,
+        dr.observaciones,
+        dr.procesado_por,
+        p.marca,
+        p.tipo as tipo_producto
+      FROM devoluciones_reemplazos dr
+      LEFT JOIN productos p ON dr.producto_id = p.id
+      WHERE dr.tipo = 'devolucion'
+    `;
+    
+    const params: any[] = [];
+    
+    // Filtrar por sucursal
+    if (sucursal && sucursal !== 'todas') {
+      query += ' AND dr.sucursal = ?';
+      params.push(sucursal);
+    }
+    
+    // Filtrar por fecha de proceso (cuando se realizó la devolución)
+    if (fecha_desde) {
+      query += ' AND DATE(dr.fecha_proceso) >= ?';
+      params.push(fecha_desde);
+    }
+    
+    if (fecha_hasta) {
+      query += ' AND DATE(dr.fecha_proceso) <= ?';
+      params.push(fecha_hasta);
+    }
+    
+    // Filtrar por método de devolución
+    if (metodo_devolucion && metodo_devolucion !== 'todos') {
+      query += ' AND dr.metodo_devolucion = ?';
+      params.push(metodo_devolucion);
+    }
+    
+    query += ' ORDER BY dr.fecha_proceso DESC';
+    
+    const [devoluciones] = await pool.execute<RowDataPacket[]>(query, params);
+    
+    // Calcular estadísticas
+    const totalDevoluciones = devoluciones.length;
+    const totalMontoDevuelto = devoluciones.reduce((sum, d: any) => sum + (Number(d.monto_devuelto) || 0), 0);
+    const devolucionesEfectivo = devoluciones.filter((d: any) => d.metodo_devolucion === 'saldo_favor');
+    const devolucionesCuentaCorriente = devoluciones.filter((d: any) => d.metodo_devolucion === 'cuenta_corriente');
+    
+    console.log(`✅ ${totalDevoluciones} devoluciones encontradas`);
+    console.log(`💰 Monto total devuelto: $${totalMontoDevuelto.toFixed(2)}`);
+    console.log(`💵 En efectivo: ${devolucionesEfectivo.length}`);
+    console.log(`💳 A cuenta corriente: ${devolucionesCuentaCorriente.length}`);
+    
+    res.status(200).json({
+      success: true,
+      data: devoluciones,
+      estadisticas: {
+        total_devoluciones: totalDevoluciones,
+        total_monto_devuelto: totalMontoDevuelto,
+        devoluciones_efectivo: devolucionesEfectivo.length,
+        monto_efectivo: devolucionesEfectivo.reduce((sum, d: any) => sum + (Number(d.monto_devuelto) || 0), 0),
+        devoluciones_cuenta_corriente: devolucionesCuentaCorriente.length,
+        monto_cuenta_corriente: devolucionesCuentaCorriente.reduce((sum, d: any) => sum + (Number(d.monto_devuelto) || 0), 0)
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error al obtener listado de devoluciones:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener listado de devoluciones',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+
+/**
  * Obtener estadísticas completas de fallas
  * GET /api/devoluciones/estadisticas-fallas
  * Query params: sucursal (opcional)

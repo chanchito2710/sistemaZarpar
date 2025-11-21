@@ -12,7 +12,8 @@ import {
   obtenerSaldosFavor,
   obtenerHistorialReemplazos,
   obtenerDetalleFallas,
-  obtenerEstadisticasFallas
+  obtenerEstadisticasFallas,
+  obtenerListadoDevoluciones
 } from '../controllers/devolucionesController.js';
 
 const router = Router();
@@ -62,6 +63,13 @@ router.get('/historial-reemplazos/:detalleId', obtenerHistorialReemplazos);
  * Query params: sucursal (opcional)
  */
 router.get('/detalle-fallas/:productoId', obtenerDetalleFallas);
+
+/**
+ * GET /api/devoluciones/listado
+ * Obtener listado de todas las devoluciones con filtros
+ * Query params: sucursal, fecha_desde, fecha_hasta, metodo_devolucion (opcionales)
+ */
+router.get('/listado', obtenerListadoDevoluciones);
 
 /**
  * GET /api/devoluciones/estadisticas-fallas

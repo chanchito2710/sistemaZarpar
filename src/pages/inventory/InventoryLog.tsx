@@ -47,11 +47,16 @@ import {
   RiseOutlined,
   FallOutlined,
   BankOutlined,
+  FileExcelOutlined,
+  FilePdfOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import { ventasService, vendedoresService } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import '../GlobalSales.css';
 
 // URL de la API - detecta automáticamente el entorno
@@ -207,6 +212,13 @@ const GlobalSales: React.FC = () => {
   const [ventasEfectivo, setVentasEfectivo] = useState<VentaDetallada[]>([]);
   const [ventasTransferencia, setVentasTransferencia] = useState<VentaDetallada[]>([]);
   const [ventasCuentaCorriente, setVentasCuentaCorriente] = useState<VentaDetallada[]>([]);
+  
+  // Estados para devoluciones
+  const [devoluciones, setDevoluciones] = useState<any[]>([]);
+  const [loadingDevoluciones, setLoadingDevoluciones] = useState(false);
+  const [fechaDevolucionesDesde, setFechaDevolucionesDesde] = useState<Dayjs | null>(fechaDesde);
+  const [fechaDevolucionesHasta, setFechaDevolucionesHasta] = useState<Dayjs | null>(fechaHasta);
+  const [metodoDevolucionFiltro, setMetodoDevolucionFiltro] = useState<string>('todos');
 
   /**
    * Cargar sucursales al montar
@@ -403,6 +415,281 @@ const GlobalSales: React.FC = () => {
       message.error('Error al cargar comisiones');
     } finally {
       setLoadingComisiones(false);
+    }
+  };
+
+  /**
+   * Cargar devoluciones con filtros
+   */
+  const cargarDevoluciones = async (usarFiltrosEspecificos = false) => {
+    setLoadingDevoluciones(true);
+    try {
+      const token = localStorage.getItem('token');
+      const filtros: any = {};
+      
+      // Filtrar por sucursal
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtros.sucursal = sucursalSeleccionada;
+      }
+      
+      // Usar filtros específicos del tab o los globales
+      const desde = usarFiltrosEspecificos ? fechaDevolucionesDesde : fechaDesde;
+      const hasta = usarFiltrosEspecificos ? fechaDevolucionesHasta : fechaHasta;
+      
+      if (desde) {
+        filtros.fecha_desde = desde.format('YYYY-MM-DD');
+      }
+      
+      if (hasta) {
+        filtros.fecha_hasta = hasta.format('YYYY-MM-DD');
+      }
+      
+      // Filtrar por método de devolución
+      if (metodoDevolucionFiltro && metodoDevolucionFiltro !== 'todos') {
+        filtros.metodo_devolucion = metodoDevolucionFiltro;
+      }
+      
+      const response = await fetch(
+        `${API_URL}/devoluciones/listado?${new URLSearchParams(filtros)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      
+      if (data.success) {
+        setDevoluciones(data.data || []);
+        console.log('✅ Devoluciones cargadas:', data.data?.length || 0);
+        console.log('📊 Estadísticas:', data.estadisticas);
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar devoluciones:', error);
+      message.error('Error al cargar devoluciones');
+    } finally {
+      setLoadingDevoluciones(false);
+    }
+  };
+
+  /**
+   * Exportar devoluciones a Excel
+   */
+  const exportarDevolucionesExcel = () => {
+    try {
+      if (devoluciones.length === 0) {
+        message.warning('No hay devoluciones para exportar');
+        return;
+      }
+
+      // Preparar datos para Excel
+      const datosExcel = devoluciones.map((dev, index) => ({
+        '#': index + 1,
+        'Fecha': dayjs(dev.fecha_proceso).format('DD/MM/YYYY HH:mm'),
+        'N° Venta': dev.numero_venta,
+        'Cliente': dev.cliente_nombre,
+        'Producto': dev.producto_nombre,
+        'Marca': dev.marca || 'N/A',
+        'Tipo': dev.tipo_producto || 'N/A',
+        'Método Devolución': dev.metodo_devolucion === 'saldo_favor' ? 'Efectivo' : 'Cuenta Corriente',
+        'Sucursal': dev.sucursal.toUpperCase(),
+        'Monto Devuelto': Number(dev.monto_devuelto || 0).toFixed(2),
+        'Procesado Por': dev.procesado_por || 'Sistema',
+        'Observaciones': dev.observaciones || '-'
+      }));
+
+      // Agregar fila de totales
+      const totalDevuelto = devoluciones.reduce((sum, d) => sum + (Number(d.monto_devuelto) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'Fecha': '',
+        'N° Venta': '',
+        'Cliente': '',
+        'Producto': '',
+        'Marca': '',
+        'Tipo': 'TOTALES:',
+        'Método Devolución': '',
+        'Sucursal': '',
+        'Monto Devuelto': totalDevuelto.toFixed(2),
+        'Procesado Por': '',
+        'Observaciones': ''
+      });
+
+      // Crear libro de Excel
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Devoluciones');
+
+      // Ajustar ancho de columnas
+      const columnWidths = [
+        { wch: 5 },   // #
+        { wch: 16 },  // Fecha
+        { wch: 18 },  // N° Venta
+        { wch: 25 },  // Cliente
+        { wch: 30 },  // Producto
+        { wch: 15 },  // Marca
+        { wch: 15 },  // Tipo
+        { wch: 18 },  // Método Devolución
+        { wch: 12 },  // Sucursal
+        { wch: 14 },  // Monto Devuelto
+        { wch: 18 },  // Procesado Por
+        { wch: 30 }   // Observaciones
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Generar nombre de archivo con filtros
+      const filtrosTexto = [];
+      if (fechaDevolucionesDesde && fechaDevolucionesHasta) {
+        filtrosTexto.push(`${fechaDevolucionesDesde.format('DD-MM-YYYY')}_al_${fechaDevolucionesHasta.format('DD-MM-YYYY')}`);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtrosTexto.push(sucursalSeleccionada);
+      }
+      const nombreArchivo = `Devoluciones${filtrosTexto.length > 0 ? '_' + filtrosTexto.join('_') : ''}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(workbook, nombreArchivo);
+      
+      message.success(`✅ Excel exportado: ${devoluciones.length} devoluciones`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar devoluciones a PDF
+   */
+  const exportarDevolucionesPDF = () => {
+    try {
+      if (devoluciones.length === 0) {
+        message.warning('No hay devoluciones para exportar');
+        return;
+      }
+
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('HISTORIAL DE DEVOLUCIONES', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      // Información de filtros
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+
+      if (fechaDevolucionesDesde && fechaDevolucionesHasta) {
+        doc.text(`Período: ${fechaDevolucionesDesde.format('DD/MM/YYYY')} - ${fechaDevolucionesHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      if (metodoDevolucionFiltro && metodoDevolucionFiltro !== 'todos') {
+        const metodoTexto = metodoDevolucionFiltro === 'saldo_favor' ? 'Efectivo' : 'Cuenta Corriente';
+        doc.text(`Método: ${metodoTexto}`, 14, yPos);
+        yPos += 5;
+      }
+
+      doc.text(`Total Devoluciones: ${devoluciones.length}`, 14, yPos);
+      yPos += 10;
+
+      // Tabla de devoluciones
+      const tablaDevoluciones = devoluciones.map((dev, index) => [
+        (index + 1).toString(),
+        dayjs(dev.fecha_proceso).format('DD/MM/YYYY'),
+        dev.numero_venta,
+        dev.cliente_nombre.substring(0, 20),
+        dev.producto_nombre.substring(0, 25),
+        dev.metodo_devolucion === 'saldo_favor' ? 'Efectivo' : 'C.C.',
+        dev.sucursal.toUpperCase(),
+        `$${Number(dev.monto_devuelto || 0).toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['#', 'Fecha', 'N° Venta', 'Cliente', 'Producto', 'Método', 'Sucursal', 'Monto']],
+        body: tablaDevoluciones,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [239, 68, 68],  // Rojo
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 8
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },   // #
+          1: { cellWidth: 22 },                    // Fecha
+          2: { cellWidth: 35 },                    // N° Venta
+          3: { cellWidth: 35 },                    // Cliente
+          4: { cellWidth: 50 },                    // Producto
+          5: { cellWidth: 22, halign: 'center' },  // Método
+          6: { cellWidth: 22, halign: 'center' },  // Sucursal
+          7: { cellWidth: 25, halign: 'right' }    // Monto
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        margin: { left: 14, right: 14 }
+      });
+
+      // Totales
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      
+      const totalDevuelto = devoluciones.reduce((sum, d) => sum + (Number(d.monto_devuelto) || 0), 0);
+      const devolucionesEfectivo = devoluciones.filter(d => d.metodo_devolucion === 'saldo_favor');
+      const devolucionesCuenta = devoluciones.filter(d => d.metodo_devolucion === 'cuenta_corriente');
+      
+      doc.text(`Total Devuelto: $${totalDevuelto.toFixed(2)}`, 14, finalY + 10);
+      doc.text(`En Efectivo: ${devolucionesEfectivo.length} ($${devolucionesEfectivo.reduce((s, d) => s + Number(d.monto_devuelto || 0), 0).toFixed(2)})`, 14, finalY + 16);
+      doc.text(`A Cuenta Corriente: ${devolucionesCuenta.length} ($${devolucionesCuenta.reduce((s, d) => s + Number(d.monto_devuelto || 0), 0).toFixed(2)})`, 14, finalY + 22);
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(
+          `Generado: ${dayjs().format('DD/MM/YYYY HH:mm')} | Página ${i} de ${pageCount}`,
+          doc.internal.pageSize.width / 2,
+          doc.internal.pageSize.height - 10,
+          { align: 'center' }
+        );
+      }
+
+      // Generar nombre de archivo
+      const filtrosTexto = [];
+      if (fechaDevolucionesDesde && fechaDevolucionesHasta) {
+        filtrosTexto.push(`${fechaDevolucionesDesde.format('DD-MM-YYYY')}_al_${fechaDevolucionesHasta.format('DD-MM-YYYY')}`);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtrosTexto.push(sucursalSeleccionada);
+      }
+      const nombreArchivo = `Devoluciones${filtrosTexto.length > 0 ? '_' + filtrosTexto.join('_') : ''}_${dayjs().format('DD-MM-YYYY')}.pdf`;
+
+      // Descargar PDF
+      doc.save(nombreArchivo);
+      
+      message.success(`✅ PDF exportado: ${devoluciones.length} devoluciones`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
     }
   };
 
@@ -1091,6 +1378,7 @@ const GlobalSales: React.FC = () => {
               cargarGastos();
               cargarEnvios();
               cargarComisiones();
+              cargarDevoluciones();
             }}
             style={{
               height: '100%',
@@ -2540,6 +2828,230 @@ const GlobalSales: React.FC = () => {
                         },
                       ]}
                     />
+                    </>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: 'devoluciones',
+              label: (
+                <span>
+                  <RiseOutlined style={{ transform: 'rotate(180deg)', color: '#ff4d4f' }} />
+                  {' '}Devoluciones ({devoluciones.length})
+                </span>
+              ),
+              children: (
+                <div>
+                  {loadingDevoluciones ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                      <Text>Cargando devoluciones...</Text>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Filtros */}
+                      <div style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8 }}>
+                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                          <Text strong style={{ fontSize: 13, color: '#595959' }}>
+                            🔍 Filtros de Búsqueda
+                          </Text>
+                          
+                          {/* Filtro por método de devolución */}
+                          <div>
+                            <Text style={{ fontSize: 12, color: '#8c8c8c', display: 'block', marginBottom: 6 }}>
+                              Método de Devolución:
+                            </Text>
+                            <div style={{ width: 250 }}>
+                              <ReactSelect
+                                value={{
+                                  value: metodoDevolucionFiltro,
+                                  label: metodoDevolucionFiltro === 'todos' ? 'Todos' :
+                                         metodoDevolucionFiltro === 'saldo_favor' ? '💵 Efectivo' :
+                                         '💳 Cuenta Corriente'
+                                }}
+                                onChange={(option) => {
+                                  if (option) {
+                                    setMetodoDevolucionFiltro(option.value);
+                                  }
+                                }}
+                                options={[
+                                  { value: 'todos', label: 'Todos' },
+                                  { value: 'saldo_favor', label: '💵 Efectivo' },
+                                  { value: 'cuenta_corriente', label: '💳 Cuenta Corriente' }
+                                ]}
+                                styles={customSelectStyles}
+                                isClearable={false}
+                                isSearchable={false}
+                                placeholder="Seleccionar método"
+                                noOptionsMessage={() => 'No hay opciones'}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Filtro por fecha */}
+                          <div>
+                            <Text style={{ fontSize: 12, color: '#8c8c8c', display: 'block', marginBottom: 6 }}>
+                              Rango de Fechas:
+                            </Text>
+                            <Space>
+                              <DatePicker.RangePicker
+                                value={[fechaDevolucionesDesde, fechaDevolucionesHasta]}
+                                onChange={(dates) => {
+                                  setFechaDevolucionesDesde(dates ? dates[0] : null);
+                                  setFechaDevolucionesHasta(dates ? dates[1] : null);
+                                }}
+                                format="DD/MM/YYYY"
+                                placeholder={['Desde', 'Hasta']}
+                                style={{ width: 280 }}
+                              />
+                              <Button
+                                type="primary"
+                                icon={<CalendarOutlined />}
+                                onClick={() => cargarDevoluciones(true)}
+                                loading={loadingDevoluciones}
+                                style={{ background: '#ff4d4f', borderColor: '#ff4d4f' }}
+                              >
+                                Filtrar
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setFechaDevolucionesDesde(fechaDesde);
+                                  setFechaDevolucionesHasta(fechaHasta);
+                                  setMetodoDevolucionFiltro('todos');
+                                  cargarDevoluciones(false);
+                                }}
+                                disabled={loadingDevoluciones}
+                              >
+                                Restablecer
+                              </Button>
+                            </Space>
+                          </div>
+                        </Space>
+                      </div>
+                      
+                      {/* Botones de Exportación */}
+                      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <Button 
+                          icon={<FileExcelOutlined />} 
+                          style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                          onClick={exportarDevolucionesExcel}
+                          disabled={loadingDevoluciones || devoluciones.length === 0}
+                        >
+                          Exportar Excel
+                        </Button>
+                        <Button 
+                          icon={<FilePdfOutlined />} 
+                          style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                          onClick={exportarDevolucionesPDF}
+                          disabled={loadingDevoluciones || devoluciones.length === 0}
+                        >
+                          Exportar PDF
+                        </Button>
+                      </div>
+                      
+                      {/* Estadísticas */}
+                      <div style={{ marginBottom: 16 }}>
+                        <Space size="large">
+                          <Statistic
+                            title="Total Devuelto"
+                            value={formatearDinero(
+                              devoluciones.reduce((sum, d) => sum + (Number(d.monto_devuelto) || 0), 0)
+                            )}
+                            valueStyle={{ color: '#ff4d4f' }}
+                          />
+                          <Statistic
+                            title="Devoluciones"
+                            value={devoluciones.length}
+                            valueStyle={{ color: '#1890ff' }}
+                          />
+                          <Statistic
+                            title="En Efectivo"
+                            value={devoluciones.filter(d => d.metodo_devolucion === 'saldo_favor').length}
+                            valueStyle={{ color: '#52c41a' }}
+                          />
+                          <Statistic
+                            title="A Cuenta Corriente"
+                            value={devoluciones.filter(d => d.metodo_devolucion === 'cuenta_corriente').length}
+                            valueStyle={{ color: '#722ed1' }}
+                          />
+                        </Space>
+                      </div>
+                      
+                      <Table
+                        dataSource={devoluciones}
+                        rowKey="id"
+                        size="small"
+                        pagination={{ pageSize: 10, showSizeChanger: false }}
+                        columns={[
+                          {
+                            title: 'Fecha',
+                            dataIndex: 'fecha_proceso',
+                            key: 'fecha_proceso',
+                            width: 100,
+                            render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY'),
+                          },
+                          {
+                            title: 'N° Venta',
+                            dataIndex: 'numero_venta',
+                            key: 'numero_venta',
+                            width: 140,
+                            render: (numero: string) => (
+                              <Text strong style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                                {numero}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: 'Cliente',
+                            dataIndex: 'cliente_nombre',
+                            key: 'cliente_nombre',
+                            ellipsis: true,
+                          },
+                          {
+                            title: 'Producto',
+                            dataIndex: 'producto_nombre',
+                            key: 'producto_nombre',
+                            ellipsis: true,
+                          },
+                          {
+                            title: 'Método',
+                            dataIndex: 'metodo_devolucion',
+                            key: 'metodo_devolucion',
+                            width: 150,
+                            render: (metodo: string) => {
+                              if (metodo === 'saldo_favor') {
+                                return <Tag color="green">💵 Efectivo</Tag>;
+                              } else if (metodo === 'cuenta_corriente') {
+                                return <Tag color="purple">💳 Cuenta Corriente</Tag>;
+                              }
+                              return <Tag>{metodo}</Tag>;
+                            },
+                          },
+                          {
+                            title: 'Sucursal',
+                            dataIndex: 'sucursal',
+                            key: 'sucursal',
+                            width: 100,
+                            render: (sucursal: string) => (
+                              <Tag color="blue">{sucursal?.toUpperCase()}</Tag>
+                            ),
+                          },
+                          {
+                            title: 'Monto',
+                            dataIndex: 'monto_devuelto',
+                            key: 'monto_devuelto',
+                            align: 'right',
+                            width: 120,
+                            render: (monto: number) => (
+                              <Text strong style={{ color: '#ff4d4f' }}>
+                                {formatearDinero(monto)}
+                              </Text>
+                            ),
+                          },
+                        ]}
+                      />
                     </>
                   )}
                 </div>
