@@ -15,28 +15,17 @@ export const obtenerAnalisisPedidos = async (req: Request, res: Response): Promi
 
     // Construcción de filtros de fecha
     let ventasFechaCondicion = 'v.fecha_venta >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
-    let fallasFechaCondicion = '';
     
     const queryParams: any[] = [];
     
     if (fecha_desde && fecha_hasta) {
       ventasFechaCondicion = 'v.fecha_venta BETWEEN ? AND ?';
       queryParams.push(fecha_desde, fecha_hasta);
-      
-      // Para fallas: contar las registradas en el rango de fechas
-      fallasFechaCondicion = `
-        AND (SELECT COUNT(*) 
-             FROM historial_stock hs 
-             WHERE hs.producto_id = ps.producto_id 
-             AND hs.sucursal = ps.sucursal
-             AND hs.tipo_movimiento = 'falla_registrada'
-             AND hs.fecha BETWEEN ? AND ?
-            )
-      `;
-      queryParams.push(fecha_desde, fecha_hasta);
     }
 
     // Query para obtener todos los productos con stock agregado, ventas y fallas
+    // NOTA: Las fallas no se filtran por fecha ya que no hay historial de registro de fallas
+    // Solo se muestra el stock de fallas actual
     const query = `
       SELECT 
         p.id,
@@ -59,18 +48,8 @@ export const obtenerAnalisisPedidos = async (req: Request, res: Response): Promi
           ), 0
         ) as ventas_periodo,
         
-        -- Fallas totales (actuales o filtradas por fecha)
-        ${fecha_desde && fecha_hasta 
-          ? `COALESCE(
-              (SELECT COUNT(*) 
-               FROM historial_stock hs 
-               WHERE hs.producto_id = p.id
-               AND hs.tipo_movimiento = 'falla_registrada'
-               AND hs.fecha BETWEEN ? AND ?
-              ), 0
-            )`
-          : `COALESCE(SUM(ps.stock_fallas), 0)`
-        } as fallas_periodo,
+        -- Fallas totales (stock de fallas actual, no histórico por fecha)
+        COALESCE(SUM(ps.stock_fallas), 0) as fallas_periodo,
         
         -- Stock mínimo (tomamos el máximo de todos los configurados)
         COALESCE(MAX(ps.stock_minimo), 0) as stock_minimo
@@ -81,11 +60,6 @@ export const obtenerAnalisisPedidos = async (req: Request, res: Response): Promi
       GROUP BY p.id, p.nombre, p.marca, p.tipo, p.calidad, p.codigo_barras
       ORDER BY p.tipo ASC, p.marca ASC, p.nombre ASC
     `;
-
-    // Agregar parámetros de fecha para fallas si aplica
-    if (fecha_desde && fecha_hasta) {
-      queryParams.push(fecha_desde, fecha_hasta);
-    }
 
     const [productos] = await pool.execute<RowDataPacket[]>(query, queryParams);
 
