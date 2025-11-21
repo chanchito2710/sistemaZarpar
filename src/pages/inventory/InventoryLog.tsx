@@ -694,6 +694,617 @@ const GlobalSales: React.FC = () => {
   };
 
   /**
+   * ========================================
+   * FUNCIONES DE EXPORTACIÓN PARA TODOS LOS TABS
+   * ========================================
+   */
+
+  /**
+   * Exportar ventas de Efectivo a Excel
+   */
+  const exportarEfectivoExcel = () => {
+    try {
+      if (ventasEfectivo.length === 0) {
+        message.warning('No hay ventas en efectivo para exportar');
+        return;
+      }
+
+      const datosExcel = ventasEfectivo.map((venta, index) => ({
+        '#': index + 1,
+        'N° Venta': venta.numero_venta,
+        'Fecha': dayjs(venta.fecha_venta).format('DD/MM/YYYY HH:mm'),
+        'Cliente': venta.cliente_nombre || 'Venta Rápida',
+        'Sucursal': venta.sucursal.toUpperCase(),
+        'Total': Number(venta.total).toFixed(2)
+      }));
+
+      const totalEfectivo = ventasEfectivo.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'N° Venta': '',
+        'Fecha': '',
+        'Cliente': 'TOTAL:',
+        'Sucursal': '',
+        'Total': totalEfectivo.toFixed(2)
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Efectivo');
+      
+      const nombreArchivo = `Ventas_Efectivo_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+      XLSX.writeFile(workbook, nombreArchivo);
+      message.success(`✅ Excel exportado: ${ventasEfectivo.length} ventas en efectivo`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar ventas de Efectivo a PDF
+   */
+  const exportarEfectivoPDF = () => {
+    try {
+      if (ventasEfectivo.length === 0) {
+        message.warning('No hay ventas en efectivo para exportar');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('VENTAS EN EFECTIVO', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+      
+      if (fechaEfectivoDesde && fechaEfectivoHasta) {
+        doc.text(`Período: ${fechaEfectivoDesde.format('DD/MM/YYYY')} - ${fechaEfectivoHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      const tablaVentas = ventasEfectivo.map((v, i) => [
+        (i + 1).toString(),
+        v.numero_venta,
+        dayjs(v.fecha_venta).format('DD/MM/YYYY'),
+        v.cliente_nombre?.substring(0, 25) || 'Venta Rápida',
+        v.sucursal.toUpperCase(),
+        `$${Number(v.total).toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['#', 'N° Venta', 'Fecha', 'Cliente', 'Sucursal', 'Total']],
+        body: tablaVentas,
+        theme: 'striped',
+        headStyles: { fillColor: [82, 196, 26], textColor: 255 }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      const totalEfectivo = ventasEfectivo.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total: $${totalEfectivo.toFixed(2)}`, 14, finalY + 10);
+
+      doc.save(`Ventas_Efectivo_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.pdf`);
+      message.success(`✅ PDF exportado: ${ventasEfectivo.length} ventas en efectivo`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
+    }
+  };
+
+  /**
+   * Exportar ventas de Transferencia a Excel
+   */
+  const exportarTransferenciaExcel = () => {
+    try {
+      if (ventasTransferencia.length === 0) {
+        message.warning('No hay ventas por transferencia para exportar');
+        return;
+      }
+
+      const datosExcel = ventasTransferencia.map((venta, index) => ({
+        '#': index + 1,
+        'N° Venta': venta.numero_venta,
+        'Fecha': dayjs(venta.fecha_venta).format('DD/MM/YYYY HH:mm'),
+        'Cliente': venta.cliente_nombre || 'Venta Rápida',
+        'Sucursal': venta.sucursal.toUpperCase(),
+        'Total': Number(venta.total).toFixed(2)
+      }));
+
+      const totalTransferencia = ventasTransferencia.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'N° Venta': '',
+        'Fecha': '',
+        'Cliente': 'TOTAL:',
+        'Sucursal': '',
+        'Total': totalTransferencia.toFixed(2)
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Transferencia');
+      
+      const nombreArchivo = `Ventas_Transferencia_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+      XLSX.writeFile(workbook, nombreArchivo);
+      message.success(`✅ Excel exportado: ${ventasTransferencia.length} ventas por transferencia`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar ventas de Transferencia a PDF
+   */
+  const exportarTransferenciaPDF = () => {
+    try {
+      if (ventasTransferencia.length === 0) {
+        message.warning('No hay ventas por transferencia para exportar');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('VENTAS POR TRANSFERENCIA', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+      
+      if (fechaTransferenciaDesde && fechaTransferenciaHasta) {
+        doc.text(`Período: ${fechaTransferenciaDesde.format('DD/MM/YYYY')} - ${fechaTransferenciaHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      const tablaVentas = ventasTransferencia.map((v, i) => [
+        (i + 1).toString(),
+        v.numero_venta,
+        dayjs(v.fecha_venta).format('DD/MM/YYYY'),
+        v.cliente_nombre?.substring(0, 25) || 'Venta Rápida',
+        v.sucursal.toUpperCase(),
+        `$${Number(v.total).toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['#', 'N° Venta', 'Fecha', 'Cliente', 'Sucursal', 'Total']],
+        body: tablaVentas,
+        theme: 'striped',
+        headStyles: { fillColor: [250, 173, 20], textColor: 255 }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      const totalTransferencia = ventasTransferencia.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total: $${totalTransferencia.toFixed(2)}`, 14, finalY + 10);
+
+      doc.save(`Ventas_Transferencia_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.pdf`);
+      message.success(`✅ PDF exportado: ${ventasTransferencia.length} ventas por transferencia`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
+    }
+  };
+
+  /**
+   * Exportar ventas de Cuenta Corriente a Excel
+   */
+  const exportarCuentaCorrienteExcel = () => {
+    try {
+      if (ventasCuentaCorriente.length === 0) {
+        message.warning('No hay ventas en cuenta corriente para exportar');
+        return;
+      }
+
+      const datosExcel = ventasCuentaCorriente.map((venta, index) => ({
+        '#': index + 1,
+        'N° Venta': venta.numero_venta,
+        'Fecha': dayjs(venta.fecha_venta).format('DD/MM/YYYY HH:mm'),
+        'Cliente': venta.cliente_nombre || 'Venta Rápida',
+        'Sucursal': venta.sucursal.toUpperCase(),
+        'Estado': venta.estado_pago?.toUpperCase() || 'COMPLETADO',
+        'Total': Number(venta.total).toFixed(2)
+      }));
+
+      const totalCuentaCorriente = ventasCuentaCorriente.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'N° Venta': '',
+        'Fecha': '',
+        'Cliente': '',
+        'Sucursal': 'TOTAL:',
+        'Estado': '',
+        'Total': totalCuentaCorriente.toFixed(2)
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Cuenta Corriente');
+      
+      const nombreArchivo = `Ventas_CuentaCorriente_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+      XLSX.writeFile(workbook, nombreArchivo);
+      message.success(`✅ Excel exportado: ${ventasCuentaCorriente.length} ventas en cuenta corriente`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar ventas de Cuenta Corriente a PDF
+   */
+  const exportarCuentaCorrientePDF = () => {
+    try {
+      if (ventasCuentaCorriente.length === 0) {
+        message.warning('No hay ventas en cuenta corriente para exportar');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('VENTAS EN CUENTA CORRIENTE', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+      
+      if (fechaCuentaCorrienteDesde && fechaCuentaCorrienteHasta) {
+        doc.text(`Período: ${fechaCuentaCorrienteDesde.format('DD/MM/YYYY')} - ${fechaCuentaCorrienteHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      const tablaVentas = ventasCuentaCorriente.map((v, i) => [
+        (i + 1).toString(),
+        v.numero_venta,
+        dayjs(v.fecha_venta).format('DD/MM/YYYY'),
+        v.cliente_nombre?.substring(0, 20) || 'Venta Rápida',
+        v.sucursal.toUpperCase(),
+        v.estado_pago?.toUpperCase() || 'COMPLETADO',
+        `$${Number(v.total).toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['#', 'N° Venta', 'Fecha', 'Cliente', 'Sucursal', 'Estado', 'Total']],
+        body: tablaVentas,
+        theme: 'striped',
+        headStyles: { fillColor: [114, 46, 209], textColor: 255 }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      const totalCuentaCorriente = ventasCuentaCorriente.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total: $${totalCuentaCorriente.toFixed(2)}`, 14, finalY + 10);
+
+      doc.save(`Ventas_CuentaCorriente_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.pdf`);
+      message.success(`✅ PDF exportado: ${ventasCuentaCorriente.length} ventas en cuenta corriente`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
+    }
+  };
+
+  /**
+   * Exportar Gastos a Excel
+   */
+  const exportarGastosExcel = () => {
+    try {
+      if (gastos.length === 0) {
+        message.warning('No hay gastos para exportar');
+        return;
+      }
+
+      const datosExcel = gastos.map((gasto, index) => ({
+        '#': index + 1,
+        'Fecha': dayjs(gasto.created_at).format('DD/MM/YYYY HH:mm'),
+        'Concepto': gasto.concepto,
+        'Descripción': gasto.descripcion || '-',
+        'Sucursal': gasto.sucursal?.toUpperCase() || '-',
+        'Monto': Number(gasto.monto).toFixed(2)
+      }));
+
+      const totalGastos = gastos.reduce((sum, g) => sum + (Number(g.monto) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'Fecha': '',
+        'Concepto': '',
+        'Descripción': 'TOTAL:',
+        'Sucursal': '',
+        'Monto': totalGastos.toFixed(2)
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Gastos');
+      
+      const nombreArchivo = `Gastos_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+      XLSX.writeFile(workbook, nombreArchivo);
+      message.success(`✅ Excel exportado: ${gastos.length} gastos`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar Gastos a PDF
+   */
+  const exportarGastosPDF = () => {
+    try {
+      if (gastos.length === 0) {
+        message.warning('No hay gastos para exportar');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REGISTRO DE GASTOS', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+      
+      if (fechaGastosDesde && fechaGastosHasta) {
+        doc.text(`Período: ${fechaGastosDesde.format('DD/MM/YYYY')} - ${fechaGastosHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      const tablaGastos = gastos.map((g, i) => [
+        (i + 1).toString(),
+        dayjs(g.created_at).format('DD/MM/YYYY'),
+        g.concepto,
+        g.descripcion?.substring(0, 30) || '-',
+        g.sucursal?.toUpperCase() || '-',
+        `$${Number(g.monto).toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['#', 'Fecha', 'Concepto', 'Descripción', 'Sucursal', 'Monto']],
+        body: tablaGastos,
+        theme: 'striped',
+        headStyles: { fillColor: [239, 68, 68], textColor: 255 }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      const totalGastos = gastos.reduce((sum, g) => sum + (Number(g.monto) || 0), 0);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total: $${totalGastos.toFixed(2)}`, 14, finalY + 10);
+
+      doc.save(`Gastos_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.pdf`);
+      message.success(`✅ PDF exportado: ${gastos.length} gastos`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
+    }
+  };
+
+  /**
+   * Exportar Envíos de Dinero a Excel
+   */
+  const exportarEnviosExcel = () => {
+    try {
+      if (envios.length === 0) {
+        message.warning('No hay envíos de dinero para exportar');
+        return;
+      }
+
+      const datosExcel = envios.map((envio, index) => ({
+        '#': index + 1,
+        'Fecha': dayjs(envio.created_at).format('DD/MM/YYYY HH:mm'),
+        'Descripción': envio.concepto || '-',
+        'Sucursal': envio.sucursal?.toUpperCase() || '-',
+        'Monto': Number(envio.monto).toFixed(2)
+      }));
+
+      const totalEnvios = envios.reduce((sum, e) => sum + (Number(e.monto) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'Fecha': '',
+        'Descripción': 'TOTAL:',
+        'Sucursal': '',
+        'Monto': totalEnvios.toFixed(2)
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Envios');
+      
+      const nombreArchivo = `Envios_Dinero_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+      XLSX.writeFile(workbook, nombreArchivo);
+      message.success(`✅ Excel exportado: ${envios.length} envíos de dinero`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar Envíos de Dinero a PDF
+   */
+  const exportarEnviosPDF = () => {
+    try {
+      if (envios.length === 0) {
+        message.warning('No hay envíos de dinero para exportar');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ENVÍOS DE DINERO', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+      
+      if (fechaEnviosDesde && fechaEnviosHasta) {
+        doc.text(`Período: ${fechaEnviosDesde.format('DD/MM/YYYY')} - ${fechaEnviosHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      const tablaEnvios = envios.map((e, i) => [
+        (i + 1).toString(),
+        dayjs(e.created_at).format('DD/MM/YYYY'),
+        e.concepto?.substring(0, 40) || '-',
+        e.sucursal?.toUpperCase() || '-',
+        `$${Number(e.monto).toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['#', 'Fecha', 'Descripción', 'Sucursal', 'Monto']],
+        body: tablaEnvios,
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246], textColor: 255 }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      const totalEnvios = envios.reduce((sum, e) => sum + (Number(e.monto) || 0), 0);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total: $${totalEnvios.toFixed(2)}`, 14, finalY + 10);
+
+      doc.save(`Envios_Dinero_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.pdf`);
+      message.success(`✅ PDF exportado: ${envios.length} envíos de dinero`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
+    }
+  };
+
+  /**
+   * Exportar Comisiones a Excel
+   */
+  const exportarComisionesExcel = () => {
+    try {
+      if (comisiones.length === 0) {
+        message.warning('No hay comisiones para exportar');
+        return;
+      }
+
+      const datosExcel = comisiones.map((comision, index) => ({
+        '#': index + 1,
+        'Fecha': dayjs(comision.fecha).format('DD/MM/YYYY'),
+        'Comisionista': `${comision.vendedor_nombre} ${comision.vendedor_apellido}`,
+        'Sucursal': comision.sucursal?.toUpperCase() || '-',
+        'Monto': Number(comision.monto).toFixed(2),
+        'Notas': comision.notas || '-'
+      }));
+
+      const totalComisiones = comisiones.reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'Fecha': '',
+        'Comisionista': '',
+        'Sucursal': 'TOTAL:',
+        'Monto': totalComisiones.toFixed(2),
+        'Notas': ''
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Comisiones');
+      
+      const nombreArchivo = `Comisiones_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+      XLSX.writeFile(workbook, nombreArchivo);
+      message.success(`✅ Excel exportado: ${comisiones.length} comisiones`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar Comisiones a PDF
+   */
+  const exportarComisionesPDF = () => {
+    try {
+      if (comisiones.length === 0) {
+        message.warning('No hay comisiones para exportar');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REGISTRO DE COMISIONES', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+      
+      if (fechaComisionesDesde && fechaComisionesHasta) {
+        doc.text(`Período: ${fechaComisionesDesde.format('DD/MM/YYYY')} - ${fechaComisionesHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      const tablaComisiones = comisiones.map((c, i) => [
+        (i + 1).toString(),
+        dayjs(c.fecha).format('DD/MM/YYYY'),
+        `${c.vendedor_nombre} ${c.vendedor_apellido}`,
+        c.sucursal?.toUpperCase() || '-',
+        `$${Number(c.monto).toFixed(2)}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 5,
+        head: [['#', 'Fecha', 'Comisionista', 'Sucursal', 'Monto']],
+        body: tablaComisiones,
+        theme: 'striped',
+        headStyles: { fillColor: [82, 196, 26], textColor: 255 }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      const totalComisiones = comisiones.reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total: $${totalComisiones.toFixed(2)}`, 14, finalY + 10);
+
+      doc.save(`Comisiones_${sucursalSeleccionada}_${dayjs().format('DD-MM-YYYY')}.pdf`);
+      message.success(`✅ PDF exportado: ${comisiones.length} comisiones`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
+    }
+  };
+
+  /**
    * Cargar ventas detalladas con filtros
    */
   const cargarVentas = async () => {
@@ -2025,6 +2636,26 @@ const GlobalSales: React.FC = () => {
                     </Space>
                   </div>
                   
+                  {/* Botones de Exportación */}
+                  <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <Button 
+                      icon={<FileExcelOutlined />} 
+                      style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                      onClick={exportarEfectivoExcel}
+                      disabled={ventasEfectivo.length === 0}
+                    >
+                      Exportar Excel
+                    </Button>
+                    <Button 
+                      icon={<FilePdfOutlined />} 
+                      style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                      onClick={exportarEfectivoPDF}
+                      disabled={ventasEfectivo.length === 0}
+                    >
+                      Exportar PDF
+                    </Button>
+                  </div>
+                  
                   {/* Estadísticas */}
                   <div style={{ marginBottom: 16 }}>
                     <Space size="large">
@@ -2163,6 +2794,26 @@ const GlobalSales: React.FC = () => {
                     </Space>
                   </div>
                   
+                  {/* Botones de Exportación */}
+                  <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <Button 
+                      icon={<FileExcelOutlined />} 
+                      style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                      onClick={exportarTransferenciaExcel}
+                      disabled={ventasTransferencia.length === 0}
+                    >
+                      Exportar Excel
+                    </Button>
+                    <Button 
+                      icon={<FilePdfOutlined />} 
+                      style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                      onClick={exportarTransferenciaPDF}
+                      disabled={ventasTransferencia.length === 0}
+                    >
+                      Exportar PDF
+                    </Button>
+                  </div>
+                  
                   {/* Estadísticas */}
                   <div style={{ marginBottom: 16 }}>
                     <Space size="large">
@@ -2299,6 +2950,26 @@ const GlobalSales: React.FC = () => {
                         </Button>
                       </Space>
                     </Space>
+                  </div>
+                  
+                  {/* Botones de Exportación */}
+                  <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <Button 
+                      icon={<FileExcelOutlined />} 
+                      style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                      onClick={exportarCuentaCorrienteExcel}
+                      disabled={ventasCuentaCorriente.length === 0}
+                    >
+                      Exportar Excel
+                    </Button>
+                    <Button 
+                      icon={<FilePdfOutlined />} 
+                      style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                      onClick={exportarCuentaCorrientePDF}
+                      disabled={ventasCuentaCorriente.length === 0}
+                    >
+                      Exportar PDF
+                    </Button>
                   </div>
                   
                   {/* Estadísticas */}
@@ -2501,6 +3172,26 @@ const GlobalSales: React.FC = () => {
                         </Space>
                       </div>
                       
+                      {/* Botones de Exportación */}
+                      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <Button 
+                          icon={<FileExcelOutlined />} 
+                          style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                          onClick={exportarGastosExcel}
+                          disabled={loadingGastos || gastos.length === 0}
+                        >
+                          Exportar Excel
+                        </Button>
+                        <Button 
+                          icon={<FilePdfOutlined />} 
+                          style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                          onClick={exportarGastosPDF}
+                          disabled={loadingGastos || gastos.length === 0}
+                        >
+                          Exportar PDF
+                        </Button>
+                      </div>
+                      
                       {/* Estadísticas */}
                       <div style={{ marginBottom: 16 }}>
                         <Space size="large">
@@ -2628,6 +3319,26 @@ const GlobalSales: React.FC = () => {
                         </Space>
                       </div>
                       
+                      {/* Botones de Exportación */}
+                      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <Button 
+                          icon={<FileExcelOutlined />} 
+                          style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                          onClick={exportarEnviosExcel}
+                          disabled={loadingEnvios || envios.length === 0}
+                        >
+                          Exportar Excel
+                        </Button>
+                        <Button 
+                          icon={<FilePdfOutlined />} 
+                          style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                          onClick={exportarEnviosPDF}
+                          disabled={loadingEnvios || envios.length === 0}
+                        >
+                          Exportar PDF
+                        </Button>
+                      </div>
+                      
                       {/* Estadísticas */}
                       <div style={{ marginBottom: 16 }}>
                         <Space size="large">
@@ -2753,6 +3464,26 @@ const GlobalSales: React.FC = () => {
                           </Button>
                         </Space>
                       </Space>
+                    </div>
+                    
+                    {/* Botones de Exportación */}
+                    <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <Button 
+                        icon={<FileExcelOutlined />} 
+                        style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                        onClick={exportarComisionesExcel}
+                        disabled={loadingComisiones || comisiones.length === 0}
+                      >
+                        Exportar Excel
+                      </Button>
+                      <Button 
+                        icon={<FilePdfOutlined />} 
+                        style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                        onClick={exportarComisionesPDF}
+                        disabled={loadingComisiones || comisiones.length === 0}
+                      >
+                        Exportar PDF
+                      </Button>
                     </div>
                     
                     {/* Estadísticas */}
