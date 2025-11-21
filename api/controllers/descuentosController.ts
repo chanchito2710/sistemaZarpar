@@ -67,6 +67,7 @@ export const obtenerConfiguracionDescuentos = async (req: Request, res: Response
     );
     
     console.log('🎯 [DESCUENTOS] Total configuraciones finales:', configuracionesFinales.length);
+    console.log('📋 [DESCUENTOS] Datos a enviar:', JSON.stringify(configuracionesFinales, null, 2));
 
     res.status(200).json({
       success: true,

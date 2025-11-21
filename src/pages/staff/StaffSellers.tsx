@@ -1765,7 +1765,8 @@ const StaffSellers: React.FC = () => {
               </>
             ),
           },
-          {
+          // ⭐ Tab "Descuentos" SOLO para administradores
+          esAdministrador && {
             key: 'descuentos',
             label: (
               <Space>
@@ -2057,7 +2058,7 @@ const StaffSellers: React.FC = () => {
               </>
             ),
           },
-        ]}
+        ].filter(Boolean)} // Filtrar tabs nulos (para condicionales)
       />
 
       {/* Modal: Editar Comisión */}
