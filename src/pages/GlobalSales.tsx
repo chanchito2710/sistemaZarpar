@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   Table,
@@ -46,10 +47,12 @@ import {
   RiseOutlined,
   FallOutlined,
   BankOutlined,
+  ShoppingCartOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import { ventasService, vendedoresService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import './GlobalSales.css';
 
 // URL de la API - detecta automáticamente el entorno
@@ -105,6 +108,9 @@ const formatearDinero = (valor: number | string | null | undefined): string => {
  * Componente Principal
  */
 const GlobalSales: React.FC = () => {
+  const navigate = useNavigate();
+  const { usuario } = useAuth();
+  
   // Estados para filtros
   const [fechaDesde, setFechaDesde] = useState<Dayjs | null>(null);
   const [fechaHasta, setFechaHasta] = useState<Dayjs | null>(null);
@@ -950,6 +956,48 @@ const GlobalSales: React.FC = () => {
           </Button>
         </Col>
       </Row>
+
+      {/* Botón de Analizar Pedidos - Solo Admin */}
+      {usuario?.esAdmin && (
+        <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+          <Col xs={24}>
+            <Button
+              size="large"
+              block
+              onClick={() => navigate('/orders/analysis')}
+              style={{
+                height: 100,
+                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                border: 'none',
+                color: 'white',
+                fontSize: 16,
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 8,
+                boxShadow: '0 4px 12px rgba(245, 87, 108, 0.3)',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 87, 108, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 87, 108, 0.3)';
+              }}
+            >
+              <ShoppingCartOutlined style={{ fontSize: 32 }} />
+              <span>🛒 Analizar Pedidos</span>
+              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>
+                Gestión de pedidos a proveedores
+              </Text>
+            </Button>
+          </Col>
+        </Row>
+      )}
 
       {/* Ranking de Sucursales con Gráfica de Barras */}
       {sucursalesStats.length > 0 && (

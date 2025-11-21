@@ -41,6 +41,7 @@ import devolucionesRoutes from './routes/devoluciones.js'
 import descuentosRoutes from './routes/descuentos.js'
 import historialStockRoutes from './routes/historialStock.js'
 import enviosFallasRoutes from './routes/enviosFallas.js'
+import pedidosRoutes from './routes/pedidos.js'
 
 // En CommonJS, __filename y __dirname ya están disponibles globalmente
 // No necesitamos definirlos manualmente
@@ -115,6 +116,7 @@ app.use('/api/devoluciones', devolucionesRoutes)
 app.use('/api/descuentos', descuentosRoutes)
 app.use('/api/historial-stock', historialStockRoutes)
 app.use('/api/envios-fallas', enviosFallasRoutes)
+app.use('/api/pedidos', pedidosRoutes)
 
 /**
  * health

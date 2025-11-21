@@ -33,6 +33,7 @@ import DatabaseManager from './pages/admin/DatabaseManager';
 import ProtectedDatabaseRoute from './components/ProtectedDatabaseRoute';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import StaffSellers from './pages/staff/StaffSellers';
+import OrderAnalysis from './pages/orders/OrderAnalysis';
 import esES from 'antd/locale/es_ES';
 import 'dayjs/locale/es';
 
@@ -83,6 +84,13 @@ function App() {
                 
                 {/* Todos: Ver lista de precios */}
                 <Route path="products/prices" element={<ProductPrices />} />
+                
+                {/* Solo Admin: Análisis de Pedidos a Proveedores */}
+                <Route path="orders/analysis" element={
+                  <ProtectedRoute requireAdmin={true}>
+                    <OrderAnalysis />
+                  </ProtectedRoute>
+                } />
                 
                 {/* ==================== MÓDULO DE CLIENTES ==================== */}
                 <Route path="customers" element={<Customers />} />
