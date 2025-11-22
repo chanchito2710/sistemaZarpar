@@ -79,7 +79,9 @@ export const crearBackupManualHandler = async (req: Request, res: Response) => {
  */
 export const listarBackupsHandler = async (req: Request, res: Response) => {
   try {
+    console.log('📋 [BACKUPS] Iniciando listar backups...');
     const backups = await listarBackups();
+    console.log(`✅ [BACKUPS] Backups obtenidos: ${backups.length}`);
     
     res.json({
       success: true,
@@ -87,7 +89,8 @@ export const listarBackupsHandler = async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    console.error('Error al listar backups:', error);
+    console.error('❌ [BACKUPS] Error al listar backups:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Error al listar backups',
@@ -220,7 +223,9 @@ export const eliminarBackupHandler = async (req: Request, res: Response) => {
  */
 export const obtenerEstadisticasHandler = async (req: Request, res: Response) => {
   try {
+    console.log('📊 [BACKUPS] Iniciando obtener estadísticas...');
     const stats = await obtenerEstadisticas();
+    console.log('✅ [BACKUPS] Estadísticas obtenidas:', stats);
     
     res.json({
       success: true,
@@ -228,7 +233,8 @@ export const obtenerEstadisticasHandler = async (req: Request, res: Response) =>
     });
     
   } catch (error: any) {
-    console.error('Error al obtener estadísticas:', error);
+    console.error('❌ [BACKUPS] Error al obtener estadísticas:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Error al obtener estadísticas',

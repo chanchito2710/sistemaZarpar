@@ -356,6 +356,7 @@ export async function restaurarBackup(filename: string, usuario_email: string): 
  */
 export async function listarBackups(): Promise<any[]> {
   try {
+    console.log('🔍 [SERVICE] Ejecutando query para listar backups...');
     const [backups]: any = await pool.execute(`
       SELECT 
         filename,
@@ -369,18 +370,26 @@ export async function listarBackups(): Promise<any[]> {
       ORDER BY created_at DESC
     `);
     
+    console.log(`📦 [SERVICE] Backups encontrados en BD: ${backups.length}`);
+    
     // Contar total para saber cuál es el último
     const totalBackups = backups.length;
     
-    return backups.map((backup: any, index: number) => ({
+    const resultado = backups.map((backup: any, index: number) => ({
       ...backup,
       tamano_formateado: formatBytes(backup.tamano_bytes),
       edad_dias: Math.floor((Date.now() - new Date(backup.created_at).getTime()) / (24 * 60 * 60 * 1000)),
       esUltimoBackup: index === 0 // El primero es el más reciente
     }));
     
+    console.log('✅ [SERVICE] Backups procesados correctamente');
+    return resultado;
+    
   } catch (error: any) {
-    console.error('Error al listar backups:', error);
+    console.error('❌ [SERVICE] Error al listar backups:', error);
+    console.error('Mensaje:', error.message);
+    console.error('SQL State:', error.sqlState);
+    console.error('SQL Message:', error.sqlMessage);
     throw error;
   }
 }
@@ -441,6 +450,7 @@ export async function eliminarBackup(filename: string, usuario_email: string): P
  */
 export async function obtenerEstadisticas(): Promise<any> {
   try {
+    console.log('📊 [SERVICE] Obteniendo estadísticas de backups...');
     const [stats]: any = await pool.execute(`
       SELECT 
         COUNT(*) as total_backups,
@@ -451,7 +461,10 @@ export async function obtenerEstadisticas(): Promise<any> {
       FROM backups_metadata
     `);
     
+    console.log('📈 [SERVICE] Stats de backups:', stats[0]);
+    
     // Obtener tamaño de la base de datos actual
+    console.log('💾 [SERVICE] Obteniendo tamaño de BD...');
     const [dbSize]: any = await pool.execute(`
       SELECT 
         SUM(data_length + index_length) as size
@@ -459,7 +472,9 @@ export async function obtenerEstadisticas(): Promise<any> {
       WHERE table_schema = ?
     `, [DB_NAME]);
     
-    return {
+    console.log('💽 [SERVICE] Tamaño BD:', dbSize[0]);
+    
+    const resultado = {
       total_backups: stats[0].total_backups || 0,
       tamano_total: formatBytes(stats[0].tamano_total || 0),
       tamano_total_bytes: stats[0].tamano_total || 0,
@@ -471,8 +486,14 @@ export async function obtenerEstadisticas(): Promise<any> {
       proximo_backup_automatico: getProximoBackup()
     };
     
+    console.log('✅ [SERVICE] Estadísticas generadas:', resultado);
+    return resultado;
+    
   } catch (error: any) {
-    console.error('Error al obtener estadísticas:', error);
+    console.error('❌ [SERVICE] Error al obtener estadísticas:', error);
+    console.error('Mensaje:', error.message);
+    console.error('SQL State:', error.sqlState);
+    console.error('SQL Message:', error.sqlMessage);
     throw error;
   }
 }
