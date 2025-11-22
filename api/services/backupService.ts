@@ -40,15 +40,22 @@ async function ejecutarMysqlDump(filename: string): Promise<string> {
   const filepath = path.join(BACKUP_DIR, filename);
   
   // Detectar si estamos en desarrollo (Docker) o producción
-  const isDocker = DB_HOST === 'localhost' && DB_PORT === '3307';
+  // En desarrollo: localhost o 127.0.0.1 con puerto 3307 = Docker
+  const isLocalhost = DB_HOST === 'localhost' || DB_HOST === '127.0.0.1';
+  const isDockerPort = DB_PORT === '3307' || DB_PORT === 3307;
+  const isDocker = isLocalhost && isDockerPort;
+  
+  console.log(`🔍 Detección Docker: HOST=${DB_HOST}, PORT=${DB_PORT}, isDocker=${isDocker}`);
   
   let command: string;
   
   if (isDocker) {
     // En desarrollo: Usar Docker exec (sin redirección >)
+    console.log('🐳 Usando Docker exec para mysqldump');
     command = `docker exec zarpar-mysql mysqldump -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME}`;
   } else {
     // En producción: Usar mysqldump directo (sin redirección >)
+    console.log('☁️ Usando mysqldump directo (Railway)');
     command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME}`;
   }
   
