@@ -22,9 +22,21 @@ router.use(verificarAutenticacion);
 
 // Middleware: Verificar que el usuario es admin
 router.use((req, res, next) => {
-  const usuario: any = (req as any).user;
+  const usuario: any = (req as any).usuario; // ✅ Corregido: era 'user', debe ser 'usuario'
+  
+  if (!usuario) {
+    console.log('❌ Usuario no encontrado en req.usuario');
+    return res.status(401).json({
+      success: false,
+      error: 'Usuario no autenticado',
+      message: 'Por favor, inicia sesión'
+    });
+  }
+  
+  console.log('✅ Usuario autenticado:', usuario.email);
   
   if (usuario.email !== 'admin@zarparuy.com') {
+    console.log('❌ Usuario no es admin:', usuario.email);
     return res.status(403).json({
       success: false,
       error: 'No tienes permisos para acceder a esta función',
@@ -32,6 +44,7 @@ router.use((req, res, next) => {
     });
   }
   
+  console.log('✅ Admin verificado:', usuario.email);
   next();
 });
 

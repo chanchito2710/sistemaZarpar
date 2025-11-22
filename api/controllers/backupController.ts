@@ -24,7 +24,7 @@ const BACKUP_DIR = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups')
 export const crearBackupManualHandler = async (req: Request, res: Response) => {
   try {
     const { nombre, nota } = req.body;
-    const usuario: any = (req as any).user;
+    const usuario: any = (req as any).usuario; // ✅ Corregido: era 'user', debe ser 'usuario'
     
     // Validar nombre personalizado
     if (nombre && nombre.length > 255) {
@@ -106,7 +106,7 @@ export const listarBackupsHandler = async (req: Request, res: Response) => {
 export const restaurarBackupHandler = async (req: Request, res: Response) => {
   try {
     const { filename } = req.params;
-    const usuario: any = (req as any).user;
+    const usuario: any = (req as any).usuario; // ✅ Corregido: era 'user', debe ser 'usuario'
     
     // Validar que el archivo existe en la BD
     const backups = await listarBackups();
@@ -188,7 +188,7 @@ export const descargarBackupHandler = async (req: Request, res: Response) => {
 export const eliminarBackupHandler = async (req: Request, res: Response) => {
   try {
     const { filename } = req.params;
-    const usuario: any = (req as any).user;
+    const usuario: any = (req as any).usuario; // ✅ Corregido: era 'user', debe ser 'usuario'
     
     // Eliminar
     await eliminarBackup(filename, usuario.email);
