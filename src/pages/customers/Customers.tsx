@@ -1460,7 +1460,21 @@ const Customers: React.FC = () => {
           </Space>
         }
         placement="right"
-        onClose={() => setDrawerVisible(false)}
+        onClose={() => {
+          setDrawerVisible(false);
+          // Limpiar cache para que la próxima vez recargue los datos
+          setTabsCargadas(new Set());
+          // Limpiar datos del cliente actual
+          setClienteAnalisis(null);
+          setVentasGlobalesCliente([]);
+          setPagosCliente([]);
+          setReemplazosCliente([]);
+          setProductosCliente([]);
+          setSaldoCuentaCorriente(0);
+          setContadorPagos(0);
+          setContadorProductos(0);
+          setContadorDevoluciones(0);
+        }}
         open={drawerVisible}
         width="90%"
       >
