@@ -34,12 +34,23 @@ if (!fs.existsSync(BACKUP_DIR)) {
 
 /**
  * Ejecutar mysqldump y crear archivo de backup
+ * Usa Docker en desarrollo y mysqldump directo en producción
  */
 async function ejecutarMysqlDump(filename: string): Promise<string> {
   const filepath = path.join(BACKUP_DIR, filename);
   
-  // Comando mysqldump con todas las opciones necesarias
-  const command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME} > "${filepath}"`;
+  // Detectar si estamos en desarrollo (Docker) o producción
+  const isDocker = DB_HOST === 'localhost' && DB_PORT === '3307';
+  
+  let command: string;
+  
+  if (isDocker) {
+    // En desarrollo: Usar Docker exec
+    command = `docker exec zarpar-mysql mysqldump -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME} > "${filepath}"`;
+  } else {
+    // En producción: Usar mysqldump directo
+    command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME} > "${filepath}"`;
+  }
   
   try {
     await execAsync(command);
@@ -286,6 +297,7 @@ export async function crearBackupManual(data: {
 
 /**
  * Restaurar backup
+ * Usa Docker en desarrollo y mysql directo en producción
  */
 export async function restaurarBackup(filename: string, usuario_email: string): Promise<void> {
   const inicio = Date.now();
@@ -297,8 +309,18 @@ export async function restaurarBackup(filename: string, usuario_email: string): 
       throw new Error('El archivo de backup no existe');
     }
     
-    // Comando para restaurar
-    const command = `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME} < "${filepath}"`;
+    // Detectar si estamos en desarrollo (Docker) o producción
+    const isDocker = DB_HOST === 'localhost' && DB_PORT === '3307';
+    
+    let command: string;
+    
+    if (isDocker) {
+      // En desarrollo: Usar Docker exec
+      command = `docker exec -i zarpar-mysql mysql -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME} < "${filepath}"`;
+    } else {
+      // En producción: Usar mysql directo
+      command = `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME} < "${filepath}"`;
+    }
     
     await execAsync(command);
     
