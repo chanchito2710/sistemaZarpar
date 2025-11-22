@@ -459,11 +459,12 @@ const Customers: React.FC = () => {
   /**
    * Cargar contadores rápidos (pagos, productos, devoluciones) sin cargar todos los datos
    */
-  const cargarContadoresCliente = async (clienteId: number) => {
+  const cargarContadoresCliente = async (clienteId: number, sucursalEspecifica?: string) => {
     try {
-      console.log('📊 [DEBUG] Cargando contadores del cliente:', clienteId);
+      const sucursalAUsar = sucursalEspecifica || sucursalSeleccionada;
+      console.log('📊 [DEBUG] Cargando contadores del cliente:', clienteId, 'sucursal:', sucursalAUsar);
       const response = await fetch(
-        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/contadores?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/ventas/cliente/${sucursalAUsar}/${clienteId}/contadores?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -505,15 +506,20 @@ const Customers: React.FC = () => {
     setContadorProductos(0);
     setContadorDevoluciones(0);
     
+    // Determinar la sucursal del cliente (usando any para acceder a sucursal_origen dinámico)
+    const sucursalDelCliente = (cliente as any).sucursal_origen 
+      ? (cliente as any).sucursal_origen.toLowerCase() 
+      : sucursalSeleccionada;
+    
     // Si el cliente tiene sucursal_origen (modo "todas"), temporalmente cambiar la sucursal seleccionada
     // para que las funciones de carga usen la sucursal correcta
     const sucursalOriginal = sucursalSeleccionada;
-    if (cliente.sucursal_origen && sucursalSeleccionada === 'todas') {
-      setSucursalSeleccionada(cliente.sucursal_origen.toLowerCase());
+    if ((cliente as any).sucursal_origen && sucursalSeleccionada === 'todas') {
+      setSucursalSeleccionada(sucursalDelCliente);
     }
     
-    // Cargar contadores rápidamente (en paralelo)
-    cargarContadoresCliente(cliente.id);
+    // Cargar contadores rápidamente (en paralelo) - pasando la sucursal específica
+    cargarContadoresCliente(cliente.id, sucursalDelCliente);
     
     // Solo cargar los datos completos de la primera pestaña (Ventas Globales)
     await cargarDatosTabActiva('1', cliente.id);
@@ -1482,8 +1488,13 @@ const Customers: React.FC = () => {
                     icon={<CalendarOutlined />}
                     onClick={() => {
                       if (clienteAnalisis) {
-                        // Recargar contadores
-                        cargarContadoresCliente(clienteAnalisis.id);
+                        // Determinar la sucursal del cliente (usando any para acceder a sucursal_origen dinámico)
+                        const sucursalDelCliente = (clienteAnalisis as any).sucursal_origen 
+                          ? (clienteAnalisis as any).sucursal_origen.toLowerCase() 
+                          : sucursalSeleccionada;
+                        
+                        // Recargar contadores con la sucursal correcta
+                        cargarContadoresCliente(clienteAnalisis.id, sucursalDelCliente);
                         // Limpiar tabs cargadas y recargar la tab actual
                         setTabsCargadas(new Set());
                         cargarDatosTabActiva(tabDrawer, clienteAnalisis.id);
