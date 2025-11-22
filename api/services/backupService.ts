@@ -45,15 +45,27 @@ async function ejecutarMysqlDump(filename: string): Promise<string> {
   let command: string;
   
   if (isDocker) {
-    // En desarrollo: Usar Docker exec
-    command = `docker exec zarpar-mysql mysqldump -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME} > "${filepath}"`;
+    // En desarrollo: Usar Docker exec (sin redirección >)
+    command = `docker exec zarpar-mysql mysqldump -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME}`;
   } else {
-    // En producción: Usar mysqldump directo
-    command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME} > "${filepath}"`;
+    // En producción: Usar mysqldump directo (sin redirección >)
+    command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME}`;
   }
   
   try {
-    await execAsync(command);
+    console.log(`📝 Ejecutando comando: ${command.replace(/-p[^ ]+/, '-p****')}`);
+    
+    // Ejecutar comando y capturar output (sin redirección shell)
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 100 * 1024 * 1024, // 100MB buffer para DBs grandes
+    });
+    
+    // Escribir el output directamente al archivo
+    fs.writeFileSync(filepath, stdout, 'utf8');
+    
+    if (stderr && !stderr.includes('Warning')) {
+      console.warn(`⚠️ STDERR: ${stderr}`);
+    }
     
     // Verificar que el archivo se creó y no está vacío
     const stats = fs.statSync(filepath);
@@ -61,8 +73,12 @@ async function ejecutarMysqlDump(filename: string): Promise<string> {
       throw new Error('El archivo de backup está vacío');
     }
     
+    console.log(`✅ Backup creado: ${filepath} (${stats.size} bytes)`);
     return filepath;
+    
   } catch (error: any) {
+    console.error(`❌ Error en mysqldump:`, error);
+    
     // Si hay error, eliminar el archivo parcial
     if (fs.existsSync(filepath)) {
       fs.unlinkSync(filepath);
