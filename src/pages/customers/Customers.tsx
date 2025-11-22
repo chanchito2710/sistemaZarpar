@@ -522,7 +522,7 @@ const Customers: React.FC = () => {
     cargarContadoresCliente(cliente.id, sucursalDelCliente);
     
     // Solo cargar los datos completos de la primera pestaña (Ventas Globales)
-    await cargarDatosTabActiva('1', cliente.id);
+    await cargarDatosTabActiva('1', cliente.id, sucursalDelCliente);
     
     // Restaurar sucursal original
     if (cliente.sucursal_origen && sucursalOriginal === 'todas') {
@@ -533,8 +533,8 @@ const Customers: React.FC = () => {
   /**
    * Cargar datos solo de la pestaña activa (lazy loading con cache)
    */
-  const cargarDatosTabActiva = async (tab: string, clienteId: number) => {
-    console.log('🔍 [DEBUG cargarDatosTabActiva] Tab:', tab, 'Cliente ID:', clienteId);
+  const cargarDatosTabActiva = async (tab: string, clienteId: number, sucursalEspecifica?: string) => {
+    console.log('🔍 [DEBUG cargarDatosTabActiva] Tab:', tab, 'Cliente ID:', clienteId, 'Sucursal:', sucursalEspecifica);
     
     // Si ya cargamos esta pestaña, no volver a cargar
     if (tabsCargadas.has(tab)) {
@@ -548,30 +548,30 @@ const Customers: React.FC = () => {
       switch (tab) {
         case '1': // Ventas Globales
           console.log('📊 [DEBUG] Cargando Ventas Globales...');
-          await cargarVentasGlobalesCliente(clienteId);
+          await cargarVentasGlobalesCliente(clienteId, sucursalEspecifica);
           break;
         case '2': // Pagos
           console.log('💰 [DEBUG] Cargando Pagos...');
-          await cargarPagosCliente(clienteId);
+          await cargarPagosCliente(clienteId, sucursalEspecifica);
           break;
         case '3': // Reemplazos/Devoluciones
           console.log('🔄 [DEBUG] Cargando Reemplazos...');
-          await cargarReemplazosCliente(clienteId);
+          await cargarReemplazosCliente(clienteId, sucursalEspecifica);
           break;
         case '4': // Productos
           console.log('📦 [DEBUG] Cargando Productos...');
-          await cargarProductosCliente(clienteId);
+          await cargarProductosCliente(clienteId, sucursalEspecifica);
           console.log('💵 [DEBUG] Cargando Saldo Cuenta Corriente (timeout 0.5s)...');
           try {
             // Timeout de 0.5 segundos para evitar que se cuelgue
             await Promise.race([
-              cargarSaldoCuentaCorriente(clienteId),
+              cargarSaldoCuentaCorriente(clienteId, sucursalEspecifica),
               new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Timeout')), 500)
               )
             ]);
             console.log('✅ [DEBUG] Saldo cargado exitosamente');
-          } catch (saldoError) {
+          } catch (saldoError: any) {
             console.warn('⚠️ [DEBUG] Error al cargar saldo (no crítico):', saldoError.message);
             // No bloqueamos la pestaña si el saldo falla o timeout
           }
@@ -596,18 +596,24 @@ const Customers: React.FC = () => {
   const handleCambioTab = async (tab: string) => {
     setTabDrawer(tab);
     if (clienteAnalisis) {
-      await cargarDatosTabActiva(tab, clienteAnalisis.id);
+      // Determinar la sucursal del cliente (usando any para acceder a sucursal_origen dinámico)
+      const sucursalDelCliente = (clienteAnalisis as any).sucursal_origen 
+        ? (clienteAnalisis as any).sucursal_origen.toLowerCase() 
+        : sucursalSeleccionada;
+      
+      await cargarDatosTabActiva(tab, clienteAnalisis.id, sucursalDelCliente);
     }
   };
 
   /**
    * Cargar ventas globales del cliente
    */
-  const cargarVentasGlobalesCliente = async (clienteId: number) => {
+  const cargarVentasGlobalesCliente = async (clienteId: number, sucursalEspecifica?: string) => {
     try {
+      const sucursalAUsar = sucursalEspecifica || sucursalSeleccionada;
       console.log('🔍 [DEBUG Ventas Cliente] API_URL:', API_URL);
       const response = await fetch(
-        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/ventas/cliente/${sucursalAUsar}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -626,10 +632,11 @@ const Customers: React.FC = () => {
   /**
    * Cargar pagos del cliente (contado + cuenta corriente)
    */
-  const cargarPagosCliente = async (clienteId: number) => {
+  const cargarPagosCliente = async (clienteId: number, sucursalEspecifica?: string) => {
     try {
+      const sucursalAUsar = sucursalEspecifica || sucursalSeleccionada;
       const response = await fetch(
-        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/pagos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/ventas/cliente/${sucursalAUsar}/${clienteId}/pagos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -647,10 +654,11 @@ const Customers: React.FC = () => {
   /**
    * Cargar reemplazos y devoluciones del cliente
    */
-  const cargarReemplazosCliente = async (clienteId: number) => {
+  const cargarReemplazosCliente = async (clienteId: number, sucursalEspecifica?: string) => {
     try {
+      const sucursalAUsar = sucursalEspecifica || sucursalSeleccionada;
       const response = await fetch(
-        `${API_URL}/devoluciones/cliente/${sucursalSeleccionada}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        `${API_URL}/devoluciones/cliente/${sucursalAUsar}/${clienteId}?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -668,15 +676,16 @@ const Customers: React.FC = () => {
   /**
    * Cargar productos más vendidos al cliente
    */
-  const cargarProductosCliente = async (clienteId: number) => {
+  const cargarProductosCliente = async (clienteId: number, sucursalEspecifica?: string) => {
     try {
+      const sucursalAUsar = sucursalEspecifica || sucursalSeleccionada;
       console.log('🔍 [DEBUG Productos Cliente] Iniciando carga de productos');
       console.log('🔍 [DEBUG] Hostname:', window.location.hostname);
       console.log('🔍 [DEBUG] API_URL:', API_URL);
       console.log('🔍 [DEBUG] Cliente ID:', clienteId);
-      console.log('🔍 [DEBUG] Sucursal:', sucursalSeleccionada);
+      console.log('🔍 [DEBUG] Sucursal:', sucursalAUsar);
       
-      const fullURL = `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/productos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`;
+      const fullURL = `${API_URL}/ventas/cliente/${sucursalAUsar}/${clienteId}/productos?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`;
       console.log('🔍 [DEBUG] Full URL:', fullURL);
       
       const response = await fetch(
@@ -707,10 +716,11 @@ const Customers: React.FC = () => {
   /**
    * Cargar saldo de cuenta corriente del cliente
    */
-  const cargarSaldoCuentaCorriente = async (clienteId: number) => {
+  const cargarSaldoCuentaCorriente = async (clienteId: number, sucursalEspecifica?: string) => {
     try {
+      const sucursalAUsar = sucursalEspecifica || sucursalSeleccionada;
       const response = await fetch(
-        `${API_URL}/cuenta-corriente/${sucursalSeleccionada}/cliente/${clienteId}/saldo`,
+        `${API_URL}/cuenta-corriente/${sucursalAUsar}/cliente/${clienteId}/saldo`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1497,7 +1507,7 @@ const Customers: React.FC = () => {
                         cargarContadoresCliente(clienteAnalisis.id, sucursalDelCliente);
                         // Limpiar tabs cargadas y recargar la tab actual
                         setTabsCargadas(new Set());
-                        cargarDatosTabActiva(tabDrawer, clienteAnalisis.id);
+                        cargarDatosTabActiva(tabDrawer, clienteAnalisis.id, sucursalDelCliente);
                       }
                     }}
                   >
