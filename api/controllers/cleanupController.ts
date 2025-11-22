@@ -58,6 +58,58 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
     
     // LIMPIEZA POR MÓDULO
     
+    // Verificar si hay sucursales antes de ejecutar queries con IN
+    if (sucursales.length === 0) {
+      // Solo ejecutar limpiezas que no dependen de sucursales
+      if (opciones.ventas) {
+        const [resumenResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM ventas_diarias_resumen`
+        );
+        resultados.push(`✅ Resúmenes diarios eliminados: ${resumenResult.affectedRows}`);
+      }
+      
+      if (opciones.comisiones) {
+        const [histPagosResult] = await connection.execute<ResultSetHeader>(
+          'DELETE FROM historial_pagos_comisiones'
+        );
+        const [remanentesResult] = await connection.execute<ResultSetHeader>(
+          'DELETE FROM remanentes_comisiones'
+        );
+        resultados.push(`✅ Historial de pagos eliminado: ${histPagosResult.affectedRows}`);
+        resultados.push(`✅ Remanentes eliminados: ${remanentesResult.affectedRows}`);
+      }
+      
+      if (opciones.productos) {
+        // Limpieza de productos sin depender de sucursal (ya que elimina todo)
+        const [comisionesProductosResult] = await connection.execute<ResultSetHeader>(`DELETE FROM comisiones_vendedores`);
+        const [ventasDetalleResult] = await connection.execute<ResultSetHeader>(`DELETE FROM ventas_detalle`);
+        const [relacionesResult] = await connection.execute<ResultSetHeader>(`DELETE FROM productos_sucursal`);
+        const [productosResult] = await connection.execute<ResultSetHeader>(`DELETE FROM productos`);
+        
+        resultados.push(`✅ Comisiones de productos eliminadas: ${comisionesProductosResult.affectedRows} registros`);
+        resultados.push(`✅ Detalles de ventas eliminados: ${ventasDetalleResult.affectedRows} registros`);
+        resultados.push(`✅ Relaciones productos-sucursal eliminadas: ${relacionesResult.affectedRows} registros`);
+        resultados.push(`✅ Productos eliminados COMPLETAMENTE: ${productosResult.affectedRows} productos`);
+      }
+      
+      if (opciones.transferencias) {
+        const [historialTransfResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM historial_transferencias`
+        );
+        resultados.push(`✅ Historial de transferencias eliminado: ${historialTransfResult.affectedRows}`);
+      }
+
+      resultados.push('⚠️ No se detectaron sucursales (tablas clientes_*) para filtrar por sucursal.');
+      
+      await connection.commit();
+      res.status(200).json({
+        success: true,
+        message: `Limpieza parcial completada (sin sucursales): ${resultados.length} operaciones`,
+        data: { sucursales: [], resultados }
+      });
+      return;
+    }
+
     // 1. Limpiar Ventas
     if (opciones.ventas) {
       // Construir placeholders para el IN (??, ??, ??)
@@ -351,15 +403,15 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     console.log(`📋 Sucursales encontradas: ${sucursales.join(', ')}`);
     resultados.push(`📋 Sucursales detectadas: ${sucursales.length} (${sucursales.join(', ')})`);
     
-    const placeholders = sucursales.map(() => '?').join(', ');
+    const placeholders = sucursales.length > 0 ? sucursales.map(() => '?').join(', ') : '';
     
     // ========================================
     // PASO 2: BORRAR VENTAS Y DETALLES
     // ========================================
     console.log('🗑️ Borrando ventas...');
+    // En borrado maestro eliminamos TODO, sin filtrar por sucursal para limpiar también datos huérfanos
     const [ventasResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM ventas WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM ventas`
     );
     resultados.push(`✅ VENTAS eliminadas: ${ventasResult.affectedRows}`);
     
@@ -373,8 +425,7 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     // ========================================
     console.log('🗑️ Borrando devoluciones y reemplazos...');
     const [devolucionesResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM devoluciones_reemplazos WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM devoluciones_reemplazos`
     );
     resultados.push(`✅ DEVOLUCIONES Y REEMPLAZOS eliminados: ${devolucionesResult.affectedRows}`);
     
@@ -383,8 +434,7 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     // ========================================
     console.log('🗑️ Borrando transferencias...');
     const [transferenciasResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM transferencias WHERE sucursal_origen IN (${placeholders}) OR sucursal_destino IN (${placeholders})`,
-      [...sucursales, ...sucursales]
+      `DELETE FROM transferencias`
     );
     resultados.push(`✅ TRANSFERENCIAS eliminadas: ${transferenciasResult.affectedRows}`);
     
@@ -398,8 +448,7 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     // ========================================
     console.log('🗑️ Borrando movimientos de caja...');
     const [movimientosCajaResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM movimientos_caja WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM movimientos_caja`
     );
     resultados.push(`✅ MOVIMIENTOS DE CAJA eliminados: ${movimientosCajaResult.affectedRows} (envíos, gastos, ajustes)`);
     
@@ -408,8 +457,7 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     // ========================================
     console.log('🗑️ Reseteando cajas a $0...');
     const [cajaResult] = await connection.execute<ResultSetHeader>(
-      `UPDATE caja SET monto_actual = 0.00 WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `UPDATE caja SET monto_actual = 0.00`
     );
     resultados.push(`✅ CAJAS reseteadas a $0: ${cajaResult.affectedRows} sucursales`);
     
@@ -419,15 +467,12 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     console.log('🗑️ Reseteando stock y borrando historial...');
     const [stockResult] = await connection.execute<ResultSetHeader>(
       `UPDATE productos_sucursal 
-       SET stock = 0, stock_fallas = 0 
-       WHERE sucursal IN (${placeholders})`,
-      sucursales
+       SET stock = 0, stock_fallas = 0`
     );
     resultados.push(`✅ STOCK reseteado a 0: ${stockResult.affectedRows} productos-sucursal`);
     
     const [historialStockResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM historial_stock WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM historial_stock`
     );
     resultados.push(`✅ HISTORIAL DE STOCK eliminado: ${historialStockResult.affectedRows} movimientos`);
     
@@ -438,15 +483,13 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     
     // Eliminar pagos de comisiones (sueldos)
     const [sueldosResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM sueldos WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM sueldos`
     );
     resultados.push(`✅ SUELDOS/COMISIONES PAGADAS eliminadas: ${sueldosResult.affectedRows}`);
     
     // Eliminar comisiones de vendedores
     const [comisionesResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM comisiones_vendedores WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM comisiones_vendedores`
     );
     resultados.push(`✅ COMISIONES DE VENDEDORES eliminadas: ${comisionesResult.affectedRows}`);
     
@@ -467,14 +510,12 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     // ========================================
     console.log('🗑️ Borrando cuenta corriente...');
     const [movCCResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM cuenta_corriente_movimientos WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM cuenta_corriente_movimientos`
     );
     resultados.push(`✅ MOVIMIENTOS DE CUENTA CORRIENTE eliminados: ${movCCResult.affectedRows}`);
     
     const [pagosCCResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM pagos_cuenta_corriente WHERE sucursal IN (${placeholders})`,
-      sucursales
+      `DELETE FROM pagos_cuenta_corriente`
     );
     resultados.push(`✅ PAGOS DE CUENTA CORRIENTE eliminados: ${pagosCCResult.affectedRows}`);
     

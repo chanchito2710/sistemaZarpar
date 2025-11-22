@@ -115,17 +115,20 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
   const cargarSucursales = async () => {
     try {
       const response = await axios.get(`${API_URL}/database/tables`);
-      const tables = response.data;
+      // El backend devuelve { success: true, data: ['tabla1', 'tabla2'] }
+      const tables = response.data.data || [];
       
       // Extraer sucursales de las tablas clientes_*
+      // tables es un array de strings, no de objetos
       const sucursalesUnicas = tables
-        .filter((t: any) => t.name.startsWith('clientes_'))
-        .map((t: any) => t.name.replace('clientes_', ''))
+        .filter((tableName: string) => tableName.startsWith('clientes_'))
+        .map((tableName: string) => tableName.replace('clientes_', ''))
         .sort();
       
       setSucursales(sucursalesUnicas);
     } catch (error) {
       console.error('Error al cargar sucursales:', error);
+      antMessage.error('Error al cargar lista de sucursales');
     }
   };
 
