@@ -2060,22 +2060,57 @@ export const obtenerSaldoCuentaCorrienteCliente = async (req: Request, res: Resp
 /**
  * Obtener devoluciones/reemplazos de un cliente
  * GET /api/devoluciones/cliente/:sucursal/:cliente_id
- * 
- * NOTA: Por ahora devuelve un array vacío. En el futuro se implementará
- * una tabla de devoluciones con su lógica completa.
  */
 export const obtenerDevolucionesCliente = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sucursal, cliente_id } = req.params;
+    const { fecha_desde, fecha_hasta } = req.query;
 
-    // TODO: Implementar tabla de devoluciones y su lógica
-    // Por ahora devolver array vacío para que no falle el frontend
-    
+    console.log('🔄 Obteniendo devoluciones del cliente:', { sucursal, cliente_id, fecha_desde, fecha_hasta });
+
+    let query = `
+      SELECT 
+        dr.id,
+        dr.tipo,
+        dr.fecha_proceso,
+        dr.producto_id,
+        dr.producto_nombre,
+        dr.cantidad_reemplazada,
+        dr.metodo_devolucion,
+        dr.observaciones,
+        dr.monto_devuelto,
+        v.numero_venta,
+        v.fecha_venta,
+        v.cliente_nombre,
+        p.marca,
+        p.tipo as tipo_producto
+      FROM devoluciones_reemplazos dr
+      INNER JOIN ventas v ON dr.venta_id = v.id
+      LEFT JOIN productos p ON dr.producto_id = p.id
+      WHERE v.sucursal = ?
+        AND v.cliente_id = ?
+    `;
+
+    const params: any[] = [sucursal, cliente_id];
+
+    if (fecha_desde) {
+      query += ' AND dr.fecha_proceso >= ?';
+      params.push(fecha_desde);
+    }
+
+    if (fecha_hasta) {
+      query += ' AND dr.fecha_proceso <= ?';
+      params.push(fecha_hasta);
+    }
+
+    query += ' ORDER BY dr.fecha_proceso DESC';
+
+    const devoluciones = await executeQuery<RowDataPacket[]>(query, params);
+
     res.status(200).json({
       success: true,
-      data: [],
-      count: 0,
-      message: 'Funcionalidad de devoluciones en desarrollo'
+      data: devoluciones,
+      count: devoluciones.length
     });
 
   } catch (error) {

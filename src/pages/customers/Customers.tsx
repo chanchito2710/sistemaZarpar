@@ -1336,7 +1336,13 @@ const Customers: React.FC = () => {
                   <Button 
                     type="primary" 
                     icon={<CalendarOutlined />}
-                    onClick={() => clienteAnalisis && cargarDatosDrawer(clienteAnalisis.id)}
+                    onClick={() => {
+                      if (clienteAnalisis) {
+                        // Limpiar tabs cargadas y recargar la tab actual
+                        setTabsCargadas(new Set());
+                        cargarDatosTabActiva(tabDrawer, clienteAnalisis.id);
+                      }
+                    }}
                   >
                     Actualizar
                   </Button>
@@ -1561,66 +1567,116 @@ const Customers: React.FC = () => {
                 key="3"
               >
                 <Card>
-                  <Table
-                    dataSource={reemplazosCliente}
-                    columns={[
-                      {
-                        title: 'Fecha',
-                        dataIndex: 'fecha_proceso',
-                        key: 'fecha_proceso',
-                        render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm')
-                      },
-                      {
-                        title: 'Tipo',
-                        dataIndex: 'tipo',
-                        key: 'tipo',
-                        render: (tipo: string) => {
-                          const config: any = {
-                            reemplazo: { color: 'blue', text: '🔄 Reemplazo' },
-                            devolucion: { color: 'orange', text: '↩️ Devolución' }
-                          };
-                          return <Tag color={config[tipo]?.color}>{config[tipo]?.text || tipo}</Tag>;
+                  {reemplazosCliente.length === 0 ? (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description="Este cliente no tiene reemplazos o devoluciones en el período seleccionado"
+                    />
+                  ) : (
+                    <Table
+                      dataSource={reemplazosCliente}
+                      columns={[
+                        {
+                          title: 'Fecha',
+                          dataIndex: 'fecha_proceso',
+                          key: 'fecha_proceso',
+                          render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY HH:mm'),
+                          sorter: (a: any, b: any) => dayjs(a.fecha_proceso).unix() - dayjs(b.fecha_proceso).unix()
+                        },
+                        {
+                          title: 'Tipo',
+                          dataIndex: 'tipo',
+                          key: 'tipo',
+                          render: (tipo: string) => {
+                            const config: any = {
+                              reemplazo: { color: 'blue', text: '🔄 Reemplazo' },
+                              devolucion: { color: 'orange', text: '↩️ Devolución' }
+                            };
+                            return <Tag color={config[tipo]?.color}>{config[tipo]?.text || tipo}</Tag>;
+                          },
+                          filters: [
+                            { text: '🔄 Reemplazo', value: 'reemplazo' },
+                            { text: '↩️ Devolución', value: 'devolucion' }
+                          ],
+                          onFilter: (value: any, record: any) => record.tipo === value
+                        },
+                        {
+                          title: 'Producto',
+                          dataIndex: 'producto_nombre',
+                          key: 'producto_nombre',
+                          render: (nombre: string, record: any) => (
+                            <div>
+                              <Text strong>{nombre}</Text>
+                              {(record.marca || record.tipo_producto) && (
+                                <div style={{ fontSize: 11 }}>
+                                  {record.marca && <Tag color="blue" style={{ fontSize: 10 }}>{record.marca}</Tag>}
+                                  {record.tipo_producto && <Tag color="green" style={{ fontSize: 10 }}>{record.tipo_producto}</Tag>}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        },
+                        {
+                          title: 'N° Venta',
+                          dataIndex: 'numero_venta',
+                          key: 'numero_venta',
+                          render: (numero: string, record: any) => (
+                            <div>
+                              <Text code strong>{numero}</Text>
+                              {record.fecha_venta && (
+                                <div style={{ fontSize: 10, color: '#999' }}>
+                                  Venta: {dayjs(record.fecha_venta).format('DD/MM/YY')}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        },
+                        {
+                          title: 'Cantidad',
+                          dataIndex: 'cantidad_reemplazada',
+                          key: 'cantidad_reemplazada',
+                          align: 'center',
+                          render: (cant: number) => <Badge count={cant || 1} showZero style={{ backgroundColor: '#52c41a' }} />
+                        },
+                        {
+                          title: 'Método Devolución',
+                          dataIndex: 'metodo_devolucion',
+                          key: 'metodo_devolucion',
+                          render: (metodo: string, record: any) => (
+                            <div>
+                              {metodo ? (
+                                metodo === 'cuenta_corriente' ? 
+                                  <Tag color="purple">💳 Cuenta Corriente</Tag> : 
+                                  metodo === 'saldo_favor' ?
+                                    <Tag color="cyan">🏦 Saldo a Favor</Tag> :
+                                    <Tag color="green">💰 Efectivo</Tag>
+                              ) : (
+                                <Tag>N/A</Tag>
+                              )}
+                              {record.monto_devuelto > 0 && (
+                                <div style={{ fontSize: 11, marginTop: 4 }}>
+                                  <Text type="success" strong>${Number(record.monto_devuelto).toFixed(2)}</Text>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        },
+                        {
+                          title: 'Observaciones',
+                          dataIndex: 'observaciones',
+                          key: 'observaciones',
+                          render: (obs: string) => obs ? (
+                            <Text ellipsis style={{ maxWidth: 200, display: 'block' }}>{obs}</Text>
+                          ) : (
+                            <Text type="secondary">-</Text>
+                          )
                         }
-                      },
-                      {
-                        title: 'Producto',
-                        dataIndex: 'producto_nombre',
-                        key: 'producto_nombre'
-                      },
-                      {
-                        title: 'N° Venta',
-                        dataIndex: 'numero_venta',
-                        key: 'numero_venta',
-                        render: (numero: string) => <Text code>{numero}</Text>
-                      },
-                      {
-                        title: 'Cantidad',
-                        dataIndex: 'cantidad_reemplazada',
-                        key: 'cantidad_reemplazada',
-                        align: 'center',
-                        render: (cant: number) => <Badge count={cant || 1} showZero />
-                      },
-                      {
-                        title: 'Método Devolución',
-                        dataIndex: 'metodo_devolucion',
-                        key: 'metodo_devolucion',
-                        render: (metodo: string) => metodo ? (
-                          metodo === 'cuenta_corriente' ? 
-                            <Tag color="purple">💳 A Cuenta Corriente</Tag> : 
-                            <Tag color="green">💰 Efectivo</Tag>
-                        ) : '-'
-                      },
-                      {
-                        title: 'Observaciones',
-                        dataIndex: 'observaciones',
-                        key: 'observaciones',
-                        render: (obs: string) => obs || '-'
-                      }
-                    ]}
-                    rowKey="id"
-                    pagination={{ pageSize: 10, showTotal: (total) => `Total: ${total} registros` }}
-                    size="small"
-                  />
+                      ]}
+                      rowKey="id"
+                      pagination={{ pageSize: 10, showTotal: (total) => `Total: ${total} reemplazos/devoluciones` }}
+                      size="small"
+                    />
+                  )}
                 </Card>
               </Tabs.TabPane>
 
@@ -1634,71 +1690,143 @@ const Customers: React.FC = () => {
                 }
                 key="4"
               >
-                <Card title="Productos Más Vendidos">
-                  <Table
-                    dataSource={productosCliente}
-                    columns={[
-                      {
-                        title: '#',
-                        key: 'index',
-                        render: (_: any, __: any, index: number) => (
-                          <Badge 
-                            count={index + 1} 
-                            style={{ 
-                              backgroundColor: index < 3 ? '#faad14' : '#d9d9d9',
-                              fontWeight: 'bold'
-                            }} 
-                          />
-                        ),
-                        width: 60
-                      },
-                      {
-                        title: 'Producto',
-                        dataIndex: 'producto_nombre',
-                        key: 'producto_nombre',
-                        render: (nombre: string, record: any) => (
-                          <div>
-                            <Text strong>{nombre}</Text>
+                <Card 
+                  title={
+                    <span>
+                      <BarChartOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                      Productos Más Vendidos (Ordenado por Cantidad)
+                    </span>
+                  }
+                  extra={
+                    productosCliente.length > 0 && (
+                      <Space>
+                        <Tag color="gold">🥇 Top {Math.min(3, productosCliente.length)}</Tag>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Período: {fechasFiltro[0].format('DD/MM/YYYY')} - {fechasFiltro[1].format('DD/MM/YYYY')}
+                        </Text>
+                      </Space>
+                    )
+                  }
+                >
+                  {productosCliente.length === 0 ? (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description="Este cliente no ha comprado productos en el período seleccionado"
+                    />
+                  ) : (
+                    <Table
+                      dataSource={productosCliente}
+                      columns={[
+                        {
+                          title: 'Ranking',
+                          key: 'index',
+                          render: (_: any, __: any, index: number) => (
+                            <Badge 
+                              count={index + 1} 
+                              style={{ 
+                                backgroundColor: 
+                                  index === 0 ? '#faad14' : // Oro
+                                  index === 1 ? '#c0c0c0' : // Plata
+                                  index === 2 ? '#cd7f32' : // Bronce
+                                  '#d9d9d9',
+                                fontWeight: 'bold',
+                                fontSize: index < 3 ? 14 : 12
+                              }} 
+                            />
+                          ),
+                          width: 80,
+                          fixed: 'left'
+                        },
+                        {
+                          title: 'Producto',
+                          dataIndex: 'producto_nombre',
+                          key: 'producto_nombre',
+                          render: (nombre: string, record: any) => (
                             <div>
-                              <Space size="small">
-                                {record.tipo && <Tag color="blue">{record.tipo}</Tag>}
-                                {record.marca && <Tag color="green">{record.marca}</Tag>}
-                              </Space>
+                              <Text strong style={{ fontSize: 13 }}>{nombre}</Text>
+                              <div style={{ marginTop: 4 }}>
+                                <Space size={4}>
+                                  {record.producto_tipo && <Tag color="blue" style={{ fontSize: 10 }}>{record.producto_tipo}</Tag>}
+                                  {record.producto_marca && <Tag color="green" style={{ fontSize: 10 }}>{record.producto_marca}</Tag>}
+                                </Space>
+                              </div>
                             </div>
-                          </div>
-                        )
-                      },
-                      {
-                        title: 'Cantidad Vendida',
-                        dataIndex: 'cantidad_vendida',
-                        key: 'cantidad_vendida',
-                        align: 'center',
-                        render: (cant: number) => <Badge count={cant} showZero style={{ backgroundColor: '#52c41a' }} />
-                      },
-                      {
-                        title: 'Total Vendido',
-                        dataIndex: 'total_vendido',
-                        key: 'total_vendido',
-                        render: (total: number) => <Text strong>${Number(total || 0).toFixed(2)}</Text>
-                      },
-                      {
-                        title: 'Precio Promedio',
-                        key: 'precio_promedio',
-                        render: (_: any, record: any) => {
-                          const promedio = record.cantidad_vendida > 0 
-                            ? Number(record.total_vendido) / Number(record.cantidad_vendida)
-                            : 0;
-                          return <Text>${promedio.toFixed(2)}</Text>;
+                          )
+                        },
+                        {
+                          title: 'Cantidad Vendida',
+                          dataIndex: 'total_cantidad',
+                          key: 'total_cantidad',
+                          align: 'center',
+                          render: (cant: number) => (
+                            <Badge 
+                              count={cant} 
+                              showZero 
+                              style={{ 
+                                backgroundColor: '#52c41a',
+                                fontSize: 14,
+                                fontWeight: 'bold'
+                              }} 
+                            />
+                          ),
+                          sorter: (a: any, b: any) => b.total_cantidad - a.total_cantidad,
+                          defaultSortOrder: 'descend'
+                        },
+                        {
+                          title: 'Total Vendido',
+                          dataIndex: 'total_vendido',
+                          key: 'total_vendido',
+                          align: 'right',
+                          render: (total: number) => (
+                            <Text strong style={{ fontSize: 14, color: '#1890ff' }}>
+                              ${Number(total || 0).toFixed(2)}
+                            </Text>
+                          ),
+                          sorter: (a: any, b: any) => Number(a.total_vendido) - Number(b.total_vendido)
+                        },
+                        {
+                          title: 'Precio Promedio',
+                          key: 'precio_promedio',
+                          align: 'right',
+                          render: (_: any, record: any) => {
+                            const promedio = record.total_cantidad > 0 
+                              ? Number(record.total_vendido) / Number(record.total_cantidad)
+                              : 0;
+                            return <Text style={{ color: '#722ed1' }}>${promedio.toFixed(2)}</Text>;
+                          }
+                        },
+                        {
+                          title: 'N° de Ventas',
+                          dataIndex: 'total_ventas',
+                          key: 'total_ventas',
+                          align: 'center',
+                          render: (cant: number) => (
+                            <Tag color="purple" style={{ fontSize: 12 }}>
+                              {cant} venta{cant !== 1 ? 's' : ''}
+                            </Tag>
+                          )
+                        },
+                        {
+                          title: 'Última Compra',
+                          dataIndex: 'ultima_compra',
+                          key: 'ultima_compra',
+                          render: (fecha: string) => (
+                            <div style={{ fontSize: 11 }}>
+                              <CalendarOutlined style={{ marginRight: 4, color: '#999' }} />
+                              {dayjs(fecha).format('DD/MM/YYYY')}
+                            </div>
+                          ),
+                          sorter: (a: any, b: any) => dayjs(a.ultima_compra).unix() - dayjs(b.ultima_compra).unix()
                         }
-                      }
-                    ]}
-                    rowKey={(record) => `${record.producto_id}_${record.producto_nombre}`}
-                    pagination={{ 
-                      pageSize: 20, 
-                      showTotal: (total) => `Total: ${total} productos` 
-                    }}
-                    size="small"
-                  />
+                      ]}
+                      rowKey={(record) => `${record.producto_id}_${record.producto_nombre}`}
+                      pagination={{ 
+                        pageSize: 20, 
+                        showTotal: (total) => `Total: ${total} productos diferentes` 
+                      }}
+                      size="small"
+                    />
+                  )}
                 </Card>
               </Tabs.TabPane>
             </Tabs>
