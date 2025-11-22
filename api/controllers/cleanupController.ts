@@ -385,6 +385,20 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     await connection.beginTransaction();
     
     const resultados: string[] = [];
+    const errores: string[] = [];
+    
+    // Helper function para ejecutar queries de forma segura
+    const ejecutarQuerySegura = async (descripcion: string, query: string, params: any[] = []) => {
+      try {
+        const [result] = await connection.execute<ResultSetHeader>(query, params);
+        resultados.push(`✅ ${descripcion}: ${result.affectedRows} registros`);
+        console.log(`✅ ${descripcion}: ${result.affectedRows}`);
+      } catch (error: any) {
+        const mensaje = `⚠️ ${descripcion}: ${error.message}`;
+        errores.push(mensaje);
+        console.warn(mensaje);
+      }
+    };
     
     // ========================================
     // PASO 1: OBTENER TODAS LAS SUCURSALES
@@ -403,121 +417,60 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
     console.log(`📋 Sucursales encontradas: ${sucursales.join(', ')}`);
     resultados.push(`📋 Sucursales detectadas: ${sucursales.length} (${sucursales.join(', ')})`);
     
-    const placeholders = sucursales.length > 0 ? sucursales.map(() => '?').join(', ') : '';
-    
     // ========================================
     // PASO 2: BORRAR VENTAS Y DETALLES
     // ========================================
     console.log('🗑️ Borrando ventas...');
-    // En borrado maestro eliminamos TODO, sin filtrar por sucursal para limpiar también datos huérfanos
-    const [ventasResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM ventas`
-    );
-    resultados.push(`✅ VENTAS eliminadas: ${ventasResult.affectedRows}`);
-    
-    const [resumenVentasResult] = await connection.execute<ResultSetHeader>(
-      'DELETE FROM ventas_diarias_resumen'
-    );
-    resultados.push(`✅ RESÚMENES DIARIOS eliminados: ${resumenVentasResult.affectedRows}`);
+    await ejecutarQuerySegura('VENTAS eliminadas', 'DELETE FROM ventas');
+    await ejecutarQuerySegura('RESÚMENES DIARIOS eliminados', 'DELETE FROM ventas_diarias_resumen');
     
     // ========================================
     // PASO 3: BORRAR DEVOLUCIONES Y REEMPLAZOS
     // ========================================
     console.log('🗑️ Borrando devoluciones y reemplazos...');
-    const [devolucionesResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM devoluciones_reemplazos`
-    );
-    resultados.push(`✅ DEVOLUCIONES Y REEMPLAZOS eliminados: ${devolucionesResult.affectedRows}`);
+    await ejecutarQuerySegura('DEVOLUCIONES Y REEMPLAZOS eliminados', 'DELETE FROM devoluciones_reemplazos');
     
     // ========================================
     // PASO 4: BORRAR TRANSFERENCIAS DE MERCADERÍA
     // ========================================
     console.log('🗑️ Borrando transferencias...');
-    const [transferenciasResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM transferencias`
-    );
-    resultados.push(`✅ TRANSFERENCIAS eliminadas: ${transferenciasResult.affectedRows}`);
-    
-    const [histTransferResult] = await connection.execute<ResultSetHeader>(
-      'DELETE FROM historial_transferencias'
-    );
-    resultados.push(`✅ HISTORIAL DE TRANSFERENCIAS eliminado: ${histTransferResult.affectedRows}`);
+    await ejecutarQuerySegura('TRANSFERENCIAS eliminadas', 'DELETE FROM transferencias');
+    await ejecutarQuerySegura('HISTORIAL DE TRANSFERENCIAS eliminado', 'DELETE FROM historial_transferencias');
     
     // ========================================
-    // PASO 5: BORRAR MOVIMIENTOS DE CAJA (ENVÍOS, GASTOS, AJUSTES)
+    // PASO 5: BORRAR MOVIMIENTOS DE CAJA
     // ========================================
     console.log('🗑️ Borrando movimientos de caja...');
-    const [movimientosCajaResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM movimientos_caja`
-    );
-    resultados.push(`✅ MOVIMIENTOS DE CAJA eliminados: ${movimientosCajaResult.affectedRows} (envíos, gastos, ajustes)`);
+    await ejecutarQuerySegura('MOVIMIENTOS DE CAJA eliminados', 'DELETE FROM movimientos_caja');
     
     // ========================================
     // PASO 6: RESETEAR CAJA A $0
     // ========================================
     console.log('🗑️ Reseteando cajas a $0...');
-    const [cajaResult] = await connection.execute<ResultSetHeader>(
-      `UPDATE caja SET monto_actual = 0.00`
-    );
-    resultados.push(`✅ CAJAS reseteadas a $0: ${cajaResult.affectedRows} sucursales`);
+    await ejecutarQuerySegura('CAJAS reseteadas a $0', 'UPDATE caja SET monto_actual = 0.00');
     
     // ========================================
-    // PASO 7: BORRAR STOCK E HISTORIAL DE MOVIMIENTOS
+    // PASO 7: BORRAR STOCK E HISTORIAL
     // ========================================
     console.log('🗑️ Reseteando stock y borrando historial...');
-    const [stockResult] = await connection.execute<ResultSetHeader>(
-      `UPDATE productos_sucursal 
-       SET stock = 0, stock_fallas = 0`
-    );
-    resultados.push(`✅ STOCK reseteado a 0: ${stockResult.affectedRows} productos-sucursal`);
-    
-    const [historialStockResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM historial_stock`
-    );
-    resultados.push(`✅ HISTORIAL DE STOCK eliminado: ${historialStockResult.affectedRows} movimientos`);
+    await ejecutarQuerySegura('STOCK reseteado a 0', 'UPDATE productos_sucursal SET stock = 0, stock_fallas = 0');
+    await ejecutarQuerySegura('HISTORIAL DE STOCK eliminado', 'DELETE FROM historial_stock');
     
     // ========================================
     // PASO 8: BORRAR COMISIONES Y SUELDOS
     // ========================================
     console.log('🗑️ Borrando comisiones...');
-    
-    // Eliminar pagos de comisiones (sueldos)
-    const [sueldosResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM sueldos`
-    );
-    resultados.push(`✅ SUELDOS/COMISIONES PAGADAS eliminadas: ${sueldosResult.affectedRows}`);
-    
-    // Eliminar comisiones de vendedores
-    const [comisionesResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM comisiones_vendedores`
-    );
-    resultados.push(`✅ COMISIONES DE VENDEDORES eliminadas: ${comisionesResult.affectedRows}`);
-    
-    // Eliminar historial de pagos
-    const [histPagosResult] = await connection.execute<ResultSetHeader>(
-      'DELETE FROM historial_pagos_comisiones'
-    );
-    resultados.push(`✅ HISTORIAL DE PAGOS DE COMISIONES eliminado: ${histPagosResult.affectedRows}`);
-    
-    // Eliminar remanentes
-    const [remanentesResult] = await connection.execute<ResultSetHeader>(
-      'DELETE FROM remanentes_comisiones'
-    );
-    resultados.push(`✅ REMANENTES DE COMISIONES eliminados: ${remanentesResult.affectedRows}`);
+    await ejecutarQuerySegura('SUELDOS/COMISIONES PAGADAS eliminadas', 'DELETE FROM sueldos');
+    await ejecutarQuerySegura('COMISIONES DE VENDEDORES eliminadas', 'DELETE FROM comisiones_vendedores');
+    await ejecutarQuerySegura('HISTORIAL DE PAGOS DE COMISIONES eliminado', 'DELETE FROM historial_pagos_comisiones');
+    await ejecutarQuerySegura('REMANENTES DE COMISIONES eliminados', 'DELETE FROM remanentes_comisiones');
     
     // ========================================
     // PASO 9: BORRAR CUENTA CORRIENTE
     // ========================================
     console.log('🗑️ Borrando cuenta corriente...');
-    const [movCCResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM cuenta_corriente_movimientos`
-    );
-    resultados.push(`✅ MOVIMIENTOS DE CUENTA CORRIENTE eliminados: ${movCCResult.affectedRows}`);
-    
-    const [pagosCCResult] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM pagos_cuenta_corriente`
-    );
-    resultados.push(`✅ PAGOS DE CUENTA CORRIENTE eliminados: ${pagosCCResult.affectedRows}`);
+    await ejecutarQuerySegura('MOVIMIENTOS DE CUENTA CORRIENTE eliminados', 'DELETE FROM cuenta_corriente_movimientos');
+    await ejecutarQuerySegura('PAGOS DE CUENTA CORRIENTE eliminados', 'DELETE FROM pagos_cuenta_corriente');
     
     // ========================================
     // PASO 10: BORRAR CLIENTES DE TODAS LAS SUCURSALES
@@ -529,44 +482,62 @@ export const borradoMaestro = async (req: Request, res: Response): Promise<void>
         const tablaClientes = `clientes_${suc}`;
         console.log(`  🗑️ Borrando de tabla: ${tablaClientes}`);
         
-        // CRÍTICO: Usar backticks para nombres de tabla dinámicos
         const [result] = await connection.execute<ResultSetHeader>(
           `DELETE FROM \`${tablaClientes}\``
         );
         
         totalClientesBorrados += result.affectedRows;
+        resultados.push(`✅ Clientes de ${suc.toUpperCase()}: ${result.affectedRows} eliminados`);
         console.log(`  ✅ Clientes de ${suc.toUpperCase()}: ${result.affectedRows} eliminados`);
       } catch (error: any) {
-        console.warn(`  ⚠️ No se pudo borrar clientes de ${suc}:`, error.message);
+        const mensaje = `⚠️ No se pudo borrar clientes de ${suc}: ${error.message}`;
+        errores.push(mensaje);
+        console.warn(mensaje);
       }
     }
-    resultados.push(`✅ CLIENTES eliminados de TODAS las sucursales: ${totalClientesBorrados}`);
+    
+    // ========================================
+    // PASO 11: BORRAR GASTOS (si existe la tabla)
+    // ========================================
+    console.log('🗑️ Borrando gastos...');
+    await ejecutarQuerySegura('GASTOS eliminados', 'DELETE FROM gastos');
     
     // ========================================
     // COMMIT Y FINALIZACIÓN
     // ========================================
     await connection.commit();
     
-    console.log('✅✅✅ BORRADO MAESTRO COMPLETADO EXITOSAMENTE ✅✅✅');
+    console.log('✅✅✅ BORRADO MAESTRO COMPLETADO ✅✅✅');
     console.log('Resultados:', resultados);
+    if (errores.length > 0) {
+      console.log('⚠️ Advertencias:', errores);
+    }
+    
+    const mensaje = errores.length > 0
+      ? '🔥 BORRADO MAESTRO COMPLETADO CON ADVERTENCIAS'
+      : '🔥 BORRADO MAESTRO COMPLETADO - TODOS LOS DATOS ELIMINADOS';
     
     res.status(200).json({
       success: true,
-      message: '🔥 BORRADO MAESTRO COMPLETADO - TODOS LOS DATOS ELIMINADOS',
+      message: mensaje,
       data: {
         sucursales: sucursales.length,
-        operaciones: resultados.length,
+        operaciones_exitosas: resultados.length,
+        advertencias: errores.length,
         resultados,
+        errores: errores.length > 0 ? errores : undefined,
       },
     });
     
   } catch (error: any) {
     await connection.rollback();
-    console.error('❌ ERROR EN BORRADO MAESTRO:', error);
+    console.error('❌ ERROR CRÍTICO EN BORRADO MAESTRO:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error crítico durante el borrado maestro',
       error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   } finally {
     connection.release();
