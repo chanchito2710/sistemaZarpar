@@ -1,0 +1,11 @@
+# Ignorar todos los archivos de backup
+*.sql
+*.sql.gz
+*.sql.zip
+
+# Excepto este archivo
+!.gitignore
+
+# Nota: Los backups NO deben subirse a Git por seguridad y tamaño
+# Los backups se guardan localmente o en servicios de backup dedicados
+

@@ -1,0 +1,505 @@
+/**
+ * 🗄️ SERVICIO DE BACKUPS
+ * 
+ * Maneja toda la lógica de backups automáticos y manuales:
+ * - Crear backups
+ * - Restaurar backups
+ * - Limpiar backups antiguos (> 7 días)
+ * - Gestionar metadata
+ */
+
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import cron from 'node-cron';
+import { pool } from '../config/database.js';
+
+const execAsync = promisify(exec);
+
+// Configuración
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups');
+const MAX_DAYS = 7;
+const DB_HOST = process.env.DB_HOST || 'localhost';
+const DB_PORT = process.env.DB_PORT || '3307';
+const DB_USER = process.env.DB_USER || 'root';
+const DB_PASSWORD = process.env.DB_PASSWORD || '';
+const DB_NAME = process.env.DB_NAME || 'zarparDataBase';
+
+// Asegurar que existe el directorio de backups
+if (!fs.existsSync(BACKUP_DIR)) {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  console.log(`✅ Directorio de backups creado: ${BACKUP_DIR}`);
+}
+
+/**
+ * Ejecutar mysqldump y crear archivo de backup
+ */
+async function ejecutarMysqlDump(filename: string): Promise<string> {
+  const filepath = path.join(BACKUP_DIR, filename);
+  
+  // Comando mysqldump con todas las opciones necesarias
+  const command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME} > "${filepath}"`;
+  
+  try {
+    await execAsync(command);
+    
+    // Verificar que el archivo se creó y no está vacío
+    const stats = fs.statSync(filepath);
+    if (stats.size === 0) {
+      throw new Error('El archivo de backup está vacío');
+    }
+    
+    return filepath;
+  } catch (error: any) {
+    // Si hay error, eliminar el archivo parcial
+    if (fs.existsSync(filepath)) {
+      fs.unlinkSync(filepath);
+    }
+    throw new Error(`Error al crear backup: ${error.message}`);
+  }
+}
+
+/**
+ * Guardar metadata del backup en base de datos
+ */
+async function guardarMetadata(data: {
+  filename: string;
+  tipo: 'automatico' | 'manual';
+  nombre_personalizado: string | null;
+  nota: string | null;
+  tamano_bytes: number;
+  creado_por_email: string;
+}): Promise<void> {
+  await pool.execute(
+    `INSERT INTO backups_metadata 
+    (filename, tipo, nombre_personalizado, nota, tamano_bytes, creado_por_email)
+    VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      data.filename,
+      data.tipo,
+      data.nombre_personalizado,
+      data.nota,
+      data.tamano_bytes,
+      data.creado_por_email
+    ]
+  );
+}
+
+/**
+ * Registrar acción en log de auditoría
+ */
+async function registrarLog(data: {
+  accion: 'crear' | 'restaurar' | 'eliminar' | 'descargar';
+  backup_filename: string;
+  usuario_email: string;
+  exitoso: boolean;
+  detalles?: string;
+  duracion_segundos?: number;
+}): Promise<void> {
+  await pool.execute(
+    `INSERT INTO backup_logs 
+    (accion, backup_filename, usuario_email, exitoso, detalles, duracion_segundos)
+    VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      data.accion,
+      data.backup_filename,
+      data.usuario_email,
+      data.exitoso,
+      data.detalles || null,
+      data.duracion_segundos || null
+    ]
+  );
+}
+
+/**
+ * Limpiar backups antiguos (> 7 días)
+ */
+export async function limpiarBackupsViejos(): Promise<number> {
+  const maxAge = MAX_DAYS * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  let eliminados = 0;
+  
+  try {
+    // Obtener todos los backups de la BD
+    const [backups]: any = await pool.execute(
+      'SELECT filename, created_at FROM backups_metadata ORDER BY created_at ASC'
+    );
+    
+    for (const backup of backups) {
+      const age = now - new Date(backup.created_at).getTime();
+      
+      if (age > maxAge) {
+        // Eliminar archivo físico
+        const filepath = path.join(BACKUP_DIR, backup.filename);
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+        }
+        
+        // Eliminar metadata
+        await pool.execute(
+          'DELETE FROM backups_metadata WHERE filename = ?',
+          [backup.filename]
+        );
+        
+        eliminados++;
+        console.log(`🗑️ Eliminado backup viejo: ${backup.filename}`);
+      }
+    }
+    
+    return eliminados;
+  } catch (error: any) {
+    console.error('Error al limpiar backups viejos:', error);
+    throw error;
+  }
+}
+
+/**
+ * Crear backup automático (llamado por cron)
+ */
+export async function crearBackupAutomatico(): Promise<void> {
+  const inicio = Date.now();
+  
+  try {
+    console.log('🔄 Iniciando backup automático...');
+    
+    // Generar nombre de archivo con timestamp
+    const fecha = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    const filename = `backup_auto_${fecha}.sql`;
+    
+    // Crear backup
+    const filepath = await ejecutarMysqlDump(filename);
+    
+    // Obtener tamaño del archivo
+    const stats = fs.statSync(filepath);
+    
+    // Guardar metadata
+    await guardarMetadata({
+      filename,
+      tipo: 'automatico',
+      nombre_personalizado: null,
+      nota: 'Backup automático programado',
+      tamano_bytes: stats.size,
+      creado_por_email: 'sistema'
+    });
+    
+    // Registrar log
+    const duracion = Math.round((Date.now() - inicio) / 1000);
+    await registrarLog({
+      accion: 'crear',
+      backup_filename: filename,
+      usuario_email: 'sistema',
+      exitoso: true,
+      detalles: `Backup automático creado. Tamaño: ${formatBytes(stats.size)}`,
+      duracion_segundos: duracion
+    });
+    
+    // Limpiar backups viejos
+    const eliminados = await limpiarBackupsViejos();
+    
+    console.log(`✅ Backup automático creado: ${filename} (${formatBytes(stats.size)})`);
+    if (eliminados > 0) {
+      console.log(`🗑️ Eliminados ${eliminados} backups antiguos`);
+    }
+    
+  } catch (error: any) {
+    console.error('❌ Error en backup automático:', error);
+    
+    // Registrar log de error
+    await registrarLog({
+      accion: 'crear',
+      backup_filename: 'error',
+      usuario_email: 'sistema',
+      exitoso: false,
+      detalles: `Error: ${error.message}`
+    });
+    
+    throw error;
+  }
+}
+
+/**
+ * Crear backup manual
+ */
+export async function crearBackupManual(data: {
+  nombre?: string;
+  nota?: string;
+  usuario_email: string;
+}): Promise<any> {
+  const inicio = Date.now();
+  
+  try {
+    // Generar nombre de archivo
+    const fecha = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    const filename = `backup_manual_${fecha}.sql`;
+    
+    // Crear backup
+    const filepath = await ejecutarMysqlDump(filename);
+    
+    // Obtener tamaño
+    const stats = fs.statSync(filepath);
+    
+    // Guardar metadata
+    await guardarMetadata({
+      filename,
+      tipo: 'manual',
+      nombre_personalizado: data.nombre || null,
+      nota: data.nota || null,
+      tamano_bytes: stats.size,
+      creado_por_email: data.usuario_email
+    });
+    
+    // Registrar log
+    const duracion = Math.round((Date.now() - inicio) / 1000);
+    await registrarLog({
+      accion: 'crear',
+      backup_filename: filename,
+      usuario_email: data.usuario_email,
+      exitoso: true,
+      detalles: `Backup manual creado${data.nombre ? `: ${data.nombre}` : ''}`,
+      duracion_segundos: duracion
+    });
+    
+    // Limpiar backups viejos
+    await limpiarBackupsViejos();
+    
+    return {
+      filename,
+      nombre: data.nombre || filename,
+      tamano: formatBytes(stats.size),
+      fecha: new Date()
+    };
+    
+  } catch (error: any) {
+    // Registrar log de error
+    await registrarLog({
+      accion: 'crear',
+      backup_filename: 'error',
+      usuario_email: data.usuario_email,
+      exitoso: false,
+      detalles: `Error: ${error.message}`
+    });
+    
+    throw error;
+  }
+}
+
+/**
+ * Restaurar backup
+ */
+export async function restaurarBackup(filename: string, usuario_email: string): Promise<void> {
+  const inicio = Date.now();
+  const filepath = path.join(BACKUP_DIR, filename);
+  
+  try {
+    // Verificar que existe el archivo
+    if (!fs.existsSync(filepath)) {
+      throw new Error('El archivo de backup no existe');
+    }
+    
+    // Comando para restaurar
+    const command = `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME} < "${filepath}"`;
+    
+    await execAsync(command);
+    
+    // Registrar log
+    const duracion = Math.round((Date.now() - inicio) / 1000);
+    await registrarLog({
+      accion: 'restaurar',
+      backup_filename: filename,
+      usuario_email,
+      exitoso: true,
+      detalles: 'Base de datos restaurada exitosamente',
+      duracion_segundos: duracion
+    });
+    
+    console.log(`✅ Backup restaurado: ${filename}`);
+    
+  } catch (error: any) {
+    // Registrar log de error
+    await registrarLog({
+      accion: 'restaurar',
+      backup_filename: filename,
+      usuario_email,
+      exitoso: false,
+      detalles: `Error: ${error.message}`
+    });
+    
+    throw new Error(`Error al restaurar backup: ${error.message}`);
+  }
+}
+
+/**
+ * Listar todos los backups con metadata
+ */
+export async function listarBackups(): Promise<any[]> {
+  try {
+    const [backups]: any = await pool.execute(`
+      SELECT 
+        filename,
+        tipo,
+        nombre_personalizado,
+        nota,
+        tamano_bytes,
+        creado_por_email,
+        created_at
+      FROM backups_metadata
+      ORDER BY created_at DESC
+    `);
+    
+    // Contar total para saber cuál es el último
+    const totalBackups = backups.length;
+    
+    return backups.map((backup: any, index: number) => ({
+      ...backup,
+      tamano_formateado: formatBytes(backup.tamano_bytes),
+      edad_dias: Math.floor((Date.now() - new Date(backup.created_at).getTime()) / (24 * 60 * 60 * 1000)),
+      esUltimoBackup: index === 0 // El primero es el más reciente
+    }));
+    
+  } catch (error: any) {
+    console.error('Error al listar backups:', error);
+    throw error;
+  }
+}
+
+/**
+ * Eliminar backup
+ */
+export async function eliminarBackup(filename: string, usuario_email: string): Promise<void> {
+  try {
+    // Verificar que no sea el último backup
+    const [count]: any = await pool.execute(
+      'SELECT COUNT(*) as total FROM backups_metadata'
+    );
+    
+    if (count[0].total <= 1) {
+      throw new Error('No puedes eliminar el último backup');
+    }
+    
+    // Eliminar archivo físico
+    const filepath = path.join(BACKUP_DIR, filename);
+    if (fs.existsSync(filepath)) {
+      fs.unlinkSync(filepath);
+    }
+    
+    // Eliminar metadata
+    await pool.execute(
+      'DELETE FROM backups_metadata WHERE filename = ?',
+      [filename]
+    );
+    
+    // Registrar log
+    await registrarLog({
+      accion: 'eliminar',
+      backup_filename: filename,
+      usuario_email,
+      exitoso: true,
+      detalles: 'Backup eliminado manualmente'
+    });
+    
+    console.log(`🗑️ Backup eliminado: ${filename}`);
+    
+  } catch (error: any) {
+    // Registrar log de error
+    await registrarLog({
+      accion: 'eliminar',
+      backup_filename: filename,
+      usuario_email,
+      exitoso: false,
+      detalles: `Error: ${error.message}`
+    });
+    
+    throw error;
+  }
+}
+
+/**
+ * Obtener estadísticas de backups
+ */
+export async function obtenerEstadisticas(): Promise<any> {
+  try {
+    const [stats]: any = await pool.execute(`
+      SELECT 
+        COUNT(*) as total_backups,
+        SUM(tamano_bytes) as tamano_total,
+        MAX(created_at) as ultimo_backup,
+        SUM(CASE WHEN tipo = 'automatico' THEN 1 ELSE 0 END) as automaticos,
+        SUM(CASE WHEN tipo = 'manual' THEN 1 ELSE 0 END) as manuales
+      FROM backups_metadata
+    `);
+    
+    // Obtener tamaño de la base de datos actual
+    const [dbSize]: any = await pool.execute(`
+      SELECT 
+        SUM(data_length + index_length) as size
+      FROM information_schema.tables
+      WHERE table_schema = ?
+    `, [DB_NAME]);
+    
+    return {
+      total_backups: stats[0].total_backups || 0,
+      tamano_total: formatBytes(stats[0].tamano_total || 0),
+      tamano_total_bytes: stats[0].tamano_total || 0,
+      ultimo_backup: stats[0].ultimo_backup,
+      automaticos: stats[0].automaticos || 0,
+      manuales: stats[0].manuales || 0,
+      tamano_bd_actual: formatBytes(dbSize[0].size || 0),
+      tamano_bd_bytes: dbSize[0].size || 0,
+      proximo_backup_automatico: getProximoBackup()
+    };
+    
+  } catch (error: any) {
+    console.error('Error al obtener estadísticas:', error);
+    throw error;
+  }
+}
+
+/**
+ * Formatear bytes a formato legible
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+/**
+ * Calcular próximo backup automático
+ */
+function getProximoBackup(): Date {
+  const now = new Date();
+  const proximo = new Date();
+  proximo.setHours(3, 0, 0, 0);
+  
+  // Si ya pasaron las 3 AM, el próximo es mañana
+  if (now.getHours() >= 3) {
+    proximo.setDate(proximo.getDate() + 1);
+  }
+  
+  return proximo;
+}
+
+/**
+ * 🤖 INICIAR CRON JOB - Backup automático cada día a las 3 AM
+ */
+export function iniciarCronBackups(): void {
+  // Cron: 0 3 * * * = Todos los días a las 3:00 AM
+  cron.schedule('0 3 * * *', async () => {
+    console.log('⏰ Cron activado - Iniciando backup automático...');
+    try {
+      await crearBackupAutomatico();
+    } catch (error) {
+      console.error('❌ Error en cron de backup:', error);
+    }
+  }, {
+    timezone: "America/Montevideo" // Hora de Uruguay
+  });
+  
+  console.log('🤖 Cron de backups automáticos iniciado (3:00 AM diario)');
+}
+

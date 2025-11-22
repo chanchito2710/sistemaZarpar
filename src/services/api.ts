@@ -2327,6 +2327,104 @@ export const enviosFallasService = {
   }
 };
 
+/**
+ * ========================================
+ * SERVICIOS DE BACKUPS
+ * ========================================
+ */
+export const backupsService = {
+  /**
+   * Crear backup manual con nombre y nota personalizada
+   */
+  crearManual: async (data: { nombre?: string; nota?: string }) => {
+    try {
+      const response = await apiClient.post('/backups/manual', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al crear backup manual:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Listar todos los backups disponibles
+   */
+  listar: async () => {
+    try {
+      const response = await apiClient.get('/backups');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al listar backups:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Restaurar un backup específico
+   */
+  restaurar: async (filename: string) => {
+    try {
+      const response = await apiClient.post(`/backups/restore/${filename}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al restaurar backup:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Descargar un backup
+   */
+  descargar: async (filename: string) => {
+    try {
+      const response = await apiClient.get(`/backups/download/${filename}`, {
+        responseType: 'blob'
+      });
+      
+      // Crear enlace de descarga
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error al descargar backup:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Eliminar un backup
+   */
+  eliminar: async (filename: string) => {
+    try {
+      const response = await apiClient.delete(`/backups/${filename}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al eliminar backup:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  /**
+   * Obtener estadísticas de backups
+   */
+  obtenerEstadisticas: async () => {
+    try {
+      const response = await apiClient.get('/backups/stats');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error al obtener estadísticas:', error);
+      throw error.response?.data || error;
+    }
+  }
+};
+
 export default apiClient;
 
 

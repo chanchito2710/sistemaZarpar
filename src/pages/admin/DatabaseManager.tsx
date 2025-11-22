@@ -19,6 +19,7 @@ import {
   Badge,
   Drawer,
   Popconfirm,
+  Tabs,
 } from 'antd';
 import {
   DatabaseOutlined,
@@ -32,10 +33,12 @@ import {
   InfoCircleOutlined,
   PlusCircleOutlined,
   ColumnHeightOutlined,
+  SaveOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { CreateTableModal, AddColumnModal } from './TableSchemaManager';
 import DataCleanupModal from './DataCleanupModal';
+import BackupsManager from './BackupsManager';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -416,11 +419,25 @@ const DatabaseManager: React.FC = () => {
           Administrador de Base de Datos
         </Title>
         <Text style={{ fontSize: '16px', color: '#6b7280' }}>
-          Visualiza y gestiona las tablas de tu base de datos
+          Visualiza y gestiona las tablas de tu base de datos y backups del sistema
         </Text>
       </div>
 
-      {/* Estadísticas */}
+      {/* Tabs - Gestión de Tablas y Backups */}
+      <Tabs
+        defaultActiveKey="tables"
+        size="large"
+        items={[
+          {
+            key: 'tables',
+            label: (
+              <span>
+                <TableOutlined /> Gestión de Tablas
+              </span>
+            ),
+            children: (
+              <div>
+                {/* Estadísticas */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={8}>
           <Card>
@@ -727,6 +744,20 @@ const DatabaseManager: React.FC = () => {
           loadTableData();
           setIsCleanupModalVisible(false);
         }}
+      />
+              </div>
+            )
+          },
+          {
+            key: 'backups',
+            label: (
+              <span>
+                <SaveOutlined /> Backups del Sistema
+              </span>
+            ),
+            children: <BackupsManager />
+          }
+        ]}
       />
     </div>
   );

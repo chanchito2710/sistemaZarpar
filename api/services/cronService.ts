@@ -1,11 +1,12 @@
 /**
  * Servicio de Tareas Programadas (Cron Jobs)
- * Maneja tareas automatizadas como guardar resúmenes diarios
+ * Maneja tareas automatizadas como guardar resúmenes diarios y backups automáticos
  */
 
 import cron from 'node-cron';
 import { executeQuery } from '../config/database';
 import { RowDataPacket } from 'mysql2';
+import { crearBackupAutomatico } from './backupService.js';
 
 /**
  * Guardar resumen diario de ventas
@@ -108,6 +109,21 @@ export const inicializarCronJobs = () => {
   });
 
   console.log('✅ Tarea programada configurada: Guardar resumen diario a las 8:30 AM (Uruguay)');
+
+  // Tarea: Backup automático de base de datos a las 3:00 AM (hora de Uruguay)
+  // Cron expression: '0 3 * * *' = A las 3:00 AM todos los días
+  cron.schedule('0 3 * * *', async () => {
+    console.log('\n🗄️ [CRON] Ejecutando tarea programada: Backup automático de base de datos');
+    try {
+      await crearBackupAutomatico();
+    } catch (error) {
+      console.error('❌ [CRON] Error en backup automático:', error);
+    }
+  }, {
+    timezone: 'America/Montevideo'
+  });
+
+  console.log('✅ Tarea programada configurada: Backup automático a las 3:00 AM (Uruguay)');
 
   // Opcional: También ejecutar al iniciar el servidor (para guardar el día anterior si no se hizo)
   console.log('🔄 Ejecutando verificación inicial...');
