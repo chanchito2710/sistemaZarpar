@@ -234,12 +234,31 @@ const Customers: React.FC = () => {
   };
 
   /**
-   * Cargar clientes de la sucursal
+   * Cargar clientes de la sucursal (o todas si es admin)
    */
   const cargarClientes = async () => {
     try {
-      const data = await clientesService.obtenerPorSucursal(sucursalSeleccionada);
-      setClientes(data);
+      if (sucursalSeleccionada === 'todas' && usuario?.esAdmin) {
+        // Cargar clientes de todas las sucursales
+        console.log('📊 Cargando clientes de TODAS las sucursales...');
+        const promesas = sucursales.map(sucursal =>
+          clientesService.obtenerPorSucursal(sucursal.toLowerCase())
+        );
+        const resultados = await Promise.all(promesas);
+        // Concatenar todos los clientes y agregar campo de sucursal
+        const todosLosClientes = resultados.flatMap((clientesDeSucursal, index) =>
+          clientesDeSucursal.map((cliente: Cliente) => ({
+            ...cliente,
+            sucursal_origen: sucursales[index] // Agregar origen
+          }))
+        );
+        setClientes(todosLosClientes);
+        console.log(`✅ Cargados ${todosLosClientes.length} clientes de ${sucursales.length} sucursales`);
+      } else {
+        // Cargar solo de la sucursal seleccionada
+        const data = await clientesService.obtenerPorSucursal(sucursalSeleccionada);
+        setClientes(data);
+      }
     } catch (error) {
       console.error('Error al cargar clientes:', error);
       message.error('Error al cargar clientes');
@@ -421,7 +440,7 @@ const Customers: React.FC = () => {
   /**
    * Abrir Drawer de Análisis del Cliente
    */
-  const abrirAnalisisCliente = async (cliente: Cliente) => {
+  const abrirAnalisisCliente = async (cliente: any) => {
     setClienteAnalisis(cliente);
     setDrawerVisible(true);
     setTabDrawer('1');
@@ -438,11 +457,23 @@ const Customers: React.FC = () => {
     setContadorProductos(0);
     setContadorDevoluciones(0);
     
+    // Si el cliente tiene sucursal_origen (modo "todas"), temporalmente cambiar la sucursal seleccionada
+    // para que las funciones de carga usen la sucursal correcta
+    const sucursalOriginal = sucursalSeleccionada;
+    if (cliente.sucursal_origen && sucursalSeleccionada === 'todas') {
+      setSucursalSeleccionada(cliente.sucursal_origen.toLowerCase());
+    }
+    
     // Cargar contadores rápidamente (en paralelo)
     cargarContadoresCliente(cliente.id);
     
     // Solo cargar los datos completos de la primera pestaña (Ventas Globales)
     await cargarDatosTabActiva('1', cliente.id);
+    
+    // Restaurar sucursal original
+    if (cliente.sucursal_origen && sucursalOriginal === 'todas') {
+      setSucursalSeleccionada(sucursalOriginal);
+    }
   };
 
   /**
@@ -669,8 +700,11 @@ const Customers: React.FC = () => {
 
       setLoading(true);
 
+      // Usar la sucursal de origen si está disponible (modo "todas"), sino usar la seleccionada
+      const sucursalParaActualizar = (clienteParaEditar as any).sucursal_origen?.toLowerCase() || sucursalSeleccionada;
+
       await clientesService.actualizar(
-        sucursalSeleccionada,
+        sucursalParaActualizar,
         clienteParaEditar.id,
         values
       );
@@ -696,11 +730,14 @@ const Customers: React.FC = () => {
   /**
    * Eliminar cliente permanentemente
    */
-  const handleEliminarCliente = async (cliente: Cliente) => {
+  const handleEliminarCliente = async (cliente: any) => {
     try {
       setLoading(true);
 
-      await clientesService.eliminar(sucursalSeleccionada, cliente.id);
+      // Usar la sucursal de origen si está disponible (modo "todas"), sino usar la seleccionada
+      const sucursalParaEliminar = cliente.sucursal_origen?.toLowerCase() || sucursalSeleccionada;
+      
+      await clientesService.eliminar(sucursalParaEliminar, cliente.id);
 
       message.success(`🗑️ Cliente "${cliente.nombre} ${cliente.apellido}" eliminado permanentemente`);
       
@@ -732,6 +769,18 @@ const Customers: React.FC = () => {
         </Space>
       )
     },
+    // Columna de sucursal (solo cuando está en modo "todas")
+    ...(sucursalSeleccionada === 'todas' ? [{
+      title: 'Sucursal',
+      key: 'sucursal_origen',
+      render: (_: any, record: any) => (
+        <Tag color="blue" style={{ fontSize: 12 }}>
+          📍 {(record.sucursal_origen || '').toUpperCase()}
+        </Tag>
+      ),
+      filters: sucursales.map(s => ({ text: s.toUpperCase(), value: s })),
+      onFilter: (value: any, record: any) => record.sucursal_origen?.toLowerCase() === value.toLowerCase()
+    }] : []),
     {
       title: 'Contacto',
       key: 'contacto',
@@ -1037,6 +1086,11 @@ const Customers: React.FC = () => {
                     style={{ width: 200 }}
                     disabled={!usuario?.esAdmin}
                   >
+                    {usuario?.esAdmin && (
+                      <Option key="todas" value="todas">
+                        🌐 Todas las Sucursales
+                      </Option>
+                    )}
                     {sucursales.map(sucursal => (
                       <Option key={sucursal} value={sucursal.toLowerCase()}>
                         {sucursal.charAt(0).toUpperCase() + sucursal.slice(1)}
