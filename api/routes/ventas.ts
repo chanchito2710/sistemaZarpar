@@ -23,7 +23,8 @@ import {
   obtenerProductosCliente,
   obtenerSaldoCuentaCorrienteCliente,
   obtenerDevolucionesCliente,
-  obtenerDescuentos
+  obtenerDescuentos,
+  obtenerContadoresCliente
 } from '../controllers/ventasController';
 
 const router = Router();
@@ -121,6 +122,13 @@ router.get('/cliente/:sucursal/:cliente_id/pagos', obtenerPagosCliente);
  * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /cliente/:sucursal/:cliente_id
  */
 router.get('/cliente/:sucursal/:cliente_id/productos', obtenerProductosCliente);
+
+/**
+ * GET /api/ventas/cliente/:sucursal/:cliente_id/contadores
+ * Obtener contadores rápidos (pagos, productos, devoluciones) sin cargar todos los datos
+ * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /cliente/:sucursal/:cliente_id
+ */
+router.get('/cliente/:sucursal/:cliente_id/contadores', obtenerContadoresCliente);
 
 /**
  * GET /api/ventas/cliente/:sucursal/:cliente_id

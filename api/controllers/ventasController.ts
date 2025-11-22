@@ -2273,3 +2273,134 @@ export const obtenerDescuentos = async (req: Request, res: Response): Promise<vo
   }
 };
 
+/**
+ * Obtener contadores rápidos de un cliente (pagos, productos, devoluciones)
+ * Para mostrar en los tabs sin cargar todos los datos
+ * GET /api/ventas/cliente/:sucursal/:cliente_id/contadores
+ */
+export const obtenerContadoresCliente = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, cliente_id } = req.params;
+    const { fecha_desde, fecha_hasta } = req.query;
+
+    console.log('📊 Obteniendo contadores del cliente:', { sucursal, cliente_id, fecha_desde, fecha_hasta });
+
+    // Query para contar pagos
+    let queryPagos = `
+      SELECT COUNT(*) as total
+      FROM (
+        SELECT v.id
+        FROM ventas v
+        WHERE v.sucursal = ?
+          AND v.cliente_id = ?
+          AND v.metodo_pago IN ('efectivo', 'transferencia')
+    `;
+    
+    const paramsPagos: any[] = [sucursal, cliente_id];
+    
+    if (fecha_desde) {
+      queryPagos += ' AND v.fecha_venta >= ?';
+      paramsPagos.push(fecha_desde);
+    }
+    
+    if (fecha_hasta) {
+      queryPagos += ' AND v.fecha_venta <= ?';
+      paramsPagos.push(fecha_hasta);
+    }
+    
+    queryPagos += `
+        UNION ALL
+        SELECT p.id
+        FROM pagos_cuenta_corriente p
+        INNER JOIN resumen_cuenta_corriente r ON p.cliente_id = r.cliente_id AND p.sucursal = r.sucursal
+        WHERE p.sucursal = ?
+          AND p.cliente_id = ?
+    `;
+    
+    paramsPagos.push(sucursal, cliente_id);
+    
+    if (fecha_desde) {
+      queryPagos += ' AND p.fecha_pago >= ?';
+      paramsPagos.push(fecha_desde);
+    }
+    
+    if (fecha_hasta) {
+      queryPagos += ' AND p.fecha_pago <= ?';
+      paramsPagos.push(fecha_hasta);
+    }
+    
+    queryPagos += ') as pagos';
+    
+    // Query para contar productos
+    let queryProductos = `
+      SELECT COUNT(DISTINCT p.id) as total
+      FROM ventas v
+      INNER JOIN ventas_detalle vd ON v.id = vd.venta_id
+      INNER JOIN productos p ON vd.producto_id = p.id
+      WHERE v.sucursal = ?
+        AND v.cliente_id = ?
+    `;
+    
+    const paramsProductos: any[] = [sucursal, cliente_id];
+    
+    if (fecha_desde) {
+      queryProductos += ' AND v.fecha_venta >= ?';
+      paramsProductos.push(fecha_desde);
+    }
+    
+    if (fecha_hasta) {
+      queryProductos += ' AND v.fecha_venta <= ?';
+      paramsProductos.push(fecha_hasta);
+    }
+    
+    // Query para contar devoluciones
+    let queryDevoluciones = `
+      SELECT COUNT(*) as total
+      FROM devoluciones_reemplazos dr
+      INNER JOIN ventas v ON dr.venta_id = v.id
+      WHERE v.sucursal = ?
+        AND v.cliente_id = ?
+    `;
+    
+    const paramsDevoluciones: any[] = [sucursal, cliente_id];
+    
+    if (fecha_desde) {
+      queryDevoluciones += ' AND dr.fecha_proceso >= ?';
+      paramsDevoluciones.push(fecha_desde);
+    }
+    
+    if (fecha_hasta) {
+      queryDevoluciones += ' AND dr.fecha_proceso <= ?';
+      paramsDevoluciones.push(fecha_hasta);
+    }
+
+    // Ejecutar las 3 queries en paralelo
+    const [resultPagos, resultProductos, resultDevoluciones] = await Promise.all([
+      executeQuery<RowDataPacket[]>(queryPagos, paramsPagos),
+      executeQuery<RowDataPacket[]>(queryProductos, paramsProductos),
+      executeQuery<RowDataPacket[]>(queryDevoluciones, paramsDevoluciones)
+    ]);
+
+    const contadores = {
+      pagos: resultPagos[0]?.total || 0,
+      productos: resultProductos[0]?.total || 0,
+      devoluciones: resultDevoluciones[0]?.total || 0
+    };
+
+    console.log('✅ Contadores obtenidos:', contadores);
+
+    res.status(200).json({
+      success: true,
+      data: contadores
+    });
+
+  } catch (error) {
+    console.error('Error al obtener contadores del cliente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener contadores del cliente',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
+

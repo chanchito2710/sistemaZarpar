@@ -148,6 +148,11 @@ const Customers: React.FC = () => {
   const [loadingDrawer, setLoadingDrawer] = useState(false);
   const [buscadorClientes, setBuscadorClientes] = useState('');
 
+  // Contadores para los tabs (para mostrar los números sin cargar todos los datos)
+  const [contadorPagos, setContadorPagos] = useState<number>(0);
+  const [contadorProductos, setContadorProductos] = useState<number>(0);
+  const [contadorDevoluciones, setContadorDevoluciones] = useState<number>(0);
+
   // Estados para edición de cliente
   const [modalEditarCliente, setModalEditarCliente] = useState(false);
   const [clienteParaEditar, setClienteParaEditar] = useState<Cliente | null>(null);
@@ -385,6 +390,35 @@ const Customers: React.FC = () => {
   };
 
   /**
+   * Cargar contadores rápidos (pagos, productos, devoluciones) sin cargar todos los datos
+   */
+  const cargarContadoresCliente = async (clienteId: number) => {
+    try {
+      console.log('📊 [DEBUG] Cargando contadores del cliente:', clienteId);
+      const response = await fetch(
+        `${API_URL}/ventas/cliente/${sucursalSeleccionada}/${clienteId}/contadores?fecha_desde=${fechasFiltro[0].format('YYYY-MM-DD')}&fecha_hasta=${fechasFiltro[1].format('YYYY-MM-DD')}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      console.log('✅ [DEBUG] Contadores recibidos:', data.data);
+      
+      if (data.success) {
+        setContadorPagos(data.data.pagos || 0);
+        setContadorProductos(data.data.productos || 0);
+        setContadorDevoluciones(data.data.devoluciones || 0);
+      }
+    } catch (error) {
+      console.error('❌ [DEBUG] Error al cargar contadores:', error);
+      // No mostrar error al usuario, solo console
+    }
+  };
+
+  /**
    * Abrir Drawer de Análisis del Cliente
    */
   const abrirAnalisisCliente = async (cliente: Cliente) => {
@@ -399,7 +433,15 @@ const Customers: React.FC = () => {
     setReemplazosCliente([]);
     setProductosCliente([]);
     setSaldoCuentaCorriente(0);
-    // Solo cargar los datos de la primera pestaña (Ventas Globales)
+    // Resetear contadores
+    setContadorPagos(0);
+    setContadorProductos(0);
+    setContadorDevoluciones(0);
+    
+    // Cargar contadores rápidamente (en paralelo)
+    cargarContadoresCliente(cliente.id);
+    
+    // Solo cargar los datos completos de la primera pestaña (Ventas Globales)
     await cargarDatosTabActiva('1', cliente.id);
   };
 
@@ -1338,6 +1380,8 @@ const Customers: React.FC = () => {
                     icon={<CalendarOutlined />}
                     onClick={() => {
                       if (clienteAnalisis) {
+                        // Recargar contadores
+                        cargarContadoresCliente(clienteAnalisis.id);
                         // Limpiar tabs cargadas y recargar la tab actual
                         setTabsCargadas(new Set());
                         cargarDatosTabActiva(tabDrawer, clienteAnalisis.id);
@@ -1468,7 +1512,7 @@ const Customers: React.FC = () => {
                 tab={
                   <span>
                     <CheckCircleOutlined />
-                    Pagos ({pagosCliente.length})
+                    Pagos ({pagosCliente.length > 0 ? pagosCliente.length : contadorPagos})
                   </span>
                 }
                 key="2"
@@ -1561,7 +1605,7 @@ const Customers: React.FC = () => {
                 tab={
                   <span>
                     <SwapOutlined />
-                    Reemplazos/Devoluciones ({reemplazosCliente.length})
+                    Reemplazos/Devoluciones ({reemplazosCliente.length > 0 ? reemplazosCliente.length : contadorDevoluciones})
                   </span>
                 }
                 key="3"
@@ -1685,7 +1729,7 @@ const Customers: React.FC = () => {
                 tab={
                   <span>
                     <TagsOutlined />
-                    Productos ({productosCliente.length})
+                    Productos ({productosCliente.length > 0 ? productosCliente.length : contadorProductos})
                   </span>
                 }
                 key="4"
