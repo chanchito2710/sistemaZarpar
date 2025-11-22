@@ -511,23 +511,11 @@ const Customers: React.FC = () => {
       ? (cliente as any).sucursal_origen.toLowerCase() 
       : sucursalSeleccionada;
     
-    // Si el cliente tiene sucursal_origen (modo "todas"), temporalmente cambiar la sucursal seleccionada
-    // para que las funciones de carga usen la sucursal correcta
-    const sucursalOriginal = sucursalSeleccionada;
-    if ((cliente as any).sucursal_origen && sucursalSeleccionada === 'todas') {
-      setSucursalSeleccionada(sucursalDelCliente);
-    }
-    
     // Cargar contadores rápidamente (en paralelo) - pasando la sucursal específica
     cargarContadoresCliente(cliente.id, sucursalDelCliente);
     
     // Solo cargar los datos completos de la primera pestaña (Ventas Globales)
     await cargarDatosTabActiva('1', cliente.id, sucursalDelCliente);
-    
-    // Restaurar sucursal original
-    if (cliente.sucursal_origen && sucursalOriginal === 'todas') {
-      setSucursalSeleccionada(sucursalOriginal);
-    }
   };
 
   /**
