@@ -52,11 +52,11 @@ async function ejecutarMysqlDump(filename: string): Promise<string> {
   if (isDocker) {
     // En desarrollo: Usar Docker exec (sin redirección >)
     console.log('🐳 Usando Docker exec para mysqldump');
-    command = `docker exec zarpar-mysql mysqldump -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME}`;
+    command = `docker exec zarpar-mysql mysqldump -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces --ignore-table=${DB_NAME}.backups_metadata --ignore-table=${DB_NAME}.backup_logs ${DB_NAME}`;
   } else {
     // En producción: Usar mysqldump directo (sin redirección >)
     console.log('☁️ Usando mysqldump directo (Railway)');
-    command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces ${DB_NAME}`;
+    command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces --ignore-table=${DB_NAME}.backups_metadata --ignore-table=${DB_NAME}.backup_logs ${DB_NAME}`;
   }
   
   try {
