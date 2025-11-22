@@ -63,11 +63,9 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
   onCancel,
   onSuccess,
 }) => {
-  const [step, setStep] = useState(1); // Paso actual del wizard
   const [loading, setLoading] = useState(false);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('todas');
   const [sucursales, setSucursales] = useState<string[]>([]);
-  const [confirmText, setConfirmText] = useState('');
   
   // Estados para Borrado Maestro
   const [modalBorradoMaestro1Visible, setModalBorradoMaestro1Visible] = useState(false);
@@ -97,9 +95,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
   }, [visible]);
 
   const resetModal = () => {
-    setStep(1);
     setSucursalSeleccionada('todas');
-    setConfirmText('');
     setOpciones({
       ventas: false,
       cuentaCorriente: false,
@@ -165,10 +161,6 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
   const puedeAvanzar = () => {
     const algunaOpcionSeleccionada = Object.values(opciones).some(v => v);
     return algunaOpcionSeleccionada;
-  };
-
-  const puedeConfirmar = () => {
-    return confirmText === 'ELIMINAR DATOS';
   };
 
   // ========================================
@@ -459,75 +451,6 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
     </Space>
   );
 
-  const renderStep2 = () => (
-    <Space direction="vertical" style={{ width: '100%' }} size="large">
-      <Alert
-        message="🔍 Resumen de Limpieza"
-        description="Revisa cuidadosamente qué se va a eliminar:"
-        type="warning"
-        showIcon
-      />
-
-      <Card>
-        <Row gutter={[16, 16]}>
-          <Col span={24}>
-            <Text strong>Sucursal:</Text>
-            <Tag color="blue" style={{ marginLeft: '8px', fontSize: '14px' }}>
-              {sucursalSeleccionada === 'todas' 
-                ? '🌍 TODAS LAS SUCURSALES' 
-                : `📍 ${sucursalSeleccionada.toUpperCase()}`
-              }
-            </Tag>
-          </Col>
-
-          <Col span={24}>
-            <Divider style={{ margin: '12px 0' }} />
-            <Text strong style={{ display: 'block', marginBottom: '12px' }}>
-              Se eliminarán:
-            </Text>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              {opciones.ventas && <Tag color="red">✓ Ventas</Tag>}
-              {opciones.cuentaCorriente && <Tag color="orange">✓ Cuenta Corriente</Tag>}
-              {opciones.clientes && <Tag color="volcano">✓ Clientes</Tag>}
-              {opciones.movimientosCaja && <Tag color="gold">✓ Movimientos de Caja</Tag>}
-              {opciones.comisiones && <Tag color="purple">✓ Comisiones</Tag>}
-              {opciones.productos && <Tag color="red">✓ TODOS los Productos (ELIMINACIÓN COMPLETA)</Tag>}
-              {opciones.movimientosInventario && <Tag color="cyan">✓ Movimientos de Inventario</Tag>}
-              {opciones.transferencias && <Tag color="blue">✓ Transferencias</Tag>}
-              {opciones.devoluciones && <Tag color="orange">✓ Devoluciones y Reemplazos</Tag>}
-              {opciones.gastos && <Tag color="magenta">✓ Gastos</Tag>}
-              {opciones.reportesEstadisticas && <Tag color="red">✓ Reportes y Estadísticas (Ventas Globales)</Tag>}
-            </Space>
-          </Col>
-        </Row>
-      </Card>
-
-      <Alert
-        message="⚠️ Confirmación Final Requerida"
-        description={
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Text>
-              Para confirmar, escribe exactamente:{' '}
-              <Text code strong style={{ fontSize: '14px' }}>
-                ELIMINAR DATOS
-              </Text>
-            </Text>
-            <Input
-              placeholder="Escribe: ELIMINAR DATOS"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              size="large"
-              style={{ marginTop: '8px' }}
-              autoFocus
-            />
-          </Space>
-        }
-        type="error"
-        showIcon
-      />
-    </Space>
-  );
-
   return (
     <>
     <Modal
@@ -546,37 +469,20 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
           <Button onClick={onCancel}>
             Cancelar
           </Button>
-          {step === 1 && (
-            <Button
-              type="primary"
-              onClick={() => setStep(2)}
-              disabled={!puedeAvanzar()}
-            >
-              Continuar →
-            </Button>
-          )}
-          {step === 2 && (
-            <>
-              <Button onClick={() => setStep(1)}>
-                ← Atrás
-              </Button>
-              <Button
-                type="primary"
-                danger
-                onClick={handleLimpiar}
-                loading={loading}
-                disabled={!puedeConfirmar()}
-                icon={<DeleteOutlined />}
-              >
-                🗑️ ELIMINAR DATOS
-              </Button>
-            </>
-          )}
+          <Button
+            type="primary"
+            danger
+            onClick={handleLimpiar}
+            loading={loading}
+            disabled={!puedeAvanzar()}
+            icon={<DeleteOutlined />}
+          >
+            🗑️ ELIMINAR DATOS
+          </Button>
         </Space>
       }
     >
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
+      {renderStep1()}
     </Modal>
 
     {/* MODAL 1: PRIMERA ADVERTENCIA */}
