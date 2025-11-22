@@ -2092,6 +2092,196 @@ const Customers: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* MODAL DE DETALLE DE VENTA */}
+      <Modal
+        title={
+          <Space>
+            <ShoppingOutlined style={{ color: '#1890ff' }} />
+            <Text strong style={{ fontSize: 16 }}>
+              Detalle de Venta {ventaDetalle?.numero_venta}
+            </Text>
+          </Space>
+        }
+        open={modalVentaVisible}
+        onCancel={() => {
+          setModalVentaVisible(false);
+          setVentaDetalle(null);
+        }}
+        footer={[
+          <Button key="cerrar" onClick={() => setModalVentaVisible(false)}>
+            Cerrar
+          </Button>
+        ]}
+        width={900}
+      >
+        {ventaDetalle && (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            {/* Información de la Venta */}
+            <Card size="small">
+              <Row gutter={[16, 16]}>
+                <Col span={12}>
+                  <Text type="secondary">Fecha:</Text>
+                  <br />
+                  <Text strong>{dayjs(ventaDetalle.fecha_venta).format('DD/MM/YYYY HH:mm')}</Text>
+                </Col>
+                <Col span={12}>
+                  <Text type="secondary">Cliente:</Text>
+                  <br />
+                  <Text strong>{ventaDetalle.cliente_nombre}</Text>
+                </Col>
+                <Col span={12}>
+                  <Text type="secondary">Método de Pago:</Text>
+                  <br />
+                  <Tag color={
+                    ventaDetalle.metodo_pago === 'efectivo' ? 'success' :
+                    ventaDetalle.metodo_pago === 'transferencia' ? 'processing' :
+                    'warning'
+                  }>
+                    {ventaDetalle.metodo_pago === 'efectivo' ? '💰 Efectivo' :
+                     ventaDetalle.metodo_pago === 'transferencia' ? '🏦 Transferencia' :
+                     '💳 Cuenta Corriente'}
+                  </Tag>
+                </Col>
+                <Col span={12}>
+                  <Text type="secondary">Estado:</Text>
+                  <br />
+                  <Tag color={
+                    ventaDetalle.estado_pago === 'pagado' ? 'success' :
+                    ventaDetalle.estado_pago === 'pendiente' ? 'error' :
+                    'warning'
+                  }>
+                    {ventaDetalle.estado_pago === 'pagado' ? '✅ Pagado' :
+                     ventaDetalle.estado_pago === 'pendiente' ? '⏳ Pendiente' :
+                     '⚠️ Parcial'}
+                  </Tag>
+                </Col>
+                {ventaDetalle.vendedor_nombre && (
+                  <Col span={12}>
+                    <Text type="secondary">Vendedor:</Text>
+                    <br />
+                    <Text strong>{ventaDetalle.vendedor_nombre}</Text>
+                  </Col>
+                )}
+                <Col span={12}>
+                  <Text type="secondary">Sucursal:</Text>
+                  <br />
+                  <Tag color="blue">📍 {ventaDetalle.sucursal?.toUpperCase()}</Tag>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* Tabla de Productos */}
+            <Card 
+              title={
+                <Space>
+                  <TagsOutlined style={{ color: '#1890ff' }} />
+                  <Text strong>Productos Vendidos</Text>
+                </Space>
+              }
+              size="small"
+            >
+              <Table
+                dataSource={ventaDetalle.productos || []}
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: 'Producto',
+                    dataIndex: 'producto_nombre',
+                    key: 'producto_nombre',
+                    render: (nombre: string, record: any) => (
+                      <div>
+                        <Text strong>{nombre}</Text>
+                        {record.producto_marca && (
+                          <div>
+                            <Tag color="blue" style={{ fontSize: 10 }}>
+                              {record.producto_marca}
+                            </Tag>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  },
+                  {
+                    title: 'Cantidad',
+                    dataIndex: 'cantidad',
+                    key: 'cantidad',
+                    align: 'center',
+                    render: (cantidad: number) => (
+                      <Badge count={cantidad} showZero style={{ backgroundColor: '#52c41a' }} />
+                    )
+                  },
+                  {
+                    title: 'Precio Unitario',
+                    dataIndex: 'precio_unitario',
+                    key: 'precio_unitario',
+                    align: 'right',
+                    render: (precio: number, record: any) => (
+                      <div>
+                        {record.descuento_porcentaje > 0 && (
+                          <div>
+                            <Text delete type="secondary" style={{ fontSize: 11 }}>
+                              ${Number(precio).toFixed(2)}
+                            </Text>
+                          </div>
+                        )}
+                        <Text strong style={{ color: record.descuento_porcentaje > 0 ? '#52c41a' : undefined }}>
+                          ${Number(record.precio_final || precio).toFixed(2)}
+                        </Text>
+                        {record.descuento_porcentaje > 0 && (
+                          <div>
+                            <Tag color="orange" style={{ fontSize: 10 }}>
+                              -{record.descuento_porcentaje}%
+                            </Tag>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  },
+                  {
+                    title: 'Subtotal',
+                    dataIndex: 'subtotal',
+                    key: 'subtotal',
+                    align: 'right',
+                    render: (subtotal: number, record: any) => {
+                      const subtotalConDescuento = record.precio_final 
+                        ? record.precio_final * record.cantidad 
+                        : subtotal;
+                      return (
+                        <Text strong style={{ fontSize: 14, color: '#1890ff' }}>
+                          ${Number(subtotalConDescuento).toFixed(2)}
+                        </Text>
+                      );
+                    }
+                  }
+                ]}
+                summary={() => (
+                  <Table.Summary fixed>
+                    <Table.Summary.Row>
+                      <Table.Summary.Cell index={0} colSpan={3}>
+                        <Text strong style={{ fontSize: 14 }}>TOTAL:</Text>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={1} align="right">
+                        <Text strong style={{ fontSize: 16, color: '#3f8600' }}>
+                          ${Number(ventaDetalle.total).toFixed(2)}
+                        </Text>
+                      </Table.Summary.Cell>
+                    </Table.Summary.Row>
+                  </Table.Summary>
+                )}
+              />
+            </Card>
+
+            {/* Observaciones si existen */}
+            {ventaDetalle.observaciones && (
+              <Card size="small" title="📝 Observaciones">
+                <Text>{ventaDetalle.observaciones}</Text>
+              </Card>
+            )}
+          </Space>
+        )}
+      </Modal>
     </div>
   );
 };
