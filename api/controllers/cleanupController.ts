@@ -24,6 +24,7 @@ import type { ResultSetHeader } from 'mysql2';
  *     transferencias: boolean,
  *     devoluciones: boolean,
  *     gastos: boolean,
+ *     reportesEstadisticas: boolean,
  *   }
  * }
  */
@@ -326,6 +327,66 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
         sucursales
       );
       resultados.push(`✅ Gastos eliminados: ${gastosResult.affectedRows}`);
+    }
+    
+    // 11. Limpiar Reportes y Estadísticas (página /inventory/log)
+    // Esta opción borra TODO lo que aparece en la página de Ventas Globales
+    if (opciones.reportesEstadisticas) {
+      const placeholders = sucursales.map(() => '?').join(', ');
+      
+      console.log('🗑️ Limpiando datos de Reportes y Estadísticas (Ventas Globales)...');
+      
+      // Borrar ventas (si no se borró ya)
+      if (!opciones.ventas) {
+        const [ventasResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM ventas WHERE sucursal IN (${placeholders})`,
+          sucursales
+        );
+        resultados.push(`✅ [REPORTES] Ventas eliminadas: ${ventasResult.affectedRows}`);
+        
+        const [resumenResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM ventas_diarias_resumen`
+        );
+        resultados.push(`✅ [REPORTES] Resúmenes diarios eliminados: ${resumenResult.affectedRows}`);
+      }
+      
+      // Borrar gastos (si no se borró ya)
+      if (!opciones.gastos) {
+        const [gastosResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM gastos WHERE sucursal IN (${placeholders})`,
+          sucursales
+        );
+        resultados.push(`✅ [REPORTES] Gastos eliminados: ${gastosResult.affectedRows}`);
+      }
+      
+      // Borrar movimientos de caja (si no se borró ya)
+      if (!opciones.movimientosCaja) {
+        const [movimientosResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM movimientos_caja WHERE sucursal IN (${placeholders})`,
+          sucursales
+        );
+        resultados.push(`✅ [REPORTES] Movimientos de caja eliminados: ${movimientosResult.affectedRows}`);
+      }
+      
+      // Borrar devoluciones (si no se borró ya)
+      if (!opciones.devoluciones) {
+        const [devolucionesResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM devoluciones_reemplazos WHERE sucursal IN (${placeholders})`,
+          sucursales
+        );
+        resultados.push(`✅ [REPORTES] Devoluciones eliminadas: ${devolucionesResult.affectedRows}`);
+      }
+      
+      // Borrar comisiones (si no se borró ya)
+      if (!opciones.comisiones) {
+        const [comisionesResult] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM comisiones_vendedores WHERE sucursal IN (${placeholders})`,
+          sucursales
+        );
+        resultados.push(`✅ [REPORTES] Comisiones eliminadas: ${comisionesResult.affectedRows}`);
+      }
+      
+      resultados.push(`✅ Limpieza de Reportes y Estadísticas completada`);
     }
     
     // Commit de la transacción

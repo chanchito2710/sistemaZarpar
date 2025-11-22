@@ -55,6 +55,7 @@ interface CleanupOptions {
   transferencias: boolean;
   devoluciones: boolean;
   gastos: boolean;
+  reportesEstadisticas: boolean;
 }
 
 const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
@@ -85,6 +86,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
     transferencias: false,
     devoluciones: false,
     gastos: false,
+    reportesEstadisticas: false,
   });
 
   useEffect(() => {
@@ -109,6 +111,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
       transferencias: false,
       devoluciones: false,
       gastos: false,
+      reportesEstadisticas: false,
     });
   };
 
@@ -365,6 +368,18 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
             </Space>
           </Checkbox>
         </Card>
+
+        <Card size="small">
+          <Checkbox
+            checked={opciones.reportesEstadisticas}
+            onChange={() => handleCheckOption('reportesEstadisticas')}
+          >
+            <Space>
+              <Text strong>Reportes y Estadísticas</Text>
+              <Tag color="red">⚠️ Limpia datos de Ventas Globales (/inventory/log)</Tag>
+            </Space>
+          </Checkbox>
+        </Card>
       </Space>
 
       {/* BORRADO MAESTRO */}
@@ -481,6 +496,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
               {opciones.transferencias && <Tag color="blue">✓ Transferencias</Tag>}
               {opciones.devoluciones && <Tag color="orange">✓ Devoluciones y Reemplazos</Tag>}
               {opciones.gastos && <Tag color="magenta">✓ Gastos</Tag>}
+              {opciones.reportesEstadisticas && <Tag color="red">✓ Reportes y Estadísticas (Ventas Globales)</Tag>}
             </Space>
           </Col>
         </Row>
