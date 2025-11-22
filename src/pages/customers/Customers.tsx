@@ -360,14 +360,26 @@ const Customers: React.FC = () => {
   const verDetalleVenta = async (ventaId: number) => {
     try {
       setLoading(true);
-      console.log('📊 [DEBUG] Cargando detalle de venta ID:', ventaId);
+      console.log('📊 [DETALLE VENTA] Cargando detalle de venta ID:', ventaId);
       const detalle = await ventasService.obtenerDetalle(ventaId);
-      console.log('✅ [DEBUG] Detalle recibido:', detalle);
-      console.log('📦 [DEBUG] Productos:', detalle.productos);
+      console.log('✅ [DETALLE VENTA] Detalle recibido:', detalle);
+      console.log('📦 [DETALLE VENTA] Cantidad de productos:', detalle.productos?.length || 0);
+      
+      if (detalle.productos && detalle.productos.length > 0) {
+        console.log('🔍 [DETALLE VENTA] Primer producto:', {
+          nombre: detalle.productos[0].nombre,
+          precio_venta: detalle.productos[0].precio_venta,
+          cantidad: detalle.productos[0].cantidad,
+          subtotal: detalle.productos[0].subtotal,
+          marca: detalle.productos[0].marca,
+          tipo: detalle.productos[0].tipo
+        });
+      }
+      
       setVentaDetalle(detalle);
       setModalVentaVisible(true);
     } catch (error) {
-      console.error('❌ [DEBUG] Error al cargar detalle de venta:', error);
+      console.error('❌ [DETALLE VENTA] Error al cargar detalle de venta:', error);
       message.error('Error al cargar detalle de venta');
     } finally {
       setLoading(false);
@@ -2096,16 +2108,24 @@ const Customers: React.FC = () => {
                 columns={[
                   {
                     title: 'Producto',
-                    dataIndex: 'producto_nombre',
-                    key: 'producto_nombre',
+                    dataIndex: 'nombre',
+                    key: 'nombre',
                     render: (nombre: string, record: any) => (
                       <div>
-                        <Text strong>{nombre || 'Sin nombre'}</Text>
-                        {record.producto_marca && (
-                          <div>
-                            <Tag color="blue" style={{ fontSize: 10 }}>
-                              {record.producto_marca}
-                            </Tag>
+                        <Text strong style={{ fontSize: 13 }}>{nombre || 'Sin nombre'}</Text>
+                        {(record.marca || record.tipo) && (
+                          <div style={{ marginTop: 4 }}>
+                            <Space size={4}>
+                              {record.tipo && <Tag color="blue" style={{ fontSize: 10 }}>{record.tipo}</Tag>}
+                              {record.marca && <Tag color="green" style={{ fontSize: 10 }}>{record.marca}</Tag>}
+                            </Space>
+                          </div>
+                        )}
+                        {record.codigo && (
+                          <div style={{ marginTop: 2 }}>
+                            <Text type="secondary" style={{ fontSize: 10 }}>
+                              Código: {record.codigo}
+                            </Text>
                           </div>
                         )}
                       </div>
@@ -2116,17 +2136,19 @@ const Customers: React.FC = () => {
                     dataIndex: 'cantidad',
                     key: 'cantidad',
                     align: 'center',
+                    width: 100,
                     render: (cantidad: number) => (
-                      <Badge count={cantidad || 0} showZero style={{ backgroundColor: '#52c41a' }} />
+                      <Badge count={cantidad || 0} showZero style={{ backgroundColor: '#52c41a', fontSize: 14 }} />
                     )
                   },
                   {
                     title: 'Precio Unitario',
-                    dataIndex: 'precio_unitario',
-                    key: 'precio_unitario',
+                    dataIndex: 'precio_venta',
+                    key: 'precio_venta',
                     align: 'right',
+                    width: 140,
                     render: (precio: number, record: any) => {
-                      const precioOriginal = Number(precio || 0);
+                      const precioOriginal = Number(precio || record.precio_unitario || 0);
                       const precioFinal = Number(record.precio_final || precio || 0);
                       const tieneDescuento = record.descuento_porcentaje && record.descuento_porcentaje > 0;
                       
@@ -2139,11 +2161,11 @@ const Customers: React.FC = () => {
                               </Text>
                             </div>
                           )}
-                          <Text strong style={{ color: tieneDescuento ? '#52c41a' : undefined }}>
+                          <Text strong style={{ color: tieneDescuento ? '#52c41a' : undefined, fontSize: 14 }}>
                             ${precioFinal.toFixed(2)}
                           </Text>
                           {tieneDescuento && (
-                            <div>
+                            <div style={{ marginTop: 2 }}>
                               <Tag color="orange" style={{ fontSize: 10 }}>
                                 -{record.descuento_porcentaje}%
                               </Tag>
@@ -2158,14 +2180,15 @@ const Customers: React.FC = () => {
                     dataIndex: 'subtotal',
                     key: 'subtotal',
                     align: 'right',
+                    width: 140,
                     render: (subtotal: number, record: any) => {
                       const cantidad = Number(record.cantidad || 0);
-                      const precioFinal = Number(record.precio_final || record.precio_unitario || 0);
+                      const precioFinal = Number(record.precio_final || record.precio_venta || record.precio_unitario || 0);
                       const subtotalCalculado = precioFinal * cantidad;
                       const subtotalFinal = subtotalCalculado || Number(subtotal || 0);
                       
                       return (
-                        <Text strong style={{ fontSize: 14, color: '#1890ff' }}>
+                        <Text strong style={{ fontSize: 15, color: '#1890ff' }}>
                           ${subtotalFinal.toFixed(2)}
                         </Text>
                       );

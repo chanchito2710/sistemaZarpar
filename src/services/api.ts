@@ -987,11 +987,19 @@ export interface VentaDetalle {
   id?: number;
   venta_id?: number;
   producto_id: number;
-  producto_nombre: string;
-  producto_marca?: string;
+  producto_nombre?: string;  // Para crear ventas (input)
+  nombre?: string;            // Para leer ventas (output del backend)
+  producto_marca?: string;    // Para crear ventas (input)
+  marca?: string;             // Para leer ventas (output del backend)
   producto_codigo?: string;
+  codigo?: string;            // Para leer ventas (output del backend)
+  tipo?: string;              // Tipo de producto
+  calidad?: string;           // Calidad del producto
   cantidad: number;
-  precio_unitario: number;
+  precio_unitario?: number;   // Para crear ventas (input)
+  precio_venta?: number;      // Para leer ventas (output del backend)
+  precio_final?: number;      // Precio con descuento aplicado
+  descuento_porcentaje?: number;  // Porcentaje de descuento aplicado
   subtotal: number;
 }
 
