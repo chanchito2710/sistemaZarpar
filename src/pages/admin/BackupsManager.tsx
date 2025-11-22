@@ -296,7 +296,7 @@ const BackupsManager: React.FC = () => {
                   fontWeight: 'bold'
                 }}
               >
-                🟢 BACKUP DEL SISTEMA
+                ⚫ BACKUP DEL SISTEMA
               </Button>
             </Col>
             <Col xs={24} sm={12}>
@@ -433,7 +433,7 @@ const BackupsManager: React.FC = () => {
 
         {/* MODAL CREAR BACKUP MANUAL */}
         <Modal
-          title={<span style={{ fontSize: 18 }}>🟢 Crear Backup Manual del Sistema</span>}
+          title={<span style={{ fontSize: 18 }}>⚫ Crear Backup Manual del Sistema</span>}
           open={backupModalVisible}
           onCancel={() => {
             setBackupModalVisible(false);
@@ -503,7 +503,7 @@ const BackupsManager: React.FC = () => {
                     borderColor: '#52c41a'
                   }}
                 >
-                  🟢 Crear Backup
+                  ⚫ Crear Backup
                 </Button>
               </Space>
             </Form.Item>
