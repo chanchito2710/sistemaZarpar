@@ -20,6 +20,10 @@ import type { ResultSetHeader } from 'mysql2';
  *     movimientosCaja: boolean,
  *     comisiones: boolean,
  *     productos: boolean,
+ *     movimientosInventario: boolean,
+ *     transferencias: boolean,
+ *     devoluciones: boolean,
+ *     gastos: boolean,
  *   }
  * }
  */
@@ -219,6 +223,57 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
         `DELETE FROM productos`
       );
       resultados.push(`✅ Productos eliminados COMPLETAMENTE: ${productosResult.affectedRows} productos`);
+    }
+    
+    // 7. Limpiar Movimientos de Inventario (historial_stock)
+    if (opciones.movimientosInventario) {
+      const placeholders = sucursales.map(() => '?').join(', ');
+      
+      const [historialResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM historial_stock WHERE sucursal IN (${placeholders})`,
+        sucursales
+      );
+      resultados.push(`✅ Historial de movimientos de inventario eliminado: ${historialResult.affectedRows}`);
+    }
+    
+    // 8. Limpiar Transferencias de mercadería entre sucursales
+    if (opciones.transferencias) {
+      const placeholders = sucursales.map(() => '?').join(', ');
+      
+      // Eliminar transferencias donde origen o destino está en las sucursales seleccionadas
+      const [transferenciasResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM transferencias WHERE sucursal_origen IN (${placeholders}) OR sucursal_destino IN (${placeholders})`,
+        [...sucursales, ...sucursales]
+      );
+      resultados.push(`✅ Transferencias eliminadas: ${transferenciasResult.affectedRows}`);
+      
+      // Eliminar historial de transferencias
+      const [historialTransfResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM historial_transferencias`
+      );
+      resultados.push(`✅ Historial de transferencias eliminado: ${historialTransfResult.affectedRows}`);
+    }
+    
+    // 9. Limpiar Devoluciones y Reemplazos
+    if (opciones.devoluciones) {
+      const placeholders = sucursales.map(() => '?').join(', ');
+      
+      const [devolucionesResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM devoluciones_reemplazos WHERE sucursal IN (${placeholders})`,
+        sucursales
+      );
+      resultados.push(`✅ Devoluciones y reemplazos eliminados: ${devolucionesResult.affectedRows}`);
+    }
+    
+    // 10. Limpiar Gastos
+    if (opciones.gastos) {
+      const placeholders = sucursales.map(() => '?').join(', ');
+      
+      const [gastosResult] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM gastos WHERE sucursal IN (${placeholders})`,
+        sucursales
+      );
+      resultados.push(`✅ Gastos eliminados: ${gastosResult.affectedRows}`);
     }
     
     // Commit de la transacción

@@ -51,6 +51,10 @@ interface CleanupOptions {
   movimientosCaja: boolean;
   comisiones: boolean;
   productos: boolean;
+  movimientosInventario: boolean;
+  transferencias: boolean;
+  devoluciones: boolean;
+  gastos: boolean;
 }
 
 const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
@@ -77,6 +81,10 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
     movimientosCaja: false,
     comisiones: false,
     productos: false,
+    movimientosInventario: false,
+    transferencias: false,
+    devoluciones: false,
+    gastos: false,
   });
 
   useEffect(() => {
@@ -97,6 +105,10 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
       movimientosCaja: false,
       comisiones: false,
       productos: false,
+      movimientosInventario: false,
+      transferencias: false,
+      devoluciones: false,
+      gastos: false,
     });
   };
 
@@ -302,6 +314,54 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
             </Space>
           </Checkbox>
         </Card>
+
+        <Card size="small">
+          <Checkbox
+            checked={opciones.movimientosInventario}
+            onChange={() => handleCheckOption('movimientosInventario')}
+          >
+            <Space>
+              <Text strong>Movimientos de Inventario</Text>
+              <Tag color="cyan">Elimina historial de cambios de stock</Tag>
+            </Space>
+          </Checkbox>
+        </Card>
+
+        <Card size="small">
+          <Checkbox
+            checked={opciones.transferencias}
+            onChange={() => handleCheckOption('transferencias')}
+          >
+            <Space>
+              <Text strong>Transferencias</Text>
+              <Tag color="blue">Elimina transferencias entre sucursales</Tag>
+            </Space>
+          </Checkbox>
+        </Card>
+
+        <Card size="small">
+          <Checkbox
+            checked={opciones.devoluciones}
+            onChange={() => handleCheckOption('devoluciones')}
+          >
+            <Space>
+              <Text strong>Devoluciones y Reemplazos</Text>
+              <Tag color="orange">Elimina registros de devoluciones/reemplazos</Tag>
+            </Space>
+          </Checkbox>
+        </Card>
+
+        <Card size="small">
+          <Checkbox
+            checked={opciones.gastos}
+            onChange={() => handleCheckOption('gastos')}
+          >
+            <Space>
+              <Text strong>Gastos</Text>
+              <Tag color="magenta">Elimina registros de gastos</Tag>
+            </Space>
+          </Checkbox>
+        </Card>
       </Space>
 
       {/* BORRADO MAESTRO */}
@@ -414,6 +474,10 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
               {opciones.movimientosCaja && <Tag color="gold">✓ Movimientos de Caja</Tag>}
               {opciones.comisiones && <Tag color="purple">✓ Comisiones</Tag>}
               {opciones.productos && <Tag color="red">✓ TODOS los Productos (ELIMINACIÓN COMPLETA)</Tag>}
+              {opciones.movimientosInventario && <Tag color="cyan">✓ Movimientos de Inventario</Tag>}
+              {opciones.transferencias && <Tag color="blue">✓ Transferencias</Tag>}
+              {opciones.devoluciones && <Tag color="orange">✓ Devoluciones y Reemplazos</Tag>}
+              {opciones.gastos && <Tag color="magenta">✓ Gastos</Tag>}
             </Space>
           </Col>
         </Row>
