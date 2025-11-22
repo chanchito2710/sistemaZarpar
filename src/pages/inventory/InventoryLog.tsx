@@ -2242,17 +2242,6 @@ const GlobalSales: React.FC = () => {
         </Col>
 
         <Col xs={12} sm={6}>
-          <Card className="stat-card stat-card-average">
-            <div style={{ padding: '8px 0' }}>
-              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>Promedio por Venta</div>
-              <div style={{ color: '#722ed1', fontSize: 20, fontWeight: 700 }}>
-                {formatearDinero(promedioVenta)}
-              </div>
-            </div>
-          </Card>
-        </Col>
-
-        <Col xs={12} sm={6}>
           <Card className="stat-card stat-card-paid">
             <div style={{ padding: '8px 0' }}>
               <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>Ventas Pagadas</div>
