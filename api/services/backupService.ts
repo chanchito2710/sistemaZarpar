@@ -42,7 +42,7 @@ async function ejecutarMysqlDump(filename: string): Promise<string> {
   // Detectar si estamos en desarrollo (Docker) o producción
   // En desarrollo: localhost o 127.0.0.1 con puerto 3307 = Docker
   const isLocalhost = DB_HOST === 'localhost' || DB_HOST === '127.0.0.1';
-  const isDockerPort = DB_PORT === '3307' || DB_PORT === 3307;
+  const isDockerPort = DB_PORT === '3307';
   const isDocker = isLocalhost && isDockerPort;
   
   console.log(`🔍 Detección Docker: HOST=${DB_HOST}, PORT=${DB_PORT}, isDocker=${isDocker}`);
@@ -336,7 +336,7 @@ export async function restaurarBackup(filename: string, usuario_email: string): 
     
     // Detectar si estamos en desarrollo (Docker) o producción
     const isLocalhost = DB_HOST === 'localhost' || DB_HOST === '127.0.0.1';
-    const isDockerPort = DB_PORT === '3307' || DB_PORT === 3307;
+    const isDockerPort = DB_PORT === '3307';
     const isDocker = isLocalhost && isDockerPort;
     
     console.log(`🔍 Detección Docker (restaurar): HOST=${DB_HOST}, PORT=${DB_PORT}, isDocker=${isDocker}`);
