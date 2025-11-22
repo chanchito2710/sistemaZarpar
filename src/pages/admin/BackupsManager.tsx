@@ -433,7 +433,7 @@ const BackupsManager: React.FC = () => {
 
         {/* MODAL CREAR BACKUP MANUAL */}
         <Modal
-          title={<span style={{ fontSize: 18 }}>⚫ Crear Backup Manual del Sistema</span>}
+          title={<span style={{ fontSize: 18, color: '#000', fontWeight: 'bold' }}>⚫ Crear Backup Manual del Sistema</span>}
           open={backupModalVisible}
           onCancel={() => {
             setBackupModalVisible(false);
