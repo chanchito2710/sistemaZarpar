@@ -175,8 +175,8 @@ const Customers: React.FC = () => {
   useEffect(() => {
     if (usuario && !sucursalSeleccionada) {
       if (usuario.esAdmin) {
-        // Admin selecciona la primera sucursal disponible o 'pando' por defecto
-        setSucursalSeleccionada(sucursales.length > 0 ? sucursales[0] : 'pando');
+        // Admin selecciona "Todas las Sucursales" por defecto
+        setSucursalSeleccionada('todas');
       } else if (usuario.sucursal) {
         // Usuario normal usa su sucursal
         setSucursalSeleccionada(usuario.sucursal.toLowerCase());
@@ -266,12 +266,22 @@ const Customers: React.FC = () => {
   };
 
   /**
-   * Cargar ventas de la sucursal
+   * Cargar ventas de la sucursal (o todas si es admin)
    */
   const cargarVentas = async () => {
     try {
-      const data = await ventasService.obtenerPorSucursal(sucursalSeleccionada);
-      setVentas(data);
+      if (sucursalSeleccionada === 'todas' && usuario?.esAdmin) {
+        // Cargar ventas de todas las sucursales
+        const promesas = sucursales.map(sucursal =>
+          ventasService.obtenerPorSucursal(sucursal.toLowerCase())
+        );
+        const resultados = await Promise.all(promesas);
+        const todasLasVentas = resultados.flat();
+        setVentas(todasLasVentas);
+      } else {
+        const data = await ventasService.obtenerPorSucursal(sucursalSeleccionada);
+        setVentas(data);
+      }
     } catch (error) {
       console.error('Error al cargar ventas:', error);
       message.error('Error al cargar ventas');
@@ -279,12 +289,22 @@ const Customers: React.FC = () => {
   };
 
   /**
-   * Cargar clientes con saldo en cuenta corriente
+   * Cargar clientes con saldo en cuenta corriente (o todas si es admin)
    */
   const cargarClientesCuentaCorriente = async () => {
     try {
-      const data = await cuentaCorrienteService.obtenerClientesConSaldo(sucursalSeleccionada);
-      setClientesCuentaCorriente(data);
+      if (sucursalSeleccionada === 'todas' && usuario?.esAdmin) {
+        // Cargar cuenta corriente de todas las sucursales
+        const promesas = sucursales.map(sucursal =>
+          cuentaCorrienteService.obtenerClientesConSaldo(sucursal.toLowerCase())
+        );
+        const resultados = await Promise.all(promesas);
+        const todosLosClientesCC = resultados.flat();
+        setClientesCuentaCorriente(todosLosClientesCC);
+      } else {
+        const data = await cuentaCorrienteService.obtenerClientesConSaldo(sucursalSeleccionada);
+        setClientesCuentaCorriente(data);
+      }
     } catch (error) {
       console.error('Error al cargar cuenta corriente:', error);
     }
