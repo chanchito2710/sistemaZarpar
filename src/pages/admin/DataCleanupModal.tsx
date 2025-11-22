@@ -444,12 +444,38 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
               border: '2px solid #ff4d4f',
             }}
           >
-            🔥 EJECUTAR BORRADO MAESTRO
-          </Button>
-        </Space>
-      </Card>
-    </Space>
-  );
+          🔥 EJECUTAR BORRADO MAESTRO
+        </Button>
+      </Space>
+    </Card>
+
+    {/* Botones de Acción */}
+    <div style={{ 
+      marginTop: '24px', 
+      paddingTop: '16px', 
+      borderTop: '1px solid #f0f0f0',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      gap: '12px'
+    }}>
+      <Button onClick={onCancel} size="large">
+        Cancelar
+      </Button>
+      <Button
+        type="primary"
+        danger
+        onClick={handleLimpiar}
+        loading={loading}
+        disabled={!puedeAvanzar()}
+        icon={<DeleteOutlined />}
+        size="large"
+        style={{ fontWeight: 'bold' }}
+      >
+        🗑️ ELIMINAR DATOS SELECCIONADOS
+      </Button>
+    </div>
+  </Space>
+);
 
   return (
     <>
@@ -464,23 +490,7 @@ const DataCleanupModal: React.FC<DataCleanupModalProps> = ({
       open={visible}
       onCancel={onCancel}
       width={700}
-      footer={
-        <Space>
-          <Button onClick={onCancel}>
-            Cancelar
-          </Button>
-          <Button
-            type="primary"
-            danger
-            onClick={handleLimpiar}
-            loading={loading}
-            disabled={!puedeAvanzar()}
-            icon={<DeleteOutlined />}
-          >
-            🗑️ ELIMINAR DATOS
-          </Button>
-        </Space>
-      }
+      footer={null}
     >
       {renderStep1()}
     </Modal>
