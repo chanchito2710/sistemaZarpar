@@ -360,11 +360,14 @@ const Customers: React.FC = () => {
   const verDetalleVenta = async (ventaId: number) => {
     try {
       setLoading(true);
+      console.log('📊 [DEBUG] Cargando detalle de venta ID:', ventaId);
       const detalle = await ventasService.obtenerDetalle(ventaId);
+      console.log('✅ [DEBUG] Detalle recibido:', detalle);
+      console.log('📦 [DEBUG] Productos:', detalle.productos);
       setVentaDetalle(detalle);
       setModalVentaVisible(true);
     } catch (error) {
-      console.error('Error al cargar detalle de venta:', error);
+      console.error('❌ [DEBUG] Error al cargar detalle de venta:', error);
       message.error('Error al cargar detalle de venta');
     } finally {
       setLoading(false);
@@ -2099,7 +2102,7 @@ const Customers: React.FC = () => {
           <Space>
             <ShoppingOutlined style={{ color: '#1890ff' }} />
             <Text strong style={{ fontSize: 16 }}>
-              Detalle de Venta {ventaDetalle?.numero_venta}
+              Detalle de Venta {ventaDetalle?.numero_venta || ''}
             </Text>
           </Space>
         }
@@ -2109,13 +2112,17 @@ const Customers: React.FC = () => {
           setVentaDetalle(null);
         }}
         footer={[
-          <Button key="cerrar" onClick={() => setModalVentaVisible(false)}>
+          <Button key="cerrar" onClick={() => {
+            setModalVentaVisible(false);
+            setVentaDetalle(null);
+          }}>
             Cerrar
           </Button>
         ]}
         width={900}
       >
-        {ventaDetalle && (
+        <Spin spinning={loading}>
+          {ventaDetalle && (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
             {/* Información de la Venta */}
             <Card size="small">
@@ -2183,6 +2190,7 @@ const Customers: React.FC = () => {
             >
               <Table
                 dataSource={ventaDetalle.productos || []}
+                rowKey={(record) => record.id || `producto_${record.producto_id}_${Math.random()}`}
                 pagination={false}
                 size="small"
                 columns={[
@@ -2192,7 +2200,7 @@ const Customers: React.FC = () => {
                     key: 'producto_nombre',
                     render: (nombre: string, record: any) => (
                       <div>
-                        <Text strong>{nombre}</Text>
+                        <Text strong>{nombre || 'Sin nombre'}</Text>
                         {record.producto_marca && (
                           <div>
                             <Tag color="blue" style={{ fontSize: 10 }}>
@@ -2209,7 +2217,7 @@ const Customers: React.FC = () => {
                     key: 'cantidad',
                     align: 'center',
                     render: (cantidad: number) => (
-                      <Badge count={cantidad} showZero style={{ backgroundColor: '#52c41a' }} />
+                      <Badge count={cantidad || 0} showZero style={{ backgroundColor: '#52c41a' }} />
                     )
                   },
                   {
@@ -2217,27 +2225,33 @@ const Customers: React.FC = () => {
                     dataIndex: 'precio_unitario',
                     key: 'precio_unitario',
                     align: 'right',
-                    render: (precio: number, record: any) => (
-                      <div>
-                        {record.descuento_porcentaje > 0 && (
-                          <div>
-                            <Text delete type="secondary" style={{ fontSize: 11 }}>
-                              ${Number(precio).toFixed(2)}
-                            </Text>
-                          </div>
-                        )}
-                        <Text strong style={{ color: record.descuento_porcentaje > 0 ? '#52c41a' : undefined }}>
-                          ${Number(record.precio_final || precio).toFixed(2)}
-                        </Text>
-                        {record.descuento_porcentaje > 0 && (
-                          <div>
-                            <Tag color="orange" style={{ fontSize: 10 }}>
-                              -{record.descuento_porcentaje}%
-                            </Tag>
-                          </div>
-                        )}
-                      </div>
-                    )
+                    render: (precio: number, record: any) => {
+                      const precioOriginal = Number(precio || 0);
+                      const precioFinal = Number(record.precio_final || precio || 0);
+                      const tieneDescuento = record.descuento_porcentaje && record.descuento_porcentaje > 0;
+                      
+                      return (
+                        <div>
+                          {tieneDescuento && (
+                            <div>
+                              <Text delete type="secondary" style={{ fontSize: 11 }}>
+                                ${precioOriginal.toFixed(2)}
+                              </Text>
+                            </div>
+                          )}
+                          <Text strong style={{ color: tieneDescuento ? '#52c41a' : undefined }}>
+                            ${precioFinal.toFixed(2)}
+                          </Text>
+                          {tieneDescuento && (
+                            <div>
+                              <Tag color="orange" style={{ fontSize: 10 }}>
+                                -{record.descuento_porcentaje}%
+                              </Tag>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
                   },
                   {
                     title: 'Subtotal',
@@ -2245,31 +2259,36 @@ const Customers: React.FC = () => {
                     key: 'subtotal',
                     align: 'right',
                     render: (subtotal: number, record: any) => {
-                      const subtotalConDescuento = record.precio_final 
-                        ? record.precio_final * record.cantidad 
-                        : subtotal;
+                      const cantidad = Number(record.cantidad || 0);
+                      const precioFinal = Number(record.precio_final || record.precio_unitario || 0);
+                      const subtotalCalculado = precioFinal * cantidad;
+                      const subtotalFinal = subtotalCalculado || Number(subtotal || 0);
+                      
                       return (
                         <Text strong style={{ fontSize: 14, color: '#1890ff' }}>
-                          ${Number(subtotalConDescuento).toFixed(2)}
+                          ${subtotalFinal.toFixed(2)}
                         </Text>
                       );
                     }
                   }
                 ]}
-                summary={() => (
-                  <Table.Summary fixed>
-                    <Table.Summary.Row>
-                      <Table.Summary.Cell index={0} colSpan={3}>
-                        <Text strong style={{ fontSize: 14 }}>TOTAL:</Text>
-                      </Table.Summary.Cell>
-                      <Table.Summary.Cell index={1} align="right">
-                        <Text strong style={{ fontSize: 16, color: '#3f8600' }}>
-                          ${Number(ventaDetalle.total).toFixed(2)}
-                        </Text>
-                      </Table.Summary.Cell>
-                    </Table.Summary.Row>
-                  </Table.Summary>
-                )}
+                summary={() => {
+                  const total = Number(ventaDetalle.total || 0);
+                  return (
+                    <Table.Summary fixed>
+                      <Table.Summary.Row>
+                        <Table.Summary.Cell index={0} colSpan={3}>
+                          <Text strong style={{ fontSize: 14 }}>TOTAL:</Text>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={1} align="right">
+                          <Text strong style={{ fontSize: 16, color: '#3f8600' }}>
+                            ${total.toFixed(2)}
+                          </Text>
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                    </Table.Summary>
+                  );
+                }}
               />
             </Card>
 
@@ -2280,7 +2299,11 @@ const Customers: React.FC = () => {
               </Card>
             )}
           </Space>
-        )}
+          )}
+          {!ventaDetalle && !loading && (
+            <Empty description="No se pudo cargar el detalle de la venta" />
+          )}
+        </Spin>
       </Modal>
     </div>
   );
