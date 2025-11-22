@@ -2166,7 +2166,75 @@ export const obtenerProductosVendidos = async (req: Request, res: Response): Pro
   }
 };
 
-
-
-
+/**
+ * Obtener descuentos aplicados en ventas con detalles completos
+ */
+export const obtenerDescuentos = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sucursal, fecha_desde, fecha_hasta } = req.query;
+    
+    // Construir query dinámicamente
+    let query = `
+      SELECT 
+        v.id as venta_id,
+        v.numero_venta,
+        v.fecha_venta,
+        v.sucursal,
+        vd.id as detalle_id,
+        vd.precio_unitario as precio_original,
+        vd.precio_final,
+        vd.descuento_porcentaje as porcentaje_descuento,
+        (vd.precio_unitario - vd.precio_final) * vd.cantidad as monto_descuento,
+        vd.cantidad,
+        p.nombre as producto_nombre,
+        p.marca,
+        p.tipo,
+        c.nombre as cliente_nombre,
+        CONCAT(ven.nombre, ' ', ven.apellido) as vendedor_nombre
+      FROM ventas v
+      INNER JOIN ventas_detalle vd ON v.id = vd.venta_id
+      INNER JOIN productos p ON vd.producto_id = p.id
+      LEFT JOIN clientes_${sucursal || 'pando'} c ON v.cliente_id = c.id
+      LEFT JOIN vendedores ven ON v.vendedor_id = ven.id
+      WHERE vd.descuento_porcentaje > 0
+    `;
+    
+    const params: any[] = [];
+    
+    // Filtrar por sucursal
+    if (sucursal && sucursal !== 'todas') {
+      query += ` AND v.sucursal = ?`;
+      params.push(sucursal);
+    }
+    
+    // Filtrar por fecha
+    if (fecha_desde) {
+      query += ` AND DATE(v.fecha_venta) >= ?`;
+      params.push(fecha_desde);
+    }
+    
+    if (fecha_hasta) {
+      query += ` AND DATE(v.fecha_venta) <= ?`;
+      params.push(fecha_hasta);
+    }
+    
+    query += ` ORDER BY v.fecha_venta DESC LIMIT 1000`;
+    
+    const descuentos = await executeQuery<RowDataPacket[]>(query, params);
+    
+    res.status(200).json({
+      success: true,
+      data: descuentos,
+      count: descuentos.length
+    });
+    
+  } catch (error) {
+    console.error('Error al obtener descuentos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener descuentos',
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+};
 

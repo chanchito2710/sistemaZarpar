@@ -227,6 +227,12 @@ const GlobalSales: React.FC = () => {
   const [fechaDevolucionesHasta, setFechaDevolucionesHasta] = useState<Dayjs | null>(fechaHasta);
   const [metodoDevolucionFiltro, setMetodoDevolucionFiltro] = useState<string>('todos');
 
+  // Estados para descuentos
+  const [descuentos, setDescuentos] = useState<any[]>([]);
+  const [loadingDescuentos, setLoadingDescuentos] = useState(false);
+  const [fechaDescuentosDesde, setFechaDescuentosDesde] = useState<Dayjs | null>(fechaDesde);
+  const [fechaDescuentosHasta, setFechaDescuentosHasta] = useState<Dayjs | null>(fechaHasta);
+
   /**
    * Cargar sucursales al montar
    */
@@ -478,6 +484,258 @@ const GlobalSales: React.FC = () => {
       message.error('Error al cargar devoluciones');
     } finally {
       setLoadingDevoluciones(false);
+    }
+  };
+
+  /**
+   * Cargar descuentos con detalles de productos y clientes
+   */
+  const cargarDescuentos = async (usarFiltrosEspecificos = false) => {
+    setLoadingDescuentos(true);
+    try {
+      const token = localStorage.getItem('token');
+      const filtros: any = {};
+      
+      // Filtrar por sucursal
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtros.sucursal = sucursalSeleccionada;
+      }
+      
+      // Usar filtros específicos del tab o los globales
+      const desde = usarFiltrosEspecificos ? fechaDescuentosDesde : fechaDesde;
+      const hasta = usarFiltrosEspecificos ? fechaDescuentosHasta : fechaHasta;
+      
+      if (desde) {
+        filtros.fecha_desde = desde.format('YYYY-MM-DD');
+      }
+      
+      if (hasta) {
+        filtros.fecha_hasta = hasta.format('YYYY-MM-DD');
+      }
+      
+      const response = await fetch(
+        `${API_URL}/ventas/descuentos?${new URLSearchParams(filtros)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await response.json();
+      
+      if (data.success) {
+        setDescuentos(data.data || []);
+        console.log('✅ Descuentos cargados:', data.data?.length || 0);
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar descuentos:', error);
+      message.error('Error al cargar descuentos');
+    } finally {
+      setLoadingDescuentos(false);
+    }
+  };
+
+  /**
+   * Exportar descuentos a Excel
+   */
+  const exportarDescuentosExcel = () => {
+    try {
+      if (descuentos.length === 0) {
+        message.warning('No hay descuentos para exportar');
+        return;
+      }
+
+      const datosExcel = descuentos.map((desc, index) => ({
+        '#': index + 1,
+        'Fecha': dayjs(desc.fecha_venta).format('DD/MM/YYYY HH:mm'),
+        'N° Venta': desc.numero_venta,
+        'Cliente': desc.cliente_nombre,
+        'Producto': desc.producto_nombre,
+        'Marca': desc.marca || 'N/A',
+        'Tipo': desc.tipo || 'N/A',
+        'Precio Original': Number(desc.precio_original || 0).toFixed(2),
+        'Precio con Descuento': Number(desc.precio_final || 0).toFixed(2),
+        'Descuento %': Number(desc.porcentaje_descuento || 0).toFixed(1) + '%',
+        'Monto Descontado': Number(desc.monto_descuento || 0).toFixed(2),
+        'Sucursal': desc.sucursal.toUpperCase(),
+        'Vendedor': desc.vendedor_nombre || 'N/A'
+      }));
+
+      const totalDescontado = descuentos.reduce((sum, d) => sum + (Number(d.monto_descuento) || 0), 0);
+      datosExcel.push({
+        '#': '',
+        'Fecha': '',
+        'N° Venta': '',
+        'Cliente': '',
+        'Producto': '',
+        'Marca': '',
+        'Tipo': '',
+        'Precio Original': '',
+        'Precio con Descuento': '',
+        'Descuento %': 'TOTAL:',
+        'Monto Descontado': totalDescontado.toFixed(2),
+        'Sucursal': '',
+        'Vendedor': ''
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Descuentos');
+
+      const columnWidths = [
+        { wch: 5 },   // #
+        { wch: 16 },  // Fecha
+        { wch: 18 },  // N° Venta
+        { wch: 25 },  // Cliente
+        { wch: 30 },  // Producto
+        { wch: 15 },  // Marca
+        { wch: 15 },  // Tipo
+        { wch: 14 },  // Precio Original
+        { wch: 18 },  // Precio con Descuento
+        { wch: 12 },  // Descuento %
+        { wch: 16 },  // Monto Descontado
+        { wch: 12 },  // Sucursal
+        { wch: 20 }   // Vendedor
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      const filtrosTexto = [];
+      if (fechaDescuentosDesde && fechaDescuentosHasta) {
+        filtrosTexto.push(`${fechaDescuentosDesde.format('DD-MM-YYYY')}_al_${fechaDescuentosHasta.format('DD-MM-YYYY')}`);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtrosTexto.push(sucursalSeleccionada);
+      }
+      const nombreArchivo = `Descuentos${filtrosTexto.length > 0 ? '_' + filtrosTexto.join('_') : ''}_${dayjs().format('DD-MM-YYYY')}.xlsx`;
+
+      XLSX.writeFile(workbook, nombreArchivo);
+      message.success(`✅ Excel exportado: ${descuentos.length} descuentos`);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      message.error('Error al exportar a Excel');
+    }
+  };
+
+  /**
+   * Exportar descuentos a PDF
+   */
+  const exportarDescuentosPDF = () => {
+    try {
+      if (descuentos.length === 0) {
+        message.warning('No hay descuentos para exportar');
+        return;
+      }
+
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('HISTORIAL DE DESCUENTOS', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 25;
+
+      if (fechaDescuentosDesde && fechaDescuentosHasta) {
+        doc.text(`Período: ${fechaDescuentosDesde.format('DD/MM/YYYY')} - ${fechaDescuentosHasta.format('DD/MM/YYYY')}`, 14, yPos);
+        yPos += 5;
+      }
+
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        doc.text(`Sucursal: ${sucursalSeleccionada.toUpperCase()}`, 14, yPos);
+        yPos += 5;
+      }
+
+      doc.text(`Total Descuentos: ${descuentos.length}`, 14, yPos);
+      yPos += 10;
+
+      const tablaDescuentos = descuentos.map((desc, index) => [
+        (index + 1).toString(),
+        dayjs(desc.fecha_venta).format('DD/MM/YY'),
+        desc.numero_venta.substring(0, 12),
+        desc.cliente_nombre.substring(0, 18),
+        desc.producto_nombre.substring(0, 20),
+        `$${Number(desc.precio_original || 0).toFixed(0)}`,
+        `${Number(desc.porcentaje_descuento || 0).toFixed(0)}%`,
+        `$${Number(desc.monto_descuento || 0).toFixed(0)}`,
+        desc.sucursal.toUpperCase().substring(0, 8)
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['#', 'Fecha', 'N° Venta', 'Cliente', 'Producto', 'P.Orig', '%Desc', 'Ahorro', 'Sucursal']],
+        body: tablaDescuentos,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [245, 158, 11],
+          textColor: 255,
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 7
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 38 },
+          4: { cellWidth: 45 },
+          5: { cellWidth: 18, halign: 'right' },
+          6: { cellWidth: 15, halign: 'center' },
+          7: { cellWidth: 18, halign: 'right' },
+          8: { cellWidth: 22, halign: 'center' }
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        margin: { left: 14, right: 14 }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPos;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      
+      const totalDescontado = descuentos.reduce((sum, d) => sum + (Number(d.monto_descuento) || 0), 0);
+      const promedioDescuento = descuentos.length > 0 ? descuentos.reduce((sum, d) => sum + (Number(d.porcentaje_descuento) || 0), 0) / descuentos.length : 0;
+      
+      doc.text(`Total Descontado: $${totalDescontado.toFixed(2)}`, 14, finalY + 10);
+      doc.text(`Promedio de Descuento: ${promedioDescuento.toFixed(1)}%`, 14, finalY + 16);
+      doc.text(`Cantidad de Descuentos: ${descuentos.length}`, 14, finalY + 22);
+
+      const pageCount = doc.getNumberOfPages();
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(
+          `Generado: ${dayjs().format('DD/MM/YYYY HH:mm')} | Página ${i} de ${pageCount}`,
+          doc.internal.pageSize.width / 2,
+          doc.internal.pageSize.height - 10,
+          { align: 'center' }
+        );
+      }
+
+      const filtrosTexto = [];
+      if (fechaDescuentosDesde && fechaDescuentosHasta) {
+        filtrosTexto.push(`${fechaDescuentosDesde.format('DD-MM-YYYY')}_al_${fechaDescuentosHasta.format('DD-MM-YYYY')}`);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
+        filtrosTexto.push(sucursalSeleccionada);
+      }
+      const nombreArchivo = `Descuentos${filtrosTexto.length > 0 ? '_' + filtrosTexto.join('_') : ''}_${dayjs().format('DD-MM-YYYY')}.pdf`;
+
+      doc.save(nombreArchivo);
+      message.success(`✅ PDF exportado: ${descuentos.length} descuentos`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      message.error('Error al exportar a PDF');
     }
   };
 
@@ -2049,6 +2307,7 @@ const GlobalSales: React.FC = () => {
               cargarEnvios();
               cargarComisiones();
               cargarDevoluciones();
+              cargarDescuentos();
             }}
             style={{
               height: '100%',
@@ -2690,7 +2949,7 @@ const GlobalSales: React.FC = () => {
             Cerrar
           </Button>
         ]}
-        width={1100}
+        width={1500}
         className="modal-metodos-pago"
       >
         <Tabs
@@ -3890,6 +4149,220 @@ const GlobalSales: React.FC = () => {
                               <Text strong style={{ color: '#ff4d4f' }}>
                                 {formatearDinero(monto)}
                               </Text>
+                            ),
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: 'descuentos',
+              label: (
+                <span>
+                  <TagsOutlined style={{ color: '#f59e0b' }} />
+                  {' '}Descuentos ({descuentos.length})
+                </span>
+              ),
+              children: (
+                <div>
+                  {loadingDescuentos ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                      <Text>Cargando descuentos...</Text>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Filtros de fecha para descuentos */}
+                      <div style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8 }}>
+                        <Space direction="vertical" style={{ width: '100%' }} size="small">
+                          <Text strong style={{ fontSize: 13, color: '#595959' }}>
+                            📅 Filtrar por Fecha
+                          </Text>
+                          <Space>
+                            <DatePicker.RangePicker
+                              value={[fechaDescuentosDesde, fechaDescuentosHasta]}
+                              onChange={(dates) => {
+                                setFechaDescuentosDesde(dates ? dates[0] : null);
+                                setFechaDescuentosHasta(dates ? dates[1] : null);
+                              }}
+                              format="DD/MM/YYYY"
+                              placeholder={['Desde', 'Hasta']}
+                              style={{ width: 280 }}
+                            />
+                            <Button
+                              type="primary"
+                              icon={<CalendarOutlined />}
+                              onClick={() => cargarDescuentos(true)}
+                              loading={loadingDescuentos}
+                              style={{ background: '#f59e0b', borderColor: '#f59e0b' }}
+                            >
+                              Filtrar
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setFechaDescuentosDesde(fechaDesde);
+                                setFechaDescuentosHasta(fechaHasta);
+                                cargarDescuentos(false);
+                              }}
+                              disabled={loadingDescuentos}
+                            >
+                              Restablecer
+                            </Button>
+                          </Space>
+                        </Space>
+                      </div>
+                      
+                      {/* Botones de Exportación */}
+                      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <Button 
+                          icon={<FileExcelOutlined />} 
+                          style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                          onClick={exportarDescuentosExcel}
+                          disabled={loadingDescuentos || descuentos.length === 0}
+                        >
+                          Exportar Excel
+                        </Button>
+                        <Button 
+                          icon={<FilePdfOutlined />} 
+                          style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
+                          onClick={exportarDescuentosPDF}
+                          disabled={loadingDescuentos || descuentos.length === 0}
+                        >
+                          Exportar PDF
+                        </Button>
+                      </div>
+                      
+                      {/* Estadísticas */}
+                      <div style={{ marginBottom: 16 }}>
+                        <Space size="large">
+                          <Statistic
+                            title="Total Descontado"
+                            value={formatearDinero(
+                              descuentos.reduce((sum, d) => sum + (Number(d.monto_descuento) || 0), 0)
+                            )}
+                            valueStyle={{ color: '#f59e0b' }}
+                          />
+                          <Statistic
+                            title="Cantidad de Descuentos"
+                            value={descuentos.length}
+                            valueStyle={{ color: '#1890ff' }}
+                          />
+                          <Statistic
+                            title="Descuento Promedio"
+                            value={descuentos.length > 0 ? 
+                              (descuentos.reduce((sum, d) => sum + (Number(d.porcentaje_descuento) || 0), 0) / descuentos.length).toFixed(1) 
+                              : 0}
+                            suffix="%"
+                            valueStyle={{ color: '#722ed1' }}
+                          />
+                        </Space>
+                      </div>
+                      
+                      <Table
+                        dataSource={descuentos}
+                        rowKey="id"
+                        size="small"
+                        pagination={{ pageSize: 10, showSizeChanger: false }}
+                        scroll={{ x: 1200 }}
+                        columns={[
+                          {
+                            title: 'Fecha',
+                            dataIndex: 'fecha_venta',
+                            key: 'fecha_venta',
+                            width: 100,
+                            render: (fecha: string) => dayjs(fecha).format('DD/MM/YYYY'),
+                          },
+                          {
+                            title: 'N° Venta',
+                            dataIndex: 'numero_venta',
+                            key: 'numero_venta',
+                            width: 140,
+                            render: (numero: string) => (
+                              <Text strong style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                                {numero}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: 'Cliente',
+                            dataIndex: 'cliente_nombre',
+                            key: 'cliente_nombre',
+                            width: 180,
+                            ellipsis: true,
+                          },
+                          {
+                            title: 'Producto',
+                            dataIndex: 'producto_nombre',
+                            key: 'producto_nombre',
+                            width: 200,
+                            ellipsis: true,
+                            render: (nombre: string, record: any) => (
+                              <div>
+                                <Text strong>{nombre}</Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  {record.marca} | {record.tipo}
+                                </Text>
+                              </div>
+                            ),
+                          },
+                          {
+                            title: 'Precio Original',
+                            dataIndex: 'precio_original',
+                            key: 'precio_original',
+                            align: 'right',
+                            width: 120,
+                            render: (precio: number) => (
+                              <Text style={{ textDecoration: 'line-through', color: '#8c8c8c' }}>
+                                {formatearDinero(precio)}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: 'Descuento',
+                            dataIndex: 'porcentaje_descuento',
+                            key: 'porcentaje_descuento',
+                            align: 'center',
+                            width: 90,
+                            render: (porcentaje: number) => (
+                              <Tag color="orange" style={{ fontSize: 12, fontWeight: 'bold' }}>
+                                -{porcentaje}%
+                              </Tag>
+                            ),
+                          },
+                          {
+                            title: 'Precio Final',
+                            dataIndex: 'precio_final',
+                            key: 'precio_final',
+                            align: 'right',
+                            width: 120,
+                            render: (precio: number) => (
+                              <Text strong style={{ color: '#52c41a', fontSize: 13 }}>
+                                {formatearDinero(precio)}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: 'Ahorro',
+                            dataIndex: 'monto_descuento',
+                            key: 'monto_descuento',
+                            align: 'right',
+                            width: 100,
+                            render: (ahorro: number) => (
+                              <Text strong style={{ color: '#f59e0b' }}>
+                                {formatearDinero(ahorro)}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: 'Sucursal',
+                            dataIndex: 'sucursal',
+                            key: 'sucursal',
+                            width: 100,
+                            render: (sucursal: string) => (
+                              <Tag color="blue">{sucursal?.toUpperCase()}</Tag>
                             ),
                           },
                         ]}

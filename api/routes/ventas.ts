@@ -22,7 +22,8 @@ import {
   obtenerPagosCliente,
   obtenerProductosCliente,
   obtenerSaldoCuentaCorrienteCliente,
-  obtenerDevolucionesCliente
+  obtenerDevolucionesCliente,
+  obtenerDescuentos
 } from '../controllers/ventasController';
 
 const router = Router();
@@ -91,6 +92,14 @@ router.get('/ventas-globales', obtenerVentasGlobales);
  * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /:id
  */
 router.get('/ventas-detalladas', obtenerVentasDetalladas);
+
+/**
+ * GET /api/ventas/descuentos
+ * Obtener descuentos aplicados en ventas con detalles completos
+ * Query params: sucursal, fecha_desde, fecha_hasta
+ * ⚠️ IMPORTANTE: Esta ruta debe ir ANTES de /:id
+ */
+router.get('/descuentos', obtenerDescuentos);
 
 /**
  * GET /api/ventas/sucursal/:sucursal
