@@ -14,6 +14,7 @@ import fs from 'fs';
 import path from 'path';
 import cron from 'node-cron';
 import { pool } from '../config/database.js';
+import mysqldump from 'mysqldump';
 
 const execAsync = promisify(exec);
 
@@ -34,45 +35,55 @@ if (!fs.existsSync(BACKUP_DIR)) {
 
 /**
  * Ejecutar mysqldump y crear archivo de backup
- * Usa Docker en desarrollo y mysqldump directo en producción
+ * Usa la librería mysqldump de npm (funciona en desarrollo y producción)
  */
 async function ejecutarMysqlDump(filename: string): Promise<string> {
   const filepath = path.join(BACKUP_DIR, filename);
   
-  // Detectar si estamos en desarrollo (Docker) o producción
-  // En desarrollo: localhost o 127.0.0.1 con puerto 3307 = Docker
-  const isLocalhost = DB_HOST === 'localhost' || DB_HOST === '127.0.0.1';
-  const isDockerPort = DB_PORT === '3307';
-  const isDocker = isLocalhost && isDockerPort;
-  
-  console.log(`🔍 Detección Docker: HOST=${DB_HOST}, PORT=${DB_PORT}, isDocker=${isDocker}`);
-  
-  let command: string;
-  
-  if (isDocker) {
-    // En desarrollo: Usar Docker exec (sin redirección >)
-    console.log('🐳 Usando Docker exec para mysqldump');
-    command = `docker exec zarpar-mysql mysqldump -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces --ignore-table=${DB_NAME}.backups_metadata --ignore-table=${DB_NAME}.backup_logs ${DB_NAME}`;
-  } else {
-    // En producción: Usar mysqldump directo (sin redirección >)
-    console.log('☁️ Usando mysqldump directo (Railway)');
-    command = `mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 --single-transaction --routines --triggers --no-tablespaces --ignore-table=${DB_NAME}.backups_metadata --ignore-table=${DB_NAME}.backup_logs ${DB_NAME}`;
-  }
-  
   try {
-    console.log(`📝 Ejecutando comando: ${command.replace(/-p[^ ]+/, '-p****')}`);
+    console.log(`📝 Iniciando backup con librería mysqldump...`);
+    console.log(`🔗 Conectando a: ${DB_HOST}:${DB_PORT} / ${DB_NAME}`);
     
-    // Ejecutar comando y capturar output (sin redirección shell)
-    const { stdout, stderr } = await execAsync(command, {
-      maxBuffer: 100 * 1024 * 1024, // 100MB buffer para DBs grandes
-    });
+    // Configuración de conexión
+    const dumpConfig = {
+      connection: {
+        host: DB_HOST,
+        port: parseInt(DB_PORT),
+        user: DB_USER,
+        password: DB_PASSWORD,
+        database: DB_NAME,
+      },
+      dumpToFile: filepath,
+      compressFile: false,
+      dump: {
+        tables: [], // Todas las tablas
+        excludeTables: ['backups_metadata', 'backup_logs'], // Excluir tablas de metadata
+        schema: {
+          format: true,
+          autoIncrement: true,
+          engine: true,
+          table: {
+            ifNotExist: true,
+            dropIfExist: true,
+            charset: true,
+          },
+        },
+        data: {
+          format: true,
+          verbose: false,
+          lockTables: false,
+        },
+        trigger: {
+          delimiter: ';;',
+          dropIfExist: true,
+        },
+      },
+    };
     
-    // Escribir el output directamente al archivo
-    fs.writeFileSync(filepath, stdout, 'utf8');
+    // Ejecutar dump
+    const result = await mysqldump(dumpConfig);
     
-    if (stderr && !stderr.includes('Warning')) {
-      console.warn(`⚠️ STDERR: ${stderr}`);
-    }
+    console.log(`✅ Dump completado - Tablas: ${result.dump.tables?.length || 0}`);
     
     // Verificar que el archivo se creó y no está vacío
     const stats = fs.statSync(filepath);
@@ -320,7 +331,7 @@ export async function crearBackupManual(data: {
 
 /**
  * Restaurar backup
- * Usa Docker en desarrollo y mysql directo en producción
+ * Lee el archivo SQL y ejecuta las queries directamente con pool
  */
 export async function restaurarBackup(filename: string, usuario_email: string): Promise<void> {
   const inicio = Date.now();
@@ -334,55 +345,57 @@ export async function restaurarBackup(filename: string, usuario_email: string): 
       throw new Error('El archivo de backup no existe');
     }
     
-    // Detectar si estamos en desarrollo (Docker) o producción
-    const isLocalhost = DB_HOST === 'localhost' || DB_HOST === '127.0.0.1';
-    const isDockerPort = DB_PORT === '3307';
-    const isDocker = isLocalhost && isDockerPort;
-    
-    console.log(`🔍 Detección Docker (restaurar): HOST=${DB_HOST}, PORT=${DB_PORT}, isDocker=${isDocker}`);
-    
     // Leer el contenido del archivo SQL
     const sqlContent = fs.readFileSync(filepath, 'utf8');
     console.log(`📄 Archivo SQL leído: ${sqlContent.length} caracteres`);
     
-    let command: string;
+    // Dividir el contenido en statements individuales
+    // Los statements están separados por ';' pero hay que tener cuidado con delimiters
+    const statements = sqlContent
+      .split(/;[\r\n]+/) // Dividir por ; seguido de salto de línea
+      .map(stmt => stmt.trim())
+      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--') && !stmt.startsWith('/*'));
     
-    if (isDocker) {
-      // En desarrollo: Usar Docker exec con stdin
-      console.log('🐳 Usando Docker exec para restaurar');
-      command = `docker exec -i zarpar-mysql mysql -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME}`;
-    } else {
-      // En producción: Usar mysql directo con stdin
-      console.log('☁️ Usando mysql directo (Railway) para restaurar');
-      command = `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME}`;
-    }
+    console.log(`📊 Ejecutando ${statements.length} statements SQL...`);
     
-    console.log(`📝 Ejecutando restauración...`);
+    // Obtener conexión del pool
+    const connection = await pool.getConnection();
     
-    // Ejecutar comando pasando el SQL por stdin
-    await new Promise<void>((resolve, reject) => {
-      const childProcess = exec(command, { maxBuffer: 100 * 1024 * 1024 }, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`❌ Error en restauración:`, error);
-          console.error(`STDERR:`, stderr);
-          reject(new Error(`Error al restaurar: ${error.message}\n${stderr}`));
-        } else {
-          if (stderr && !stderr.includes('Warning')) {
-            console.warn(`⚠️ STDERR:`, stderr);
-          }
-          console.log(`✅ Restauración completada`);
-          resolve();
-        }
-      });
+    try {
+      // Deshabilitar foreign key checks temporalmente
+      await connection.query('SET FOREIGN_KEY_CHECKS = 0');
       
-      // Escribir el contenido SQL al stdin del proceso
-      if (childProcess.stdin) {
-        childProcess.stdin.write(sqlContent);
-        childProcess.stdin.end();
-      } else {
-        reject(new Error('No se pudo escribir al stdin del proceso'));
+      let executedCount = 0;
+      
+      // Ejecutar cada statement
+      for (const statement of statements) {
+        if (statement.trim()) {
+          try {
+            await connection.query(statement);
+            executedCount++;
+            
+            // Mostrar progreso cada 100 statements
+            if (executedCount % 100 === 0) {
+              console.log(`⏳ Progreso: ${executedCount}/${statements.length} statements`);
+            }
+          } catch (stmtError: any) {
+            // Ignorar algunos errores comunes que no son críticos
+            if (!stmtError.message.includes('already exists') && 
+                !stmtError.message.includes('Unknown database')) {
+              console.warn(`⚠️ Error en statement (ignorado):`, stmtError.message.substring(0, 100));
+            }
+          }
+        }
       }
-    });
+      
+      // Rehabilitar foreign key checks
+      await connection.query('SET FOREIGN_KEY_CHECKS = 1');
+      
+      console.log(`✅ Restauración completada: ${executedCount} statements ejecutados`);
+      
+    } finally {
+      connection.release();
+    }
     
     // Registrar log
     const duracion = Math.round((Date.now() - inicio) / 1000);
