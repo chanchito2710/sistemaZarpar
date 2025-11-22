@@ -34,33 +34,48 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
   try {
     const { sucursal, opciones } = req.body;
     
-    console.log('🗑️ Iniciando limpieza de datos:', { sucursal, opciones });
+    console.log('🔍 [DEBUG] ========== INICIO LIMPIEZA DATOS ==========');
+    console.log('🔍 [DEBUG] Request body completo:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 [DEBUG] Sucursal recibida:', sucursal);
+    console.log('🔍 [DEBUG] Opciones recibidas:', JSON.stringify(opciones, null, 2));
     
     // Iniciar transacción para seguridad
+    console.log('🔍 [DEBUG] Iniciando transacción SQL...');
     await connection.beginTransaction();
+    console.log('✅ [DEBUG] Transacción iniciada correctamente');
     
     let resultados: string[] = [];
     
     // Obtener todas las sucursales si es 'todas'
     const sucursales: string[] = [];
+    console.log('🔍 [DEBUG] Detectando sucursales...');
     if (sucursal === 'todas') {
+      console.log('🔍 [DEBUG] Modo: TODAS las sucursales');
       const [tables] = await connection.execute<any[]>(
         "SHOW TABLES LIKE 'clientes_%'"
       );
+      console.log('🔍 [DEBUG] Tablas encontradas:', tables.length);
       
       tables.forEach((table: any) => {
         const tableName = Object.values(table)[0] as string;
         const suc = tableName.replace('clientes_', '');
         sucursales.push(suc);
       });
+      console.log('🔍 [DEBUG] Sucursales detectadas:', sucursales);
     } else {
+      console.log('🔍 [DEBUG] Modo: Sucursal específica:', sucursal);
       sucursales.push(sucursal);
     }
     
+    console.log('🔍 [DEBUG] Array de sucursales final:', sucursales);
+    console.log('🔍 [DEBUG] Cantidad de sucursales:', sucursales.length);
+    
     // LIMPIEZA POR MÓDULO
+    console.log('🔍 [DEBUG] ========== INICIANDO LIMPIEZA POR MÓDULO ==========');
     
     // Verificar si hay sucursales antes de ejecutar queries con IN
     if (sucursales.length === 0) {
+      console.log('⚠️ [DEBUG] NO SE ENCONTRARON SUCURSALES - Modo limpieza parcial');
       // Solo ejecutar limpiezas que no dependen de sucursales
       if (opciones.ventas) {
         const [resumenResult] = await connection.execute<ResultSetHeader>(
@@ -113,19 +128,27 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
 
     // 1. Limpiar Ventas
     if (opciones.ventas) {
+      console.log('🔍 [DEBUG] Opción 1: VENTAS activada');
       // Construir placeholders para el IN (??, ??, ??)
       const placeholders = sucursales.map(() => '?').join(', ');
+      console.log('🔍 [DEBUG] Placeholders:', placeholders);
+      console.log('🔍 [DEBUG] Ejecutando DELETE FROM ventas...');
       const [result] = await connection.execute<ResultSetHeader>(
         `DELETE FROM ventas WHERE sucursal IN (${placeholders})`,
         sucursales
       );
+      console.log('✅ [DEBUG] Ventas eliminadas:', result.affectedRows);
       resultados.push(`✅ Ventas eliminadas: ${result.affectedRows}`);
       
       // Eliminar resúmenes diarios de ventas (tabla ventas_diarias_resumen)
+      console.log('🔍 [DEBUG] Ejecutando DELETE FROM ventas_diarias_resumen...');
       const [resumenResult] = await connection.execute<ResultSetHeader>(
         `DELETE FROM ventas_diarias_resumen`
       );
+      console.log('✅ [DEBUG] Resúmenes diarios eliminados:', resumenResult.affectedRows);
       resultados.push(`✅ Resúmenes diarios eliminados: ${resumenResult.affectedRows}`);
+    } else {
+      console.log('⏭️ [DEBUG] Opción 1: VENTAS - No activada, saltando...');
     }
     
     // 2. Limpiar Cuenta Corriente
@@ -333,60 +356,127 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
     // Esta opción borra TODO lo que aparece en la página de Ventas Globales
     // Para simplicidad y robustez, borra TODO sin filtrar por sucursal (como borrado maestro)
     if (opciones.reportesEstadisticas) {
-      console.log('🗑️ Limpiando datos de Reportes y Estadísticas (Ventas Globales)...');
+      console.log('🔍 [DEBUG] ========== Opción 11: REPORTES Y ESTADÍSTICAS ==========');
+      console.log('🔍 [DEBUG] Estado de otras opciones:', {
+        ventas: opciones.ventas,
+        gastos: opciones.gastos,
+        movimientosCaja: opciones.movimientosCaja,
+        devoluciones: opciones.devoluciones,
+        comisiones: opciones.comisiones
+      });
       
       // Borrar ventas (si no se borró ya)
       if (!opciones.ventas) {
-        const [ventasResult] = await connection.execute<ResultSetHeader>(
-          `DELETE FROM ventas`
-        );
-        resultados.push(`✅ [REPORTES] Ventas eliminadas: ${ventasResult.affectedRows}`);
+        console.log('🔍 [DEBUG] Borrando VENTAS (no borradas previamente)...');
+        try {
+          const [ventasResult] = await connection.execute<ResultSetHeader>(
+            `DELETE FROM ventas`
+          );
+          console.log('✅ [DEBUG] Ventas eliminadas:', ventasResult.affectedRows);
+          resultados.push(`✅ [REPORTES] Ventas eliminadas: ${ventasResult.affectedRows}`);
+        } catch (error: any) {
+          console.error('❌ [DEBUG] Error al borrar ventas:', error.message);
+          throw error;
+        }
         
-        const [resumenResult] = await connection.execute<ResultSetHeader>(
-          `DELETE FROM ventas_diarias_resumen`
-        );
-        resultados.push(`✅ [REPORTES] Resúmenes diarios eliminados: ${resumenResult.affectedRows}`);
+        console.log('🔍 [DEBUG] Borrando RESÚMENES DIARIOS...');
+        try {
+          const [resumenResult] = await connection.execute<ResultSetHeader>(
+            `DELETE FROM ventas_diarias_resumen`
+          );
+          console.log('✅ [DEBUG] Resúmenes diarios eliminados:', resumenResult.affectedRows);
+          resultados.push(`✅ [REPORTES] Resúmenes diarios eliminados: ${resumenResult.affectedRows}`);
+        } catch (error: any) {
+          console.error('❌ [DEBUG] Error al borrar resúmenes diarios:', error.message);
+          throw error;
+        }
+      } else {
+        console.log('⏭️ [DEBUG] Ventas ya borradas previamente, saltando...');
       }
       
       // Borrar gastos (si no se borró ya)
       if (!opciones.gastos) {
-        const [gastosResult] = await connection.execute<ResultSetHeader>(
-          `DELETE FROM gastos`
-        );
-        resultados.push(`✅ [REPORTES] Gastos eliminados: ${gastosResult.affectedRows}`);
+        console.log('🔍 [DEBUG] Borrando GASTOS (no borrados previamente)...');
+        try {
+          const [gastosResult] = await connection.execute<ResultSetHeader>(
+            `DELETE FROM gastos`
+          );
+          console.log('✅ [DEBUG] Gastos eliminados:', gastosResult.affectedRows);
+          resultados.push(`✅ [REPORTES] Gastos eliminados: ${gastosResult.affectedRows}`);
+        } catch (error: any) {
+          console.error('❌ [DEBUG] Error al borrar gastos:', error.message);
+          throw error;
+        }
+      } else {
+        console.log('⏭️ [DEBUG] Gastos ya borrados previamente, saltando...');
       }
       
       // Borrar movimientos de caja (si no se borró ya)
       if (!opciones.movimientosCaja) {
-        const [movimientosResult] = await connection.execute<ResultSetHeader>(
-          `DELETE FROM movimientos_caja`
-        );
-        resultados.push(`✅ [REPORTES] Movimientos de caja eliminados: ${movimientosResult.affectedRows}`);
+        console.log('🔍 [DEBUG] Borrando MOVIMIENTOS DE CAJA (no borrados previamente)...');
+        try {
+          const [movimientosResult] = await connection.execute<ResultSetHeader>(
+            `DELETE FROM movimientos_caja`
+          );
+          console.log('✅ [DEBUG] Movimientos de caja eliminados:', movimientosResult.affectedRows);
+          resultados.push(`✅ [REPORTES] Movimientos de caja eliminados: ${movimientosResult.affectedRows}`);
+        } catch (error: any) {
+          console.error('❌ [DEBUG] Error al borrar movimientos de caja:', error.message);
+          throw error;
+        }
+      } else {
+        console.log('⏭️ [DEBUG] Movimientos de caja ya borrados previamente, saltando...');
       }
       
       // Borrar devoluciones (si no se borró ya)
       if (!opciones.devoluciones) {
-        const [devolucionesResult] = await connection.execute<ResultSetHeader>(
-          `DELETE FROM devoluciones_reemplazos`
-        );
-        resultados.push(`✅ [REPORTES] Devoluciones eliminadas: ${devolucionesResult.affectedRows}`);
+        console.log('🔍 [DEBUG] Borrando DEVOLUCIONES (no borradas previamente)...');
+        try {
+          const [devolucionesResult] = await connection.execute<ResultSetHeader>(
+            `DELETE FROM devoluciones_reemplazos`
+          );
+          console.log('✅ [DEBUG] Devoluciones eliminadas:', devolucionesResult.affectedRows);
+          resultados.push(`✅ [REPORTES] Devoluciones eliminadas: ${devolucionesResult.affectedRows}`);
+        } catch (error: any) {
+          console.error('❌ [DEBUG] Error al borrar devoluciones:', error.message);
+          throw error;
+        }
+      } else {
+        console.log('⏭️ [DEBUG] Devoluciones ya borradas previamente, saltando...');
       }
       
       // Borrar comisiones (si no se borró ya)
       if (!opciones.comisiones) {
-        const [comisionesResult] = await connection.execute<ResultSetHeader>(
-          `DELETE FROM comisiones_vendedores`
-        );
-        resultados.push(`✅ [REPORTES] Comisiones eliminadas: ${comisionesResult.affectedRows}`);
+        console.log('🔍 [DEBUG] Borrando COMISIONES (no borradas previamente)...');
+        try {
+          const [comisionesResult] = await connection.execute<ResultSetHeader>(
+            `DELETE FROM comisiones_vendedores`
+          );
+          console.log('✅ [DEBUG] Comisiones eliminadas:', comisionesResult.affectedRows);
+          resultados.push(`✅ [REPORTES] Comisiones eliminadas: ${comisionesResult.affectedRows}`);
+        } catch (error: any) {
+          console.error('❌ [DEBUG] Error al borrar comisiones:', error.message);
+          throw error;
+        }
+      } else {
+        console.log('⏭️ [DEBUG] Comisiones ya borradas previamente, saltando...');
       }
       
+      console.log('✅ [DEBUG] Limpieza de Reportes y Estadísticas completada');
       resultados.push(`✅ Limpieza de Reportes y Estadísticas completada (borrado total)`);
+    } else {
+      console.log('⏭️ [DEBUG] Opción 11: REPORTES Y ESTADÍSTICAS - No activada, saltando...');
     }
     
     // Commit de la transacción
+    console.log('🔍 [DEBUG] ========== FINALIZANDO LIMPIEZA ==========');
+    console.log('🔍 [DEBUG] Resultados totales:', resultados.length);
+    console.log('🔍 [DEBUG] Haciendo COMMIT de la transacción...');
     await connection.commit();
+    console.log('✅ [DEBUG] COMMIT exitoso');
     
     console.log('✅ Limpieza completada exitosamente:', resultados);
+    console.log('🔍 [DEBUG] Enviando respuesta exitosa al cliente...');
     
     res.status(200).json({
       success: true,
@@ -397,17 +487,34 @@ export const limpiarDatos = async (req: Request, res: Response): Promise<void> =
       },
     });
     
+    console.log('✅ [DEBUG] Respuesta enviada correctamente');
+    
   } catch (error: any) {
     // Rollback en caso de error
+    console.error('❌❌❌ [DEBUG] ERROR CRÍTICO EN LIMPIEZA ❌❌❌');
+    console.error('❌ [DEBUG] Tipo de error:', error.constructor.name);
+    console.error('❌ [DEBUG] Mensaje:', error.message);
+    console.error('❌ [DEBUG] Código SQL (si aplica):', error.code);
+    console.error('❌ [DEBUG] errno (si aplica):', error.errno);
+    console.error('❌ [DEBUG] Stack trace completo:', error.stack);
+    
+    console.log('🔍 [DEBUG] Haciendo ROLLBACK...');
     await connection.rollback();
-    console.error('❌ Error en limpieza de datos:', error);
+    console.log('✅ [DEBUG] ROLLBACK completado');
+    
+    console.log('🔍 [DEBUG] Enviando error 500 al cliente...');
     res.status(500).json({
       success: false,
       message: 'Error al limpiar los datos',
       error: error.message,
+      errorCode: error.code,
+      errorDetails: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   } finally {
+    console.log('🔍 [DEBUG] Liberando conexión de base de datos...');
     connection.release();
+    console.log('✅ [DEBUG] Conexión liberada');
+    console.log('🔍 [DEBUG] ========== FIN LIMPIEZA DATOS ==========');
   }
 };
 
