@@ -44,8 +44,8 @@ async function ejecutarMysqlDump(filename: string): Promise<string> {
     console.log(`📝 Iniciando backup con librería mysqldump...`);
     console.log(`🔗 Conectando a: ${DB_HOST}:${DB_PORT} / ${DB_NAME}`);
     
-    // Configuración de conexión
-    const dumpConfig = {
+    // Configuración de conexión (sin tipos estrictos para evitar errores)
+    const dumpConfig: any = {
       connection: {
         host: DB_HOST,
         port: parseInt(DB_PORT),
@@ -55,43 +55,57 @@ async function ejecutarMysqlDump(filename: string): Promise<string> {
       },
       dumpToFile: filepath,
       compressFile: false,
-      dump: {
-        tables: [], // Todas las tablas
-        excludeTables: ['backups_metadata', 'backup_logs'], // Excluir tablas de metadata
-        schema: {
-          format: true,
-          autoIncrement: true,
-          engine: true,
-          table: {
-            ifNotExist: true,
-            dropIfExist: true,
-            charset: true,
-          },
-        },
-        data: {
-          format: true,
-          verbose: false,
-          lockTables: false,
-        },
-        trigger: {
-          delimiter: ';;',
-          dropIfExist: true,
-        },
-      },
     };
     
     // Ejecutar dump
     const result = await mysqldump(dumpConfig);
     
-    console.log(`✅ Dump completado - Tablas: ${result.dump.tables?.length || 0}`);
+    console.log(`✅ Dump completado`);
     
     // Verificar que el archivo se creó y no está vacío
+    if (!fs.existsSync(filepath)) {
+      throw new Error('El archivo de backup no se creó');
+    }
+    
     const stats = fs.statSync(filepath);
     if (stats.size === 0) {
       throw new Error('El archivo de backup está vacío');
     }
     
-    console.log(`✅ Backup creado: ${filepath} (${stats.size} bytes)`);
+    // Leer el contenido y eliminar las tablas de metadata si están presentes
+    let sqlContent = fs.readFileSync(filepath, 'utf8');
+    
+    // Filtrar las líneas que contienen backups_metadata y backup_logs
+    const lines = sqlContent.split('\n');
+    const filteredLines = [];
+    let skipTable = false;
+    
+    for (const line of lines) {
+      // Detectar si estamos en una tabla de metadata
+      if (line.includes('`backups_metadata`') || line.includes('`backup_logs`')) {
+        skipTable = true;
+      }
+      
+      // Si encontramos el final de la tabla, dejamos de saltear
+      if (skipTable && (line.includes('UNLOCK TABLES') || line.includes('-- Table structure for'))) {
+        skipTable = false;
+        if (line.includes('UNLOCK TABLES')) {
+          continue; // Saltar esta línea también
+        }
+      }
+      
+      // Agregar la línea si no estamos saltando
+      if (!skipTable) {
+        filteredLines.push(line);
+      }
+    }
+    
+    // Escribir el contenido filtrado
+    sqlContent = filteredLines.join('\n');
+    fs.writeFileSync(filepath, sqlContent, 'utf8');
+    
+    const finalStats = fs.statSync(filepath);
+    console.log(`✅ Backup creado: ${filepath} (${finalStats.size} bytes)`);
     return filepath;
     
   } catch (error: any) {
