@@ -194,6 +194,16 @@ const Customers: React.FC = () => {
   }, [sucursalSeleccionada]);
 
   /**
+   * Recargar datos cuando se cargan las sucursales (solo si está en modo "todas")
+   */
+  useEffect(() => {
+    if (sucursalSeleccionada === 'todas' && sucursales.length > 0 && clientes.length === 0) {
+      console.log('🔄 Sucursales cargadas, recargando datos...');
+      cargarDatos();
+    }
+  }, [sucursales]);
+
+  /**
    * Cargar reportes cuando cambian las fechas
    */
   useEffect(() => {
@@ -239,8 +249,14 @@ const Customers: React.FC = () => {
   const cargarClientes = async () => {
     try {
       if (sucursalSeleccionada === 'todas' && usuario?.esAdmin) {
+        // Verificar que las sucursales estén cargadas
+        if (sucursales.length === 0) {
+          console.log('⚠️ Esperando que se carguen las sucursales...');
+          return;
+        }
+        
         // Cargar clientes de todas las sucursales
-        console.log('📊 Cargando clientes de TODAS las sucursales...');
+        console.log('📊 Cargando clientes de TODAS las sucursales...', sucursales);
         const promesas = sucursales.map(sucursal =>
           clientesService.obtenerPorSucursal(sucursal.toLowerCase())
         );
@@ -254,7 +270,7 @@ const Customers: React.FC = () => {
         );
         setClientes(todosLosClientes);
         console.log(`✅ Cargados ${todosLosClientes.length} clientes de ${sucursales.length} sucursales`);
-      } else {
+      } else if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
         // Cargar solo de la sucursal seleccionada
         const data = await clientesService.obtenerPorSucursal(sucursalSeleccionada);
         setClientes(data);
@@ -271,6 +287,12 @@ const Customers: React.FC = () => {
   const cargarVentas = async () => {
     try {
       if (sucursalSeleccionada === 'todas' && usuario?.esAdmin) {
+        // Verificar que las sucursales estén cargadas
+        if (sucursales.length === 0) {
+          console.log('⚠️ Esperando que se carguen las sucursales para ventas...');
+          return;
+        }
+        
         // Cargar ventas de todas las sucursales
         const promesas = sucursales.map(sucursal =>
           ventasService.obtenerPorSucursal(sucursal.toLowerCase())
@@ -278,7 +300,7 @@ const Customers: React.FC = () => {
         const resultados = await Promise.all(promesas);
         const todasLasVentas = resultados.flat();
         setVentas(todasLasVentas);
-      } else {
+      } else if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
         const data = await ventasService.obtenerPorSucursal(sucursalSeleccionada);
         setVentas(data);
       }
@@ -294,6 +316,12 @@ const Customers: React.FC = () => {
   const cargarClientesCuentaCorriente = async () => {
     try {
       if (sucursalSeleccionada === 'todas' && usuario?.esAdmin) {
+        // Verificar que las sucursales estén cargadas
+        if (sucursales.length === 0) {
+          console.log('⚠️ Esperando que se carguen las sucursales para cuenta corriente...');
+          return;
+        }
+        
         // Cargar cuenta corriente de todas las sucursales
         const promesas = sucursales.map(sucursal =>
           cuentaCorrienteService.obtenerClientesConSaldo(sucursal.toLowerCase())
@@ -301,7 +329,7 @@ const Customers: React.FC = () => {
         const resultados = await Promise.all(promesas);
         const todosLosClientesCC = resultados.flat();
         setClientesCuentaCorriente(todosLosClientesCC);
-      } else {
+      } else if (sucursalSeleccionada && sucursalSeleccionada !== 'todas') {
         const data = await cuentaCorrienteService.obtenerClientesConSaldo(sucursalSeleccionada);
         setClientesCuentaCorriente(data);
       }
