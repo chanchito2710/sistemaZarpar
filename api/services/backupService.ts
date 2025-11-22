@@ -327,25 +327,62 @@ export async function restaurarBackup(filename: string, usuario_email: string): 
   const filepath = path.join(BACKUP_DIR, filename);
   
   try {
+    console.log(`🔄 Iniciando restauración de backup: ${filename}`);
+    
     // Verificar que existe el archivo
     if (!fs.existsSync(filepath)) {
       throw new Error('El archivo de backup no existe');
     }
     
     // Detectar si estamos en desarrollo (Docker) o producción
-    const isDocker = DB_HOST === 'localhost' && DB_PORT === '3307';
+    const isLocalhost = DB_HOST === 'localhost' || DB_HOST === '127.0.0.1';
+    const isDockerPort = DB_PORT === '3307' || DB_PORT === 3307;
+    const isDocker = isLocalhost && isDockerPort;
+    
+    console.log(`🔍 Detección Docker (restaurar): HOST=${DB_HOST}, PORT=${DB_PORT}, isDocker=${isDocker}`);
+    
+    // Leer el contenido del archivo SQL
+    const sqlContent = fs.readFileSync(filepath, 'utf8');
+    console.log(`📄 Archivo SQL leído: ${sqlContent.length} caracteres`);
     
     let command: string;
     
     if (isDocker) {
-      // En desarrollo: Usar Docker exec
-      command = `docker exec -i zarpar-mysql mysql -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME} < "${filepath}"`;
+      // En desarrollo: Usar Docker exec con stdin
+      console.log('🐳 Usando Docker exec para restaurar');
+      command = `docker exec -i zarpar-mysql mysql -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME}`;
     } else {
-      // En producción: Usar mysql directo
-      command = `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME} < "${filepath}"`;
+      // En producción: Usar mysql directo con stdin
+      console.log('☁️ Usando mysql directo (Railway) para restaurar');
+      command = `mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASSWORD} --default-character-set=utf8mb4 ${DB_NAME}`;
     }
     
-    await execAsync(command);
+    console.log(`📝 Ejecutando restauración...`);
+    
+    // Ejecutar comando pasando el SQL por stdin
+    await new Promise<void>((resolve, reject) => {
+      const childProcess = exec(command, { maxBuffer: 100 * 1024 * 1024 }, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`❌ Error en restauración:`, error);
+          console.error(`STDERR:`, stderr);
+          reject(new Error(`Error al restaurar: ${error.message}\n${stderr}`));
+        } else {
+          if (stderr && !stderr.includes('Warning')) {
+            console.warn(`⚠️ STDERR:`, stderr);
+          }
+          console.log(`✅ Restauración completada`);
+          resolve();
+        }
+      });
+      
+      // Escribir el contenido SQL al stdin del proceso
+      if (childProcess.stdin) {
+        childProcess.stdin.write(sqlContent);
+        childProcess.stdin.end();
+      } else {
+        reject(new Error('No se pudo escribir al stdin del proceso'));
+      }
+    });
     
     // Registrar log
     const duracion = Math.round((Date.now() - inicio) / 1000);
@@ -358,9 +395,11 @@ export async function restaurarBackup(filename: string, usuario_email: string): 
       duracion_segundos: duracion
     });
     
-    console.log(`✅ Backup restaurado: ${filename}`);
+    console.log(`✅ Backup restaurado: ${filename} (${duracion}s)`);
     
   } catch (error: any) {
+    console.error(`❌ Error al restaurar backup:`, error);
+    
     // Registrar log de error
     await registrarLog({
       accion: 'restaurar',
