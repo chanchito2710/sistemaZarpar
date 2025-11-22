@@ -74,8 +74,10 @@ app.use(antiSEOHeaders)
 app.use(cors({
   origin: [
     'http://localhost:5678',
+    'http://localhost:5679',
     'http://localhost:3456',
     'http://127.0.0.1:5678',
+    'http://127.0.0.1:5679',
     'http://127.0.0.1:3456',
     // Agregar dominio de producción aquí
   ],
